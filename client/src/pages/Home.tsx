@@ -17,9 +17,12 @@ import {
   ArrowUpRight,
   BarChart3,
   Building2,
+  ChartNoAxesCombined,
   CheckCircle2,
   ChevronRight,
   CircleAlert,
+  CircleDollarSign,
+  Columns3,
   Compass,
   Database,
   FileCheck2,
@@ -51,6 +54,17 @@ type MarketData = {
   internetUse?: number | null;
   tradeOpenness?: number | null;
   investmentRate?: number | null;
+  fdiInflowUsd?: number | null;
+  fdiInflowPctGdp?: number | null;
+  governance?: {
+    politicalStability: number | null;
+    governmentEffectiveness: number | null;
+    regulatoryQuality: number | null;
+    ruleOfLaw: number | null;
+    controlOfCorruption: number | null;
+    sourceYear: number | null;
+    sourceStatus: Status;
+  };
   sourceYear?: number | null;
   sourceStatus: Status;
 };
@@ -72,6 +86,9 @@ type Calibration = {
 };
 
 type Candidate = { code: string; name: string; region: string; calibration: Calibration };
+type ModeKey = "greenfield" | "acquisition" | "alliance" | "licensing" | "distributor" | "office" | "digital";
+type FinancialProfile = { initialInvestment?: number | null; annualOperatingCost?: number | null; revenueCapturePct?: number | null };
+type FinancialAssumptions = { currency?: string | null; tamYearOne?: number | null; annualMarketGrowthPct?: number | null; samPct?: number | null; somPctYearOne?: number | null; somPctHorizon?: number | null; operatingMarginPct?: number | null; discountRatePct?: number | null; modeProfiles?: Partial<Record<ModeKey, FinancialProfile>> };
 
 type CountryResult = {
   code: string;
@@ -79,6 +96,7 @@ type CountryResult = {
   data: MarketData;
   scores: { market: number; resources: number; competition: number; government: number; distanceFit: number; safety: number; attractiveness: number; riskAdjusted: number; confidence: number };
   entryModes: { mode: string; score: number; rationale: string; commitment: string }[];
+  financial: { status: "ok" | "insufficient_data"; currency: string | null; horizonYears: number; market: { tamYearOne: number | null; tamAtHorizon: number | null; samAtHorizon: number | null; somRevenueYearOne: number | null; somRevenueAtHorizon: number | null }; alternatives: { key: ModeKey; mode: string; status: "ok" | "insufficient_data" | "not_meaningful"; roiPct: number | null; npv: number | null; paybackYear: number | null; initialInvestment: number | null; annualOperatingCost: number | null; revenueCapturePct: number | null; missingInputs: string[] }[]; missingInputs: string[]; methodology: string };
   timing: { label: string; description: string };
   flags: string[];
 };
@@ -103,6 +121,16 @@ const objectiveOptions: { value: Objective; label: string; detail: string }[] = 
   { value: "coordination", label: "Coordinación", detail: "Crear una plataforma regional o global" },
 ];
 
+const financeModes: { key: ModeKey; label: string; commitment: string }[] = [
+  { key: "greenfield", label: "Filial propia / greenfield", commitment: "Alto" },
+  { key: "acquisition", label: "Adquisición", commitment: "Alto" },
+  { key: "alliance", label: "Joint venture o alianza", commitment: "Medio" },
+  { key: "licensing", label: "Licencia o franquicia", commitment: "Bajo" },
+  { key: "distributor", label: "Agente o distribuidor", commitment: "Bajo" },
+  { key: "office", label: "Oficina / observatorio", commitment: "Bajo" },
+  { key: "digital", label: "Entrada digital o híbrida", commitment: "Bajo" },
+];
+
 const calibrationFields: { key: keyof Calibration; label: string; group: string; help: string; reverse?: boolean }[] = [
   { key: "demandQuality", label: "Calidad de la demanda", group: "Oportunidad", help: "Adecuación de segmentos, disposición a pagar y propuesta de valor." },
   { key: "resourceFit", label: "Encaje de recursos", group: "Oportunidad", help: "Talento, insumos, infraestructura y activos que apoyan la ventaja competitiva." },
@@ -122,6 +150,7 @@ const calibrationFields: { key: keyof Calibration; label: string; group: string;
 function blankData(): MarketData { return { sourceStatus: "unavailable" }; }
 function formatNumber(value: number | null | undefined, options: Intl.NumberFormatOptions = {}) { return value === null || value === undefined ? "—" : new Intl.NumberFormat("es-ES", options).format(value); }
 function formatBillions(value: number | null | undefined) { return value === null || value === undefined ? "—" : `US$ ${new Intl.NumberFormat("es-ES", { notation: "compact", maximumFractionDigits: 1 }).format(value)}`; }
+function formatMoney(value: number | null | undefined, currency?: string | null) { return value === null || value === undefined ? "—" : new Intl.NumberFormat("es-ES", { style: "currency", currency: currency || "USD", maximumFractionDigits: 0 }).format(value); }
 function scoreStyle(score: number) { return score >= 70 ? "text-emerald-700 bg-emerald-50 border-emerald-200" : score >= 50 ? "text-amber-800 bg-amber-50 border-amber-200" : "text-rose-700 bg-rose-50 border-rose-200"; }
 function scoreTone(score: number) { return score >= 70 ? "bg-emerald-500" : score >= 50 ? "bg-amber-500" : "bg-rose-500"; }
 
@@ -140,6 +169,8 @@ export default function Home() {
   const [selectedCode, setSelectedCode] = useState("");
   const [activeCountry, setActiveCountry] = useState<string | undefined>();
   const [marketData, setMarketData] = useState<Record<string, MarketData>>({});
+  const [financialByCountry, setFinancialByCountry] = useState<Record<string, FinancialAssumptions>>({});
+  const [comparisonCodes, setComparisonCodes] = useState<string[]>([]);
   const [result, setResult] = useState<Evaluation | null>(null);
   const [popMin, setPopMin] = useState("0");
   const [gdpMin, setGdpMin] = useState("0");
@@ -192,6 +223,36 @@ export default function Home() {
     setResult(null);
   }
 
+  function updateFinancial(key: keyof Omit<FinancialAssumptions, "modeProfiles">, value: string) {
+    if (!activeCandidate) return;
+    setFinancialByCountry((current) => ({
+      ...current,
+      [activeCandidate.code]: { ...current[activeCandidate.code], [key]: key === "currency" ? value.toUpperCase() : (value === "" ? null : Number(value)) },
+    }));
+    setResult(null);
+  }
+
+  function updateModeFinancial(mode: ModeKey, key: keyof FinancialProfile, value: string) {
+    if (!activeCandidate) return;
+    setFinancialByCountry((current) => ({
+      ...current,
+      [activeCandidate.code]: {
+        ...current[activeCandidate.code],
+        modeProfiles: {
+          ...current[activeCandidate.code]?.modeProfiles,
+          [mode]: { ...current[activeCandidate.code]?.modeProfiles?.[mode], [key]: value === "" ? null : Number(value) },
+        },
+      },
+    }));
+    setResult(null);
+  }
+
+  function toggleComparison(code: string) {
+    setComparisonCodes((current) => current.includes(code)
+      ? current.filter((item) => item !== code)
+      : current.length >= 4 ? (toast.info("La vista lado a lado admite hasta cuatro países."), current) : [...current, code]);
+  }
+
   async function refreshData() {
     if (!candidates.length) { toast.error("Añada primero al menos un país candidato."); return; }
     try {
@@ -210,6 +271,7 @@ export default function Home() {
       companyName: companyName.trim(), homeCountry: homeCountry.trim(), industry: industry.trim(), businessModel: businessModel.trim(), valueProposition: valueProposition.trim(), objective, horizonYears: Number(horizonYears) || 3,
       countryInputs: screenedCandidates.map(({ code, name, calibration }) => ({ code, name, calibration })),
       marketData: Object.fromEntries(screenedCandidates.map((candidate) => [candidate.code, marketData[candidate.code] ?? blankData()])),
+      financialByCountry: Object.fromEntries(screenedCandidates.map((candidate) => [candidate.code, financialByCountry[candidate.code] ?? {}])),
       weights,
     };
   }
@@ -237,7 +299,8 @@ export default function Home() {
   function exportReport() {
     if (!result) { toast.error("Genere primero una evaluación para exportarla."); return; }
     const rows = result.countries.map((country, index) => `| ${index + 1} | ${country.name} | ${country.scores.riskAdjusted}/100 | ${country.scores.attractiveness}/100 | ${country.scores.safety}/100 | ${country.entryModes[0]?.mode ?? "—"} | ${country.timing.label} |`).join("\n");
-    const content = `# ${scenarioName || "Análisis de entrada internacional"}\n\n**Empresa:** ${companyName}\n\n**País base:** ${homeCountry}\n\n**Industria:** ${industry}\n\n**Modelo de negocio:** ${businessModel}\n\n**Objetivo de entrada:** ${selectedObjective.label}\n\n**Horizonte:** ${horizonYears} años\n\n## Resultado\n\n${result.portfolio.recommendation}\n\n| Prioridad | País | Puntuación ajustada por riesgo | Atractividad | Seguridad | Modo inicial sugerido | Timing |\n|---:|---|---:|---:|---:|---|---|\n${rows}\n\n## Salvaguardas metodológicas\n\n${result.portfolio.caveats.map((item) => `- ${item}`).join("\n")}\n\n## Evidencia y fuentes\n\nLos datos macroeconómicos se obtienen de World Bank Open Data cuando están disponibles. Los demás criterios se calibran explícitamente por el responsable del análisis y deben sustentarse en evidencia de industria, cliente, regulación y validación local.\n\n---\n\n*Herramienta estructurada según los capítulos 5–8 de Global Strategic Management, 5.ª ed., Lasserre y Monteiro (2023).*\n`;
+    const financialSections = result.countries.map((country) => `### ${country.name}\n\n| Métrica | Valor |\n|---|---:|\n| TAM en horizonte | ${formatMoney(country.financial.market.tamAtHorizon, country.financial.currency)} |\n| SOM · ingresos en horizonte | ${formatMoney(country.financial.market.somRevenueAtHorizon, country.financial.currency)} |\n\n| Alternativa | ROI | NPV | Recuperación | Estado |\n|---|---:|---:|---:|---|\n${country.financial.alternatives.map((alternative) => `| ${alternative.mode} | ${alternative.roiPct === null ? "—" : `${formatNumber(alternative.roiPct, { maximumFractionDigits: 1 })}%`} | ${formatMoney(alternative.npv, country.financial.currency)} | ${alternative.paybackYear ? `Año ${alternative.paybackYear}` : "—"} | ${alternative.status} |`).join("\n")}`).join("\n\n");
+    const content = `# ${scenarioName || "Análisis de entrada internacional"}\n\n**Empresa:** ${companyName}\n\n**País base:** ${homeCountry}\n\n**Industria:** ${industry}\n\n**Modelo de negocio:** ${businessModel}\n\n**Objetivo de entrada:** ${selectedObjective.label}\n\n**Horizonte:** ${horizonYears} años\n\n## Resultado\n\n${result.portfolio.recommendation}\n\n| Prioridad | País | Puntuación ajustada por riesgo | Atractividad | Seguridad | Modo inicial sugerido | Timing |\n|---:|---|---:|---:|---:|---|---|\n${rows}\n\n## TAM, SAM, SOM y viabilidad económica\n\n${financialSections}\n\n**Convención:** ROI simple acumulado = (beneficio operativo acumulado − inversión inicial) / inversión inicial. NPV descuenta beneficios operativos anuales y resta inversión inicial en t=0. Los valores dependen de supuestos introducidos por el usuario y no incluyen impuestos, financiación, capital de trabajo, valor terminal ni efectos de divisa.\n\n## Salvaguardas metodológicas\n\n${result.portfolio.caveats.map((item) => `- ${item}`).join("\n")}\n\n## Evidencia y fuentes\n\nLos datos macroeconómicos se obtienen de World Bank Open Data; la IED neta se origina en UNCTAD y los indicadores de gobernanza se descargan de la revisión WGI 2025. Los demás criterios se calibran explícitamente por el responsable del análisis y deben sustentarse en evidencia de industria, cliente, regulación y validación local.\n\n---\n\n*Herramienta estructurada según los capítulos 5–8 de Global Strategic Management, 5.ª ed., Lasserre y Monteiro (2023).*\n`;
     const blob = new Blob([content], { type: "text/markdown;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
@@ -270,7 +333,9 @@ export default function Home() {
             <TabsTrigger value="brief"><Building2 className="mr-2 h-4 w-4" /> 1. Mandato</TabsTrigger>
             <TabsTrigger value="screen"><Globe2 className="mr-2 h-4 w-4" /> 2. Mercados</TabsTrigger>
             <TabsTrigger value="calibrate"><SlidersHorizontal className="mr-2 h-4 w-4" /> 3. Calibración</TabsTrigger>
-            <TabsTrigger value="decision"><Target className="mr-2 h-4 w-4" /> 4. Decisión</TabsTrigger>
+            <TabsTrigger value="finance"><CircleDollarSign className="mr-2 h-4 w-4" /> 4. Economía</TabsTrigger>
+            <TabsTrigger value="compare"><Columns3 className="mr-2 h-4 w-4" /> 5. Comparar</TabsTrigger>
+            <TabsTrigger value="decision"><Target className="mr-2 h-4 w-4" /> 6. Decisión</TabsTrigger>
           </TabsList>
 
           <TabsContent value="brief" className="tab-enter">
@@ -297,7 +362,7 @@ export default function Home() {
               </CardContent></Card>
               <Card className="data-card"><CardHeader><div className="flex items-center justify-between"><div><div className="step-tag">DATOS EXTERNOS</div><CardTitle>Base factual</CardTitle></div><Database className="h-6 w-6 text-sky-700" /></div><CardDescription>Los indicadores macroeconómicos se actualizan desde fuentes públicas. Los factores estratégicos se califican separadamente para no fingir una precisión inexistente.</CardDescription></CardHeader><CardContent className="space-y-3">{sourcesQuery.data?.map((source) => <a key={source.name} href={source.url} target="_blank" rel="noreferrer" className="source-row"><div><strong>{source.name}</strong><p>{source.coverage}</p></div><Badge variant="outline" className={source.status === "Conectado" ? "source-live" : ""}>{source.status}</Badge></a>)}</CardContent></Card>
             </div>
-            {candidates.length > 0 && <Card className="metric-card mt-6"><CardHeader><CardTitle>Indicadores actualizados</CardTitle><CardDescription>Valores más recientes disponibles en World Bank Open Data. La ausencia de datos se muestra como tal; no se imputan datos externos.</CardDescription></CardHeader><CardContent><div className="overflow-x-auto"><table className="metrics-table"><thead><tr><th>Mercado</th><th>Estado</th><th>PIB</th><th>PIB / hab.</th><th>PIB real</th><th>Población</th><th>Internet</th><th>Año</th></tr></thead><tbody>{candidates.map((candidate) => { const data = marketData[candidate.code] ?? blankData(); const passes = screenedCandidates.some((item) => item.code === candidate.code); return <tr key={candidate.code} className={!passes ? "muted-row" : ""}><td><strong>{candidate.name}</strong><span>{candidate.code}</span></td><td><StatusBadge status={data.sourceStatus} /></td><td>{formatBillions(data.gdpUsd)}</td><td>{data.gdpPerCapita ? `US$ ${formatNumber(data.gdpPerCapita, { maximumFractionDigits: 0 })}` : "—"}</td><td>{data.gdpGrowth !== null && data.gdpGrowth !== undefined ? `${formatNumber(data.gdpGrowth, { maximumFractionDigits: 1 })}%` : "—"}</td><td>{data.population ? `${formatNumber(data.population / 1_000_000, { maximumFractionDigits: 1 })} M` : "—"}</td><td>{data.internetUse !== null && data.internetUse !== undefined ? `${formatNumber(data.internetUse, { maximumFractionDigits: 0 })}%` : "—"}</td><td>{data.sourceYear ?? "—"}</td></tr>; })}</tbody></table></div></CardContent></Card>}
+            {candidates.length > 0 && <Card className="metric-card mt-6"><CardHeader><CardTitle>Indicadores actualizados</CardTitle><CardDescription>Valores más recientes disponibles. La IED proviene de UNCTAD mediante World Bank Open Data; los indicadores de gobernanza se descargan de la revisión WGI 2025.</CardDescription></CardHeader><CardContent><div className="overflow-x-auto"><table className="metrics-table"><thead><tr><th>Mercado</th><th>Estado</th><th>PIB</th><th>PIB / hab.</th><th>PIB real</th><th>IED neta</th><th>IED / PIB</th><th>WGI</th><th>Año</th></tr></thead><tbody>{candidates.map((candidate) => { const data = marketData[candidate.code] ?? blankData(); const passes = screenedCandidates.some((item) => item.code === candidate.code); const governance = data.governance; const governanceAverage = governance ? [governance.politicalStability, governance.governmentEffectiveness, governance.regulatoryQuality, governance.ruleOfLaw, governance.controlOfCorruption].filter((value): value is number => value !== null).reduce((sum, value, _, all) => sum + value / all.length, 0) : null; return <tr key={candidate.code} className={!passes ? "muted-row" : ""}><td><strong>{candidate.name}</strong><span>{candidate.code}</span></td><td><StatusBadge status={data.sourceStatus} /></td><td>{formatBillions(data.gdpUsd)}</td><td>{data.gdpPerCapita ? `US$ ${formatNumber(data.gdpPerCapita, { maximumFractionDigits: 0 })}` : "—"}</td><td>{data.gdpGrowth !== null && data.gdpGrowth !== undefined ? `${formatNumber(data.gdpGrowth, { maximumFractionDigits: 1 })}%` : "—"}</td><td>{formatBillions(data.fdiInflowUsd)}</td><td>{data.fdiInflowPctGdp !== null && data.fdiInflowPctGdp !== undefined ? `${formatNumber(data.fdiInflowPctGdp, { maximumFractionDigits: 1 })}%` : "—"}</td><td>{governanceAverage === null ? "—" : `${formatNumber(governanceAverage, { maximumFractionDigits: 0 })}/100`}</td><td>{data.sourceYear ?? "—"}</td></tr>; })}</tbody></table></div></CardContent></Card>}
           </TabsContent>
 
           <TabsContent value="calibrate" className="tab-enter">
@@ -310,10 +375,26 @@ export default function Home() {
             <Card className="weights-card mt-6"><CardHeader><div className="flex items-center justify-between"><div><div className="step-tag">LÓGICA DE PONDERACIÓN</div><CardTitle>Exprese las prioridades del mandato</CardTitle><CardDescription>Los pesos no son “verdad”; hacen visibles los trade-offs. El motor normaliza los pesos automáticamente.</CardDescription></div><Badge variant="outline">Total: {Object.values(weights).reduce((sum, value) => sum + value, 0)}</Badge></div></CardHeader><CardContent><div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">{([ ["market", "Mercado"], ["resources", "Recursos"], ["competition", "Competencia"], ["government", "Gobierno"], ["distance", "Encaje CAGE"], ["risk", "Seguridad / riesgo"] ] as [keyof typeof weights, string][]).map(([key, label]) => <div key={key} className="weight-control"><div><span>{label}</span><strong>{weights[key]}%</strong></div><Slider min={0} max={50} step={1} value={[weights[key]]} onValueChange={([value]) => { setWeights((current) => ({ ...current, [key]: value })); setResult(null); }} /></div>)}</div></CardContent></Card>
           </TabsContent>
 
+          <TabsContent value="finance" className="tab-enter">
+            <div className="finance-intro"><div><div className="eyebrow"><CircleDollarSign className="h-3.5 w-3.5" /> caso económico de entrada</div><h2>Cuantifique el espacio de mercado y los trade-offs.</h2><p>Introduzca supuestos por país y por modo de entrada. La herramienta separa el tamaño del mercado de los ingresos capturables y no convierte estimaciones en hechos.</p></div><div className="formula-chip">ROI = (beneficio operativo acumulado − inversión inicial) / inversión inicial</div></div>
+            <div className="grid gap-6 xl:grid-cols-[.7fr_1.3fr]">
+              <Card className="strategic-card"><CardHeader><div className="step-tag">MERCADO ACTIVO</div><CardTitle>{activeCandidate?.name ?? "Seleccione un mercado"}</CardTitle><CardDescription>Los supuestos financieros se almacenan por país para que la comparación sea consistente.</CardDescription></CardHeader><CardContent>{candidates.length ? <div className="space-y-2">{candidates.map((candidate) => <button key={candidate.code} onClick={() => setActiveCountry(candidate.code)} className={`country-selector ${activeCandidate?.code === candidate.code ? "selected" : ""}`}><span className="country-code">{candidate.code}</span><span><strong>{candidate.name}</strong><small>{marketData[candidate.code]?.fdiInflowUsd ? `IED neta: ${formatBillions(marketData[candidate.code].fdiInflowUsd)}` : "Añada supuestos financieros"}</small></span><ChevronRight className="ml-auto h-4 w-4" /></button>)}</div> : <EmptyState icon={CircleDollarSign} title="Primero añada mercados" text="La estimación TAM/SAM/SOM se configura de forma separada para cada país candidato." />}</CardContent></Card>
+              <Card className="financial-card"><CardHeader><div className="step-tag">{activeCandidate ? `SUPUESTOS · ${activeCandidate.code}` : "SUPUESTOS"}</div><CardTitle>TAM, SAM y SOM</CardTitle><CardDescription>Use una sola moneda y periodo anual dentro de este escenario. TAM es el mercado total, SAM la porción servible y SOM la cuota factible de capturar.</CardDescription></CardHeader><CardContent>{activeCandidate ? <div className="space-y-7"><section><h3 className="finance-section-title">Espacio de mercado</h3><div className="grid gap-4 md:grid-cols-4"><Field label="Moneda"><Input value={financialByCountry[activeCandidate.code]?.currency ?? ""} placeholder="EUR" maxLength={10} onChange={(event) => updateFinancial("currency", event.target.value)} /></Field><Field label="TAM año 1"><Input type="number" min="0" value={financialByCountry[activeCandidate.code]?.tamYearOne ?? ""} placeholder="Ej. 50000000" onChange={(event) => updateFinancial("tamYearOne", event.target.value)} /></Field><Field label="Crecimiento anual (%)"><Input type="number" value={financialByCountry[activeCandidate.code]?.annualMarketGrowthPct ?? ""} placeholder="Ej. 6" onChange={(event) => updateFinancial("annualMarketGrowthPct", event.target.value)} /></Field><Field label="SAM (% TAM)"><Input type="number" min="0" max="100" value={financialByCountry[activeCandidate.code]?.samPct ?? ""} placeholder="Ej. 30" onChange={(event) => updateFinancial("samPct", event.target.value)} /></Field></div><div className="mt-4 grid gap-4 md:grid-cols-4"><Field label="SOM año 1 (% SAM)"><Input type="number" min="0" max="100" value={financialByCountry[activeCandidate.code]?.somPctYearOne ?? ""} placeholder="Ej. 1" onChange={(event) => updateFinancial("somPctYearOne", event.target.value)} /></Field><Field label={`SOM año ${horizonYears} (% SAM)`}><Input type="number" min="0" max="100" value={financialByCountry[activeCandidate.code]?.somPctHorizon ?? ""} placeholder="Ej. 4" onChange={(event) => updateFinancial("somPctHorizon", event.target.value)} /></Field><Field label="Margen operativo (%)"><Input type="number" value={financialByCountry[activeCandidate.code]?.operatingMarginPct ?? ""} placeholder="Ej. 18" onChange={(event) => updateFinancial("operatingMarginPct", event.target.value)} /></Field><Field label="Tasa descuento (%)"><Input type="number" min="0" value={financialByCountry[activeCandidate.code]?.discountRatePct ?? ""} placeholder="Ej. 10" onChange={(event) => updateFinancial("discountRatePct", event.target.value)} /></Field></div></section>
+                  <section><div className="flex items-end justify-between gap-4"><div><h3 className="finance-section-title">Economía por alternativa de entrada</h3><p className="section-help">Inversión inicial en t=0, coste operativo anual y % de ingresos del SOM retenido por la empresa. Complete solo las alternativas que quiera comparar.</p></div><Badge variant="outline">{horizonYears} años</Badge></div><div className="overflow-x-auto mt-4"><table className="finance-input-table"><thead><tr><th>Modo</th><th>Compromiso</th><th>Inversión inicial</th><th>Coste anual</th><th>Captura de ingresos (%)</th></tr></thead><tbody>{financeModes.map((mode) => <tr key={mode.key}><td><strong>{mode.label}</strong></td><td><Badge variant="outline">{mode.commitment}</Badge></td><td><Input type="number" min="0" value={financialByCountry[activeCandidate.code]?.modeProfiles?.[mode.key]?.initialInvestment ?? ""} onChange={(event) => updateModeFinancial(mode.key, "initialInvestment", event.target.value)} placeholder="0" /></td><td><Input type="number" min="0" value={financialByCountry[activeCandidate.code]?.modeProfiles?.[mode.key]?.annualOperatingCost ?? ""} onChange={(event) => updateModeFinancial(mode.key, "annualOperatingCost", event.target.value)} placeholder="0" /></td><td><Input type="number" min="0" max="100" value={financialByCountry[activeCandidate.code]?.modeProfiles?.[mode.key]?.revenueCapturePct ?? ""} onChange={(event) => updateModeFinancial(mode.key, "revenueCapturePct", event.target.value)} placeholder="100" /></td></tr>)}</tbody></table></div></section>
+                  <div className="finance-note"><CircleAlert className="h-4 w-4" /><p><strong>Convención:</strong> el ROI mostrado es simple y acumulado en el horizonte. El NPV descuenta los beneficios operativos anuales. No se infieren impuestos, financiación, capital de trabajo, valor terminal ni efectos de divisa; incorpórelos en un caso financiero completo si son materiales.</p></div></div> : <EmptyState icon={CircleDollarSign} title="Sin país activo" text="Seleccione un mercado en la columna izquierda para introducir el caso económico." />}</CardContent></Card>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="compare" className="tab-enter">
+            <div className="comparison-header"><div><div className="eyebrow"><Columns3 className="h-3.5 w-3.5" /> comparación de predecisión</div><h2>Vea los mercados bajo la misma lente.</h2><p>Seleccione hasta cuatro países. La vista compara evidencia, supuestos y resultados, sin ocultar los datos ausentes.</p></div>{result && <Button onClick={() => setActiveTab("decision")}><Target className="mr-2 h-4 w-4" /> Ir a decisión</Button>}</div>
+            <Card className="comparison-picker"><CardContent><div className="comparison-picks">{candidates.map((candidate) => <button key={candidate.code} onClick={() => toggleComparison(candidate.code)} className={`compare-pick ${comparisonCodes.includes(candidate.code) ? "chosen" : ""}`}><span className="country-code">{candidate.code}</span><span>{candidate.name}</span>{comparisonCodes.includes(candidate.code) && <CheckCircle2 className="ml-auto h-4 w-4" />}</button>)}</div></CardContent></Card>
+            {!comparisonCodes.length ? <EmptyState icon={Columns3} title="Seleccione mercados para comparar" text="Elija entre dos y cuatro países para crear una vista lado a lado antes de avanzar a la decisión." /> : <CountryComparison countries={comparisonCodes.map((code) => ({ candidate: candidates.find((candidate) => candidate.code === code)!, data: marketData[code] ?? blankData(), result: result?.countries.find((country) => country.code === code) }))} />}
+          </TabsContent>
+
           <TabsContent value="decision" className="tab-enter">
             {!result ? <div className="decision-empty"><div className="decision-empty-icon"><Target className="h-8 w-8" /></div><h2>La decisión debe seguir a la evidencia.</h2><p>Cuando haya completado el mandato, los mercados y la calibración, genere una lectura comparativa de atractivo, riesgo, timing y modos de entrada.</p><Button size="lg" onClick={runEvaluation} disabled={evaluation.isPending || !formValid}>{evaluation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <BarChart3 className="mr-2 h-4 w-4" />} Generar evaluación</Button><span className="validity-note">{formValid ? `${screenedCandidates.length} mercados listos para analizar` : "Faltan datos del mandato o mercados que pasen el filtro"}</span></div> : <div className="space-y-6"><section className="decision-hero"><div><div className="eyebrow"><CheckCircle2 className="h-3.5 w-3.5" /> lectura ajustada por riesgo</div><h2>{result.portfolio.leadingCountry ?? "Comparación completada"}</h2><p>{result.portfolio.recommendation}</p></div><div className="hero-score"><span>Puntuación líder</span><strong>{result.countries[0]?.scores.riskAdjusted ?? "—"}<small>/100</small></strong><Button variant="outline" onClick={runEvaluation} disabled={evaluation.isPending}><RefreshCw className="mr-2 h-4 w-4" /> Recalcular</Button></div></section>
               <div className="grid gap-6 xl:grid-cols-[1.32fr_.68fr]"><Card className="ranking-card"><CardHeader><CardTitle>Prioridad de mercado</CardTitle><CardDescription>Orden basada en la combinación explícita de atractividad y seguridad. La confianza muestra cuánta información está disponible, no la probabilidad de éxito.</CardDescription></CardHeader><CardContent className="space-y-4">{result.countries.map((country, index) => <div className="ranking-row" key={country.code}><div className="rank-index">{index + 1}</div><div className="rank-country"><strong>{country.name}</strong><span>{country.timing.label}</span></div><div className="score-bar"><div><span>Atractividad {country.scores.attractiveness}</span><span>Seguridad {country.scores.safety}</span></div><div className="bar-track"><div className="bar-fill attractiveness" style={{ width: `${country.scores.attractiveness}%` }} /><div className="bar-marker" style={{ left: `${country.scores.safety}%` }} /></div></div><div className={`score-pill ${scoreStyle(country.scores.riskAdjusted)}`}>{country.scores.riskAdjusted}</div></div>)}</CardContent></Card><Card className="readout-card"><CardHeader><CardTitle>Cómo leer el resultado</CardTitle></CardHeader><CardContent><Readout icon={Target} title="Atractividad" text="Mercado, recursos, competencia, gobierno y encaje CAGE." /><Readout icon={ShieldCheck} title="Seguridad" text="Inverso de la exposición política, económica, competitiva y operativa." /><Readout icon={FileCheck2} title="Confianza" text="Cobertura de datos públicos y explicitud de los supuestos introducidos." /></CardContent></Card></div>
-              <Card className="recommendations-card"><CardHeader><div><CardTitle>Ruta recomendada por mercado</CardTitle><CardDescription>El modo no se determina solo por puntuación. Cruza atractivo, riesgo, capacidades internas, urgencia, control, IP y apertura regulatoria.</CardDescription></div><Button variant="outline" onClick={exportReport}><ArrowDownToLine className="mr-2 h-4 w-4" /> Informe</Button></CardHeader><CardContent><div className="recommendation-grid">{result.countries.map((country) => <article className="country-recommendation" key={country.code}><div className="recommendation-top"><div><span className="country-code">{country.code}</span><h3>{country.name}</h3></div><div className={`score-pill ${scoreStyle(country.scores.riskAdjusted)}`}>{country.scores.riskAdjusted}</div></div><div className="timing-box"><ArrowUpRight className="h-4 w-4" /><div><strong>{country.timing.label}</strong><p>{country.timing.description}</p></div></div><div className="mode-list">{country.entryModes.map((mode, idx) => <div className="mode-row" key={mode.mode}><span>{idx + 1}</span><div><strong>{mode.mode}</strong><p>{mode.rationale}</p></div><Badge variant="outline">{mode.commitment}</Badge></div>)}</div>{country.flags.length > 0 && <div className="flag-list">{country.flags.map((flag) => <p key={flag}><AlertTriangle className="h-3.5 w-3.5" /> {flag}</p>)}</div>}<div className="confidence-row"><span>Confianza de evidencia</span><Progress value={country.scores.confidence} /><strong>{country.scores.confidence}%</strong></div></article>)}</div></CardContent></Card>
+              <Card className="recommendations-card"><CardHeader><div><CardTitle>Ruta recomendada por mercado</CardTitle><CardDescription>El modo no se determina solo por puntuación. Cruza atractivo, riesgo, capacidades internas, urgencia, control, IP y apertura regulatoria.</CardDescription></div><Button variant="outline" onClick={exportReport}><ArrowDownToLine className="mr-2 h-4 w-4" /> Informe</Button></CardHeader><CardContent><div className="recommendation-grid">{result.countries.map((country) => <article className="country-recommendation" key={country.code}><div className="recommendation-top"><div><span className="country-code">{country.code}</span><h3>{country.name}</h3></div><div className={`score-pill ${scoreStyle(country.scores.riskAdjusted)}`}>{country.scores.riskAdjusted}</div></div><div className="timing-box"><ArrowUpRight className="h-4 w-4" /><div><strong>{country.timing.label}</strong><p>{country.timing.description}</p></div></div><div className="mode-list">{country.entryModes.map((mode, idx) => <div className="mode-row" key={mode.mode}><span>{idx + 1}</span><div><strong>{mode.mode}</strong><p>{mode.rationale}</p></div><Badge variant="outline">{mode.commitment}</Badge></div>)}</div><div className="financial-readout"><div className="financial-readout-head"><span>Viabilidad económica</span>{country.financial.status === "ok" ? <Badge className="source-live">TAM/SAM/SOM completo</Badge> : <Badge variant="outline">Supuestos pendientes</Badge>}</div>{country.financial.status === "ok" && <div className="financial-market-summary"><span>TAM horizonte <b>{formatMoney(country.financial.market.tamAtHorizon, country.financial.currency)}</b></span><span>SOM ingresos <b>{formatMoney(country.financial.market.somRevenueAtHorizon, country.financial.currency)}</b></span></div>}{country.financial.alternatives.map((alternative) => <div className="financial-alternative" key={alternative.key}><strong>{alternative.mode}</strong>{alternative.status === "ok" ? <div><span>ROI <b>{formatNumber(alternative.roiPct, { maximumFractionDigits: 1 })}%</b></span><span>NPV <b>{formatMoney(alternative.npv, country.financial.currency)}</b></span>{alternative.paybackYear && <span>Recup. <b>Año {alternative.paybackYear}</b></span>}</div> : <p>Faltan: {alternative.missingInputs.slice(0, 2).join(", ")}.</p>}</div>)}</div>{country.flags.length > 0 && <div className="flag-list">{country.flags.map((flag) => <p key={flag}><AlertTriangle className="h-3.5 w-3.5" /> {flag}</p>)}</div>}<div className="confidence-row"><span>Confianza de evidencia</span><Progress value={country.scores.confidence} /><strong>{country.scores.confidence}%</strong></div></article>)}</div></CardContent></Card>
               <section className="caveat-callout"><CircleAlert className="h-5 w-5" /><div><strong>Condición de decisión</strong><p>{result.portfolio.caveats[0]} Antes de invertir, convierta la alternativa preferida en un caso financiero con escenarios, sensibilidad, ROI/NPV y una revisión legal, regulatoria y de socios.</p></div></section>
             </div>}
           </TabsContent>
@@ -325,6 +406,17 @@ export default function Home() {
   );
 }
 
+function CountryComparison({ countries }: { countries: { candidate: Candidate; data: MarketData; result?: CountryResult }[] }) {
+  return <div className="comparison-board" style={{ gridTemplateColumns: `repeat(${Math.min(countries.length, 4)}, minmax(260px, 1fr))` }}>{countries.map(({ candidate, data, result }) => {
+    const governance = data.governance;
+    const governanceValues = governance ? [governance.politicalStability, governance.governmentEffectiveness, governance.regulatoryQuality, governance.ruleOfLaw, governance.controlOfCorruption].filter((value): value is number => value !== null) : [];
+    const governanceAverage = governanceValues.length ? governanceValues.reduce((sum, value) => sum + value, 0) / governanceValues.length : null;
+    const bestAlternative = result?.financial.alternatives.filter((alternative) => alternative.status === "ok").sort((a, b) => (b.npv ?? -Infinity) - (a.npv ?? -Infinity))[0];
+    return <article key={candidate.code} className="comparison-country"><header><span className="country-code">{candidate.code}</span><div><h3>{candidate.name}</h3><p>{candidate.region}</p></div>{result && <div className={`score-pill ${scoreStyle(result.scores.riskAdjusted)}`}>{result.scores.riskAdjusted}</div>}</header><ComparisonMetric label="PIB" value={formatBillions(data.gdpUsd)} /><ComparisonMetric label="Crecimiento PIB" value={data.gdpGrowth === null || data.gdpGrowth === undefined ? "—" : `${formatNumber(data.gdpGrowth, { maximumFractionDigits: 1 })}%`} /><ComparisonMetric label="IED neta (UNCTAD)" value={formatBillions(data.fdiInflowUsd)} /><ComparisonMetric label="Gobernanza WGI" value={governanceAverage === null ? "—" : `${formatNumber(governanceAverage, { maximumFractionDigits: 0 })}/100`} /><ComparisonMetric label="Atractividad" value={result ? `${result.scores.attractiveness}/100` : "Genere evaluación"} tone={result ? scoreTone(result.scores.attractiveness) : undefined} /><ComparisonMetric label="Seguridad" value={result ? `${result.scores.safety}/100` : "Genere evaluación"} tone={result ? scoreTone(result.scores.safety) : undefined} /><ComparisonMetric label="TAM en horizonte" value={result ? formatMoney(result.financial.market.tamAtHorizon, result.financial.currency) : "Genere evaluación"} /><ComparisonMetric label="SOM · ingresos horizonte" value={result ? formatMoney(result.financial.market.somRevenueAtHorizon, result.financial.currency) : "Genere evaluación"} /><div className="comparison-mode"><span>Alternativa económica líder</span>{bestAlternative ? <><strong>{bestAlternative.mode}</strong><div><b>ROI {formatNumber(bestAlternative.roiPct, { maximumFractionDigits: 1 })}%</b><b>NPV {formatMoney(bestAlternative.npv, result?.financial.currency)}</b></div></> : <p>{result ? "Complete los supuestos financieros de una alternativa." : "Genere evaluación."}</p>}</div>{result?.flags.length ? <div className="comparison-flags">{result.flags.slice(0, 2).map((flag) => <p key={flag}><AlertTriangle className="h-3.5 w-3.5" /> {flag}</p>)}</div> : null}</article>;
+  })}</div>;
+}
+
+function ComparisonMetric({ label, value, tone }: { label: string; value: string; tone?: string }) { return <div className="comparison-metric"><span>{label}</span><strong>{value}</strong>{tone && <i className={tone} />}</div>; }
 function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) { return <div className="field"><Label>{label}{required && <span className="required">*</span>}</Label>{children}</div>; }
 function FrameworkStep({ n, title, text }: { n: string; title: string; text: string }) { return <div className="framework-step"><span>{n}</span><div><strong>{title}</strong><p>{text}</p></div></div>; }
 function EmptyState({ icon: Icon, title, text }: { icon: typeof Globe2; title: string; text: string }) { return <div className="empty-state"><Icon className="h-6 w-6" /><strong>{title}</strong><p>{text}</p></div>; }

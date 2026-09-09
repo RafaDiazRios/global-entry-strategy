@@ -1,3 +1,6 @@
+import { evaluateFinancials, type EntryModeKey, type FinancialAssumptions, type FinancialResult } from "./financialEngine";
+import type { GovernanceData } from "./wgi";
+
 export type EntryObjective = "market" | "resources" | "learning" | "coordination";
 
 export type QualitativeCalibration = {
@@ -25,6 +28,9 @@ export type MarketData = {
   internetUse?: number | null;
   tradeOpenness?: number | null;
   investmentRate?: number | null;
+  fdiInflowUsd?: number | null;
+  fdiInflowPctGdp?: number | null;
+  governance?: GovernanceData;
   sourceYear?: number | null;
   sourceStatus: "live" | "partial" | "unavailable";
 };
@@ -45,6 +51,7 @@ export type EvaluationInput = {
   horizonYears: number;
   countryInputs: CountryInput[];
   marketData: Record<string, MarketData>;
+  financialByCountry?: Record<string, FinancialAssumptions>;
   weights?: Partial<ScoreWeights>;
 };
 
@@ -74,11 +81,13 @@ export type CountryResult = {
     confidence: number;
   };
   entryModes: EntryModeRecommendation[];
+  financial: FinancialResult;
   timing: TimingRecommendation;
   flags: string[];
 };
 
 export type EntryModeRecommendation = {
+  key: EntryModeKey;
   mode: string;
   score: number;
   rationale: string;
@@ -165,9 +174,16 @@ function calculateConfidence(data: MarketData, calibration: QualitativeCalibrati
     data.internetUse,
     data.tradeOpenness,
     data.investmentRate,
+    data.fdiInflowUsd,
+    data.fdiInflowPctGdp,
+    data.governance?.politicalStability,
+    data.governance?.governmentEffectiveness,
+    data.governance?.regulatoryQuality,
+    data.governance?.ruleOfLaw,
+    data.governance?.controlOfCorruption,
   ].filter((value) => value !== null && value !== undefined).length;
   const manualValues = Object.values(calibration).filter((value) => value !== 50).length;
-  return clamp(35 + dataPoints * 6 + Math.min(manualValues, 8) * 2);
+  return clamp(20 + dataPoints * 4 + Math.min(manualValues, 8) * 2);
 }
 
 function calculateEntryModes(
@@ -237,36 +253,42 @@ function calculateEntryModes(
 
   const modes: EntryModeRecommendation[] = [
     {
+      key: "greenfield",
       mode: "Filial propia / greenfield",
       score: directInvestment,
       commitment: "Alto",
       rationale: "Maximiza el control y la captura de valor, pero requiere capacidad interna, permiso regulatorio y una exposición al riesgo razonable.",
     },
     {
+      key: "acquisition",
       mode: "Adquisición",
       score: acquisition,
       commitment: "Alto",
       rationale: "Acelera el acceso a activos, clientes y capacidades. Exige debida diligencia, precio disciplinado y capacidad de integración intercultural.",
     },
     {
+      key: "alliance",
       mode: "Joint venture o alianza",
       score: jointVenture,
       commitment: "Medio",
       rationale: "Comparte riesgo y aporta legitimidad o acceso local. La recomendación presupone un análisis de encaje estratégico, operativo, cultural y organizativo del socio.",
     },
     {
+      key: "licensing",
       mode: "Licencia o franquicia",
       score: licensing,
       commitment: "Bajo",
       rationale: "Reduce la inversión y la exposición, a cambio de menor control sobre mercado, calidad y conocimiento. Es menos apropiada cuando el IP es muy sensible.",
     },
     {
+      key: "distributor",
       mode: "Agente o distribuidor",
       score: distributor,
       commitment: "Bajo",
       rationale: "Permite probar demanda y cobertura comercial con bajo compromiso. Debe incluir hitos de revisión para evitar dependencia o pérdida de conocimiento del cliente.",
     },
     {
+      key: "office",
       mode: "Oficina de representación / observatorio",
       score: office,
       commitment: "Bajo",
@@ -276,6 +298,7 @@ function calculateEntryModes(
 
   if (/(digital|saas|software|plataforma|marketplace|e-commerce|ecommerce)/i.test(businessModel)) {
     modes.push({
+      key: "digital",
       mode: "Entrada digital o híbrida",
       score: digital,
       commitment: "Bajo",
@@ -328,10 +351,23 @@ export function evaluateStrategy(input: EvaluationInput): EvaluationResult {
     ]);
     const resources = clamp(0.52 * macroResources + 0.48 * calibration.resourceFit);
     const competition = clamp(calibration.competitionAttractiveness);
-    const government = clamp(calibration.governmentOpenness);
+    const governance = data.governance;
+    const governmentEvidence = governance?.sourceStatus === "unavailable"
+      ? null
+      : mean([governance?.governmentEffectiveness ?? Number.NaN, governance?.regulatoryQuality ?? Number.NaN, governance?.ruleOfLaw ?? Number.NaN, governance?.controlOfCorruption ?? Number.NaN]);
+    const government = clamp(governmentEvidence === null ? calibration.governmentOpenness : 0.65 * calibration.governmentOpenness + 0.35 * governmentEvidence);
     const distanceFit = clamp(100 - calibration.cageDistance);
+    const politicalExposure = governance?.politicalStability === null || governance?.politicalStability === undefined
+      ? calibration.politicalRisk
+      : 0.65 * calibration.politicalRisk + 0.35 * (100 - governance.politicalStability);
+    const operationalExposure = governance?.governmentEffectiveness === null || governance?.governmentEffectiveness === undefined
+      ? calibration.operationalRisk
+      : 0.65 * calibration.operationalRisk + 0.35 * (100 - governance.governmentEffectiveness);
+    const competitiveExposure = governance?.controlOfCorruption === null || governance?.controlOfCorruption === undefined
+      ? calibration.competitiveRisk
+      : 0.65 * calibration.competitiveRisk + 0.35 * (100 - governance.controlOfCorruption);
     const safety = clamp(
-      100 - mean([calibration.politicalRisk, calibration.economicRisk, calibration.competitiveRisk, calibration.operationalRisk]),
+      100 - mean([politicalExposure, calibration.economicRisk, competitiveExposure, operationalExposure]),
     );
     const attractiveness = clamp(
       (market * weights.market +
@@ -350,6 +386,13 @@ export function evaluateStrategy(input: EvaluationInput): EvaluationResult {
     if (calibration.ipSensitivity >= 70) flags.push("Sensibilidad alta de IP: extreme controles antes de licenciar o compartir tecnología.");
     if (calibration.competitionAttractiveness <= 35) flags.push("Contexto competitivo desfavorable: valide rivalidad, barreras y poder de canal antes de comprometer inversión.");
     if (data.sourceStatus !== "live") flags.push("Datos macroeconómicos incompletos o no disponibles: la puntuación se apoya más en calibración cualitativa.");
+    if (governance?.sourceStatus === "unavailable") flags.push("Gobernanza WGI no disponible: el componente de gobierno y riesgo se apoya solo en la calibración cualitativa.");
+    const entryModes = calculateEntryModes(attractiveness, safety, calibration, input.objective, input.businessModel);
+    const financial = evaluateFinancials(
+      input.financialByCountry?.[country.code],
+      entryModes.map(({ key, mode }) => ({ key, mode })),
+      input.horizonYears,
+    );
 
     return {
       code: country.code,
@@ -367,7 +410,8 @@ export function evaluateStrategy(input: EvaluationInput): EvaluationResult {
         riskAdjusted,
         confidence: calculateConfidence(data, calibration),
       },
-      entryModes: calculateEntryModes(attractiveness, safety, calibration, input.objective, input.businessModel),
+      entryModes,
+      financial,
       timing: recommendTiming(attractiveness, safety, calibration),
       flags,
     } satisfies CountryResult;

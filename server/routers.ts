@@ -30,6 +30,16 @@ const countrySchema = z.object({
   calibration: calibrationSchema.optional(),
 });
 
+const governanceSchema = z.object({
+  politicalStability: z.number().nullable(),
+  governmentEffectiveness: z.number().nullable(),
+  regulatoryQuality: z.number().nullable(),
+  ruleOfLaw: z.number().nullable(),
+  controlOfCorruption: z.number().nullable(),
+  sourceYear: z.number().nullable(),
+  sourceStatus: z.enum(["live", "partial", "unavailable"]),
+});
+
 const marketDataSchema = z.object({
   gdpUsd: z.number().nullable().optional(),
   gdpPerCapita: z.number().nullable().optional(),
@@ -39,8 +49,37 @@ const marketDataSchema = z.object({
   internetUse: z.number().nullable().optional(),
   tradeOpenness: z.number().nullable().optional(),
   investmentRate: z.number().nullable().optional(),
+  fdiInflowUsd: z.number().nullable().optional(),
+  fdiInflowPctGdp: z.number().nullable().optional(),
+  governance: governanceSchema.optional(),
   sourceYear: z.number().nullable().optional(),
   sourceStatus: z.enum(["live", "partial", "unavailable"]),
+});
+
+const modeFinancialProfileSchema = z.object({
+  initialInvestment: z.number().nonnegative().nullable().optional(),
+  annualOperatingCost: z.number().nonnegative().nullable().optional(),
+  revenueCapturePct: z.number().min(0).max(100).nullable().optional(),
+});
+
+const financialAssumptionsSchema = z.object({
+  currency: z.string().min(1).max(10).nullable().optional(),
+  tamYearOne: z.number().nonnegative().nullable().optional(),
+  annualMarketGrowthPct: z.number().min(-100).max(500).nullable().optional(),
+  samPct: z.number().min(0).max(100).nullable().optional(),
+  somPctYearOne: z.number().min(0).max(100).nullable().optional(),
+  somPctHorizon: z.number().min(0).max(100).nullable().optional(),
+  operatingMarginPct: z.number().min(-100).max(100).nullable().optional(),
+  discountRatePct: z.number().min(0).max(100).nullable().optional(),
+  modeProfiles: z.object({
+    greenfield: modeFinancialProfileSchema.optional(),
+    acquisition: modeFinancialProfileSchema.optional(),
+    alliance: modeFinancialProfileSchema.optional(),
+    licensing: modeFinancialProfileSchema.optional(),
+    distributor: modeFinancialProfileSchema.optional(),
+    office: modeFinancialProfileSchema.optional(),
+    digital: modeFinancialProfileSchema.optional(),
+  }).optional(),
 });
 
 const evaluationSchema = z.object({
@@ -53,6 +92,7 @@ const evaluationSchema = z.object({
   horizonYears: z.number().int().min(1).max(25),
   countryInputs: z.array(countrySchema).min(1).max(12),
   marketData: z.record(z.string(), marketDataSchema),
+  financialByCountry: z.record(z.string(), financialAssumptionsSchema).optional(),
   weights: z.object({
     market: z.number().min(0).max(100).optional(),
     resources: z.number().min(0).max(100).optional(),
