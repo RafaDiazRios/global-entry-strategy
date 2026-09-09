@@ -12,12 +12,16 @@
 - [x] Integración de Tax Foundation y Frankfurter, con edición manual preservada.
 - [x] Gates de aprobación con responsables, fechas de revisión e hitos persistentes.
 - [x] Guía visible de primera evaluación que explica que Enter no confirma ni calcula.
+- [x] Carga automática y progresiva de indicadores al añadir mercados, sin bloquear la tabla por WGI.
+- [x] Tabla de Mercados con impuesto corporativo, FX, fecha de última actualización, edición manual y restauración selectiva.
+- [x] Reintento específico de WGI por país, sin volver a consultar los demás indicadores.
 
 ## Verificación completada
 
 - [x] Migración de las tablas de gates aplicada a la base de datos.
 - [x] Validación en vivo de la tasa corporativa mexicana y MXN/USD.
 - [x] Suite Vitest, comprobación TypeScript, compilación de producción y revisión visual del PDF.
+- [x] Pruebas de carga rápida de datos públicos, trazabilidad de actualización, TypeScript y compilación tras la ampliación de Mercados.
 
 ## Consideraciones para la siguiente evolución
 

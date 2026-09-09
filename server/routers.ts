@@ -55,6 +55,8 @@ const marketDataSchema = z.object({
   fdiInflowPctGdp: z.number().nullable().optional(),
   governance: governanceSchema.optional(),
   sourceYear: z.number().nullable().optional(),
+  lastUpdatedAt: z.string().nullable().optional(),
+  manualFields: z.array(z.string().min(1).max(80)).max(30).optional(),
   sourceStatus: z.enum(["live", "partial", "unavailable"]),
 });
 

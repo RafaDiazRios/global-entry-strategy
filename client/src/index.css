@@ -415,3 +415,33 @@ button:active:not(:disabled) { transform: scale(.98); }
 @media (max-width: 700px) { .guide-steps, .scenario-input-grid { grid-template-columns: 1fr; } .guide-footnote { align-items: flex-start; flex-wrap: wrap; } .guide-footnote [data-slot="badge"] { margin-left: 0; } .scenario-outcome-grid { grid-template-columns: 1fr; } .approval-intro, .approval-card-heading, .approval-create-footer { align-items: flex-start; flex-direction: column; } .approval-status { width: 100%; } .approval-create-card [data-slot="card-header"], .approval-create-card [data-slot="card-content"] { padding-left: 18px; padding-right: 18px; } }
 
 .metric-loading { display: inline-flex; align-items: center; gap: 4px; color: #4e8066; font-size: 10px; font-weight: 700; }
+
+/* Editable market comparison */
+.market-table-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; }
+.market-table-heading [data-slot="badge"] { flex: 0 0 auto; color: #4d7762; font-size: 9px; }
+.market-table-guide { display: flex; flex-wrap: wrap; gap: 7px 16px; margin: 0 0 13px; padding: 9px 11px; border: 1px solid #d9e9df; border-radius: 8px; background: #f4faf6; color: #6d8477; font-size: 10px; line-height: 1.4; }
+.market-table-guide strong { color: #3f6d55; }
+.editable-metrics-table { min-width: 1640px; }
+.editable-metrics-table th { vertical-align: bottom; }
+.editable-metrics-table td { min-width: 100px; vertical-align: middle; }
+.editable-metrics-table .market-name-cell { min-width: 150px; }
+.market-edit-button { height: 24px; margin-top: 7px; padding: 0 7px; font-size: 9px; }
+.metric-value { display: inline-flex; align-items: center; justify-content: flex-end; gap: 5px; min-height: 23px; }
+.metric-value [data-slot="badge"] { height: 18px; padding: 0 5px; font-size: 7.5px; }
+.manual-badge { border-color: #e8cb81; background: #fff8e5; color: #91711f; }
+.public-badge { border-color: #b5d8c2; background: #f0f8f3; color: #387253; }
+.metric-editor { display: flex; align-items: center; gap: 4px; }
+.metric-editor input { width: 112px; height: 30px; padding: 0 7px; background: #fffdf7; font-size: 10px; text-align: right; }
+.metric-restore { width: 26px; height: 26px; color: #8a6c23; }
+.metric-restore:hover { background: #fff5d9; color: #705719; }
+.metric-public-label { color: #5f806d; font-size: 8px; font-weight: 700; }
+.wgi-cell { min-width: 168px !important; text-align: center; }
+.wgi-cell > strong { display: block; color: #35664f; }
+.wgi-cell > small { display: block; margin-top: 3px; color: #819187; font-size: 9px; }
+.wgi-retry { display: grid; justify-items: center; gap: 5px; white-space: normal; }
+.wgi-retry > span { max-width: 145px; color: #9b6340; font-size: 9px; line-height: 1.3; }
+.wgi-retry button { height: 26px; border-color: #e5ca91; background: #fffaf0; color: #87651c; font-size: 9px; }
+.updated-at-cell { min-width: 128px !important; text-align: left !important; }
+.updated-at-cell strong { display: block; color: #426651; font-size: 10px; font-weight: 700; }
+.updated-at-cell small { display: block; margin-top: 3px; color: #84938b; font-size: 8.5px; }
+@media (max-width: 620px) { .market-table-heading { align-items: flex-start; flex-direction: column; } .market-table-guide { display: grid; gap: 5px; } }

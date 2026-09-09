@@ -22,7 +22,11 @@ export async function refreshScenarioDataHandler(req: Request, res: Response) {
         const marketData: Record<string, MarketData> = {};
         const financialByCountry = { ...(input.financialByCountry ?? {}) };
         for (const country of input.countryInputs) {
-          marketData[country.code] = await getWorldBankMarketData(country.code);
+          const refreshedMarket = await getWorldBankMarketData(country.code);
+          const previousMarket = input.marketData?.[country.code];
+          const manualFields = previousMarket?.manualFields ?? [];
+          const manualValues = Object.fromEntries(manualFields.map((field) => [field, previousMarket?.[field as keyof MarketData] ?? null]));
+          marketData[country.code] = { ...refreshedMarket, ...manualValues, manualFields };
           const previous = financialByCountry[country.code] ?? {};
           const reportingCurrency = previous.reportingCurrency || "USD";
           const reference = await getCountryFinancialReference(country.code, reportingCurrency);

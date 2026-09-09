@@ -32,6 +32,10 @@ export type MarketData = {
   fdiInflowPctGdp?: number | null;
   governance?: GovernanceData;
   sourceYear?: number | null;
+  /** Timestamp of the most recent public-data refresh for this country. */
+  lastUpdatedAt?: string | null;
+  /** Market fields deliberately overwritten by the analyst in the active scenario. */
+  manualFields?: string[];
   sourceStatus: "live" | "partial" | "unavailable";
 };
 

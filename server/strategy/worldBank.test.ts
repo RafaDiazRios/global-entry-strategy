@@ -17,7 +17,8 @@ describe("getWorldBankMarketData", () => {
     const data = await getWorldBankMarketData("DE", false);
 
     expect(governanceSpy).not.toHaveBeenCalled();
-    expect(data).toMatchObject({ gdpUsd: 123, gdpPerCapita: 123, fdiInflowUsd: 123, sourceYear: 2025, sourceStatus: "live" });
+    expect(data).toMatchObject({ gdpUsd: 123, gdpPerCapita: 123, fdiInflowUsd: 123, sourceYear: 2025, sourceStatus: "live", manualFields: [] });
     expect(data.governance.sourceStatus).toBe("unavailable");
+    expect(data.lastUpdatedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
   });
 });

@@ -54,6 +54,8 @@ export async function getWorldBankMarketData(countryCode: string, includeGoverna
     fdiInflowPctGdp: mapped.fdiInflowPctGdp.value,
     governance,
     sourceYear: years.length ? Math.max(...years) : null,
+    lastUpdatedAt: new Date().toISOString(),
+    manualFields: [],
     sourceStatus: available >= 8 ? "live" : available >= 4 ? "partial" : "unavailable",
   };
 }

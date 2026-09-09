@@ -26,6 +26,12 @@ Los indicadores de gobernanza WGI se descargan en segundo plano porque el archiv
 
 La actualización no sustituye campos que usted haya editado deliberadamente como manuales para impuesto o FX. En la fase Economía, una etiqueta **Público** identifica la cifra descargada y una etiqueta **Manual** identifica una cifra sobrescrita. Las fuentes, la fecha y sus límites se muestran bajo cada campo.
 
+## Ajustar un indicador de mercado
+
+La tabla **Indicadores actualizados y estimaciones** incorpora PIB, PIB por habitante, crecimiento real, IED neta, IED sobre PIB, impuesto corporativo, tipo de cambio y la puntuación media WGI. Cada fila muestra la **última actualización** pública para ese país. Pulse **Editar** junto al nombre del mercado para sustituir cualquiera de los indicadores por una estimación propia. En WGI, la edición aplica la misma puntuación media a los cinco componentes de gobernanza y debe usarse únicamente si existe una justificación documentada. La etiqueta **Manual** deja visible que el número ya no proviene de la consulta pública. El icono de restauración repone únicamente esa cifra desde la fuente; no sobrescribe los demás ajustes manuales del país.
+
+Si la carga WGI no devuelve valores, la celda WGI muestra un mensaje y el botón **Reintentar WGI**. Ese botón consulta solo la fuente WGI para el país afectado, sin recargar PIB, IED, impuesto ni FX. Es útil cuando el archivo de gobernanza oficial no responde temporalmente.
+
 ## Cómo leer los escenarios
 
 El caso **Base** corresponde exactamente a sus supuestos económicos. El caso **Optimista** y el **Conservador** requieren tres valores: cambio porcentual de precio/ingreso, cambio del margen operativo en puntos porcentuales y cambio porcentual del tipo de cambio a moneda de reporte. Por ejemplo, una mejora de margen de `3` significa pasar de un margen base de 20% a 23%; no significa incrementar el margen un 3% relativo.

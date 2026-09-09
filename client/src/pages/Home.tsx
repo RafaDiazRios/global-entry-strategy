@@ -33,8 +33,10 @@ import {
   Globe2,
   Loader2,
   MapPinned,
+  Pencil,
   Plus,
   RefreshCw,
+  RotateCcw,
   Save,
   ShieldCheck,
   SlidersHorizontal,
@@ -70,6 +72,8 @@ type MarketData = {
     sourceStatus: Status;
   };
   sourceYear?: number | null;
+  lastUpdatedAt?: string | null;
+  manualFields?: string[];
   sourceStatus: Status;
 };
 
@@ -159,10 +163,14 @@ const calibrationFields: { key: keyof Calibration; label: string; group: string;
   { key: "ipSensitivity", label: "Sensibilidad de IP", group: "Entrada", help: "Riesgo estratégico de transferencia o apropiación de tecnología y conocimiento.", reverse: true },
 ];
 
-function blankData(): MarketData { return { sourceStatus: "unavailable" }; }
+type MarketMetricKey = "gdpUsd" | "gdpPerCapita" | "gdpGrowth" | "fdiInflowUsd" | "fdiInflowPctGdp";
+type MarketManualKey = MarketMetricKey | "governance";
+type FinancialReferenceKey = "taxRatePct" | "fxRateToReportingCurrency";
+function blankData(): MarketData { return { sourceStatus: "unavailable", manualFields: [] }; }
 function formatNumber(value: number | null | undefined, options: Intl.NumberFormatOptions = {}) { return value === null || value === undefined ? "—" : new Intl.NumberFormat("es-ES", options).format(value); }
 function formatBillions(value: number | null | undefined) { return value === null || value === undefined ? "—" : `US$ ${new Intl.NumberFormat("es-ES", { notation: "compact", maximumFractionDigits: 1 }).format(value)}`; }
 function formatMoney(value: number | null | undefined, currency?: string | null) { return value === null || value === undefined ? "—" : new Intl.NumberFormat("es-ES", { style: "currency", currency: currency || "USD", maximumFractionDigits: 0 }).format(value); }
+function formatUpdatedAt(value: string | null | undefined) { return value ? new Date(value).toLocaleString("es-ES", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : "Pendiente"; }
 function scoreStyle(score: number) { return score >= 70 ? "text-emerald-700 bg-emerald-50 border-emerald-200" : score >= 50 ? "text-amber-800 bg-amber-50 border-amber-200" : "text-rose-700 bg-rose-50 border-rose-200"; }
 function scoreTone(score: number) { return score >= 70 ? "bg-emerald-500" : score >= 50 ? "bg-amber-500" : "bg-rose-500"; }
 function decisionStyle(action: CountryResult["investmentRecommendation"]["action"]) { return action === "advance" ? "decision-advance" : action === "test" ? "decision-test" : action === "discard" ? "decision-discard" : "decision-incomplete"; }
@@ -199,6 +207,8 @@ export default function Home() {
   const [result, setResult] = useState<Evaluation | null>(null);
   const [savedScenarioId, setSavedScenarioId] = useState<number | null>(null);
   const [governanceLoadingCodes, setGovernanceLoadingCodes] = useState<string[]>([]);
+  const [governanceErrors, setGovernanceErrors] = useState<Record<string, string>>({});
+  const [editingMarketCode, setEditingMarketCode] = useState<string | null>(null);
   const [popMin, setPopMin] = useState("0");
   const [gdpMin, setGdpMin] = useState("0");
   const [growthMin, setGrowthMin] = useState("-100");
@@ -258,6 +268,59 @@ export default function Home() {
     if (!activeCandidate) return;
     setCandidates((current) => current.map((candidate) => candidate.code === activeCandidate.code ? { ...candidate, calibration: { ...candidate.calibration, [key]: value } } : candidate));
     setResult(null);
+  }
+
+  function updateMarketMetric(code: string, key: MarketMetricKey, value: string) {
+    setMarketData((current) => {
+      const data = current[code] ?? blankData();
+      const manualFields = new Set(data.manualFields ?? []);
+      manualFields.add(key);
+      return { ...current, [code]: { ...data, [key]: value === "" ? null : Number(value), manualFields: Array.from(manualFields) } };
+    });
+    setResult(null);
+    setSavedScenarioId(null);
+  }
+
+  function restorePublicMarketMetric(code: string, key: MarketMetricKey) {
+    void refreshCountryData([code], false, key);
+  }
+
+  function updateGovernanceMetric(code: string, value: string) {
+    const parsed = Number(value);
+    const score = value === "" || !Number.isFinite(parsed) ? null : Math.max(0, Math.min(100, parsed));
+    setMarketData((current) => {
+      const data = current[code] ?? blankData();
+      const manualFields = new Set(data.manualFields ?? []);
+      manualFields.add("governance");
+      return {
+        ...current,
+        [code]: {
+          ...data,
+          governance: { politicalStability: score, governmentEffectiveness: score, regulatoryQuality: score, ruleOfLaw: score, controlOfCorruption: score, sourceYear: data.governance?.sourceYear ?? null, sourceStatus: score === null ? "unavailable" : "partial" },
+          manualFields: Array.from(manualFields),
+        },
+      };
+    });
+    setResult(null);
+    setSavedScenarioId(null);
+  }
+
+  function restorePublicGovernance(code: string) {
+    setMarketData((current) => ({ ...current, [code]: { ...(current[code] ?? blankData()), manualFields: (current[code]?.manualFields ?? []).filter((field) => field !== "governance") } }));
+    void retryGovernance(code, true);
+  }
+
+  function updateCountryFinancialMetric(code: string, key: FinancialReferenceKey, value: string) {
+    setFinancialByCountry((current) => ({
+      ...current,
+      [code]: { ...current[code], [key]: value === "" ? null : Number(value), ...(key === "taxRatePct" ? { taxRateDataMode: "manual" as const } : { fxRateDataMode: "manual" as const }) },
+    }));
+    setResult(null);
+    setSavedScenarioId(null);
+  }
+
+  function restorePublicFinancialMetric(code: string, key: FinancialReferenceKey) {
+    void refreshCountryData([code], false, undefined, key);
   }
 
   function updateFinancial(key: keyof Omit<FinancialAssumptions, "modeProfiles" | "sensitivityScenarios">, value: string) {
@@ -320,13 +383,21 @@ export default function Home() {
       : current.length >= 4 ? (toast.info("La vista lado a lado admite hasta cuatro países."), current) : [...current, code]);
   }
 
-  async function refreshCountryData(countryCodes: string[], showFeedback: boolean) {
+  async function refreshCountryData(countryCodes: string[], showFeedback: boolean, restoreMetric?: MarketMetricKey, restoreFinancialMetric?: FinancialReferenceKey) {
     try {
       const [fresh, financialReferences] = await Promise.all([
         fetchData.mutateAsync({ countryCodes }),
         fetchFinancialData.mutateAsync({ countryCodes, reportingCurrency: "USD" }),
       ]);
-      setMarketData((current) => ({ ...current, ...fresh }));
+      setMarketData((current) => ({
+        ...current,
+        ...Object.fromEntries(countryCodes.map((code) => {
+          const previous = current[code];
+          const preservedFields = (previous?.manualFields ?? []).filter((field) => field !== restoreMetric) as MarketMetricKey[];
+          const preservedValues = Object.fromEntries(preservedFields.map((field) => [field, previous?.[field] ?? null]));
+          return [code, { ...fresh[code], ...preservedValues, manualFields: preservedFields }];
+        })),
+      }));
       setFinancialByCountry((current) => ({ ...current, ...Object.fromEntries(countryCodes.map((code) => {
         const reference = financialReferences[code];
         const existing = current[code] ?? {};
@@ -336,18 +407,26 @@ export default function Home() {
           reportingCurrency: existing.reportingCurrency ?? reference?.fx.reportingCurrency ?? "USD",
           taxReference: reference?.tax ?? null,
           fxReference: reference?.fx ?? null,
-          taxRatePct: existing.taxRateDataMode === "manual" ? existing.taxRatePct : reference?.tax.ratePct ?? null,
-          fxRateToReportingCurrency: existing.fxRateDataMode === "manual" ? existing.fxRateToReportingCurrency : reference?.fx.rateToReportingCurrency ?? null,
-          taxRateDataMode: existing.taxRateDataMode === "manual" ? "manual" : "public",
-          fxRateDataMode: existing.fxRateDataMode === "manual" ? "manual" : "public",
+          taxRatePct: restoreFinancialMetric === "taxRatePct" || existing.taxRateDataMode !== "manual" ? reference?.tax.ratePct ?? null : existing.taxRatePct,
+          fxRateToReportingCurrency: restoreFinancialMetric === "fxRateToReportingCurrency" || existing.fxRateDataMode !== "manual" ? reference?.fx.rateToReportingCurrency ?? null : existing.fxRateToReportingCurrency,
+          taxRateDataMode: restoreFinancialMetric === "taxRatePct" || existing.taxRateDataMode !== "manual" ? "public" : "manual",
+          fxRateDataMode: restoreFinancialMetric === "fxRateToReportingCurrency" || existing.fxRateDataMode !== "manual" ? "public" : "manual",
         }];
       })) }));
       setResult(null);
       setSavedScenarioId(null);
+      setGovernanceErrors((current) => {
+        const next = { ...current };
+        countryCodes.forEach((code) => delete next[code]);
+        return next;
+      });
       setGovernanceLoadingCodes((current) => Array.from(new Set([...current, ...countryCodes])));
       void fetchGovernanceData.mutateAsync({ countryCodes }).then((governance) => {
-        setMarketData((current) => Object.fromEntries(Object.entries(current).map(([code, data]) => [code, governance[code] ? { ...data, governance: governance[code], sourceYear: Math.max(data.sourceYear ?? 0, governance[code].sourceYear ?? 0) || null } : data])));
+        setMarketData((current) => Object.fromEntries(Object.entries(current).map(([code, data]) => [code, governance[code] && !data.manualFields?.includes("governance") ? { ...data, governance: governance[code], sourceYear: Math.max(data.sourceYear ?? 0, governance[code].sourceYear ?? 0) || null, lastUpdatedAt: new Date().toISOString() } : data])));
+        const unavailableCodes = countryCodes.filter((code) => !governance[code] || governance[code].sourceStatus === "unavailable");
+        if (unavailableCodes.length) setGovernanceErrors((current) => ({ ...current, ...Object.fromEntries(unavailableCodes.map((code) => [code, "La fuente WGI no devolvió datos para este país."])) }));
       }).catch(() => {
+        setGovernanceErrors((current) => ({ ...current, ...Object.fromEntries(countryCodes.map((code) => [code, "No se pudo contactar con la fuente WGI."])) }));
         if (showFeedback) toast.warning("Los indicadores macro y financieros se actualizaron; WGI no respondió y se puede intentar de nuevo.");
       }).finally(() => {
         setGovernanceLoadingCodes((current) => current.filter((code) => !countryCodes.includes(code)));
@@ -366,6 +445,35 @@ export default function Home() {
   async function refreshData() {
     if (!candidates.length) { toast.error("Añada primero al menos un país candidato."); return; }
     await refreshCountryData(candidates.map((candidate) => candidate.code), true);
+  }
+
+  async function retryGovernance(code: string, restoreManual = false) {
+    setGovernanceErrors((current) => {
+      const next = { ...current };
+      delete next[code];
+      return next;
+    });
+    setGovernanceLoadingCodes((current) => Array.from(new Set([...current, code])));
+    try {
+      const governance = await fetchGovernanceData.mutateAsync({ countryCodes: [code] });
+      const refreshed = governance[code];
+      if (!refreshed || refreshed.sourceStatus === "unavailable") {
+        setGovernanceErrors((current) => ({ ...current, [code]: "La fuente WGI no devolvió datos para este país." }));
+        toast.error("WGI no devolvió datos; puede conservar los demás indicadores o intentarlo más tarde.");
+        return;
+      }
+      setMarketData((current) => {
+        const currentData = current[code] ?? blankData();
+        if (currentData.manualFields?.includes("governance") && !restoreManual) return current;
+        return { ...current, [code]: { ...currentData, governance: refreshed, sourceYear: Math.max(currentData.sourceYear ?? 0, refreshed.sourceYear ?? 0) || null, lastUpdatedAt: new Date().toISOString(), manualFields: restoreManual ? (currentData.manualFields ?? []).filter((field) => field !== "governance") : currentData.manualFields } };
+      });
+      toast.success("Indicadores WGI actualizados para este mercado.");
+    } catch {
+      setGovernanceErrors((current) => ({ ...current, [code]: "No se pudo contactar con la fuente WGI." }));
+      toast.error("No se pudo reintentar WGI para este mercado.");
+    } finally {
+      setGovernanceLoadingCodes((current) => current.filter((item) => item !== code));
+    }
   }
 
   function buildInput() {
@@ -479,7 +587,7 @@ export default function Home() {
               </CardContent></Card>
               <Card className="data-card"><CardHeader><div className="flex items-center justify-between"><div><div className="step-tag">DATOS EXTERNOS</div><CardTitle>Base factual</CardTitle></div><Database className="h-6 w-6 text-sky-700" /></div><CardDescription>Los indicadores macroeconómicos, fiscales y de divisa se actualizan desde fuentes públicas. Los factores estratégicos se califican separadamente para no fingir una precisión inexistente.</CardDescription></CardHeader><CardContent className="space-y-3">{[...(sourcesQuery.data ?? []), ...(financialSourcesQuery.data ?? [])].map((source) => <a key={source.name} href={source.url} target="_blank" rel="noreferrer" className="source-row"><div><strong>{source.name}</strong><p>{source.coverage}</p></div><Badge variant="outline" className={source.status === "Conectado" ? "source-live" : ""}>{source.status}</Badge></a>)}</CardContent></Card>
             </div>
-            {candidates.length > 0 && <Card className="metric-card mt-6"><CardHeader><CardTitle>Indicadores actualizados</CardTitle><CardDescription>PIB, crecimiento, IED, impuesto y FX se muestran en primer lugar. WGI se carga después porque la fuente oficial es más pesada; la celda indicará “Cargando” mientras llega.</CardDescription></CardHeader><CardContent><div className="overflow-x-auto"><table className="metrics-table"><thead><tr><th>Mercado</th><th>Estado</th><th>PIB</th><th>PIB / hab.</th><th>PIB real</th><th>IED neta</th><th>IED / PIB</th><th>WGI</th><th>Año</th></tr></thead><tbody>{candidates.map((candidate) => { const data = marketData[candidate.code] ?? blankData(); const passes = screenedCandidates.some((item) => item.code === candidate.code); const governance = data.governance; const governanceAverage = governance ? [governance.politicalStability, governance.governmentEffectiveness, governance.regulatoryQuality, governance.ruleOfLaw, governance.controlOfCorruption].filter((value): value is number => value !== null).reduce((sum, value, _, all) => sum + value / all.length, 0) : null; const governanceLoading = governanceLoadingCodes.includes(candidate.code); return <tr key={candidate.code} className={!passes ? "muted-row" : ""}><td><strong>{candidate.name}</strong><span>{candidate.code}</span></td><td><StatusBadge status={data.sourceStatus} /></td><td>{formatBillions(data.gdpUsd)}</td><td>{data.gdpPerCapita ? `US$ ${formatNumber(data.gdpPerCapita, { maximumFractionDigits: 0 })}` : "—"}</td><td>{data.gdpGrowth !== null && data.gdpGrowth !== undefined ? `${formatNumber(data.gdpGrowth, { maximumFractionDigits: 1 })}%` : "—"}</td><td>{formatBillions(data.fdiInflowUsd)}</td><td>{data.fdiInflowPctGdp !== null && data.fdiInflowPctGdp !== undefined ? `${formatNumber(data.fdiInflowPctGdp, { maximumFractionDigits: 1 })}%` : "—"}</td><td>{governanceLoading ? <span className="metric-loading"><Loader2 className="h-3 w-3 animate-spin" /> Cargando</span> : governanceAverage === null ? "—" : `${formatNumber(governanceAverage, { maximumFractionDigits: 0 })}/100`}</td><td>{data.sourceYear ?? "—"}</td></tr>; })}</tbody></table></div></CardContent></Card>}
+            {candidates.length > 0 && <MarketComparisonTable candidates={candidates} marketData={marketData} financialByCountry={financialByCountry} governanceLoadingCodes={governanceLoadingCodes} governanceErrors={governanceErrors} editingCode={editingMarketCode} onToggleEditing={setEditingMarketCode} onMarketChange={updateMarketMetric} onRestoreMarket={restorePublicMarketMetric} onFinancialChange={updateCountryFinancialMetric} onRestoreFinancial={restorePublicFinancialMetric} onRetryGovernance={retryGovernance} onGovernanceChange={updateGovernanceMetric} onRestoreGovernance={restorePublicGovernance} />}
           </TabsContent>
 
           <TabsContent value="calibrate" className="tab-enter">
@@ -532,6 +640,33 @@ export default function Home() {
     </DashboardLayout>
   );
 }
+
+function MarketComparisonTable({ candidates, marketData, financialByCountry, governanceLoadingCodes, governanceErrors, editingCode, onToggleEditing, onMarketChange, onRestoreMarket, onFinancialChange, onRestoreFinancial, onRetryGovernance, onGovernanceChange, onRestoreGovernance }: { candidates: Candidate[]; marketData: Record<string, MarketData>; financialByCountry: Record<string, FinancialAssumptions>; governanceLoadingCodes: string[]; governanceErrors: Record<string, string>; editingCode: string | null; onToggleEditing: (code: string | null) => void; onMarketChange: (code: string, key: MarketMetricKey, value: string) => void; onRestoreMarket: (code: string, key: MarketMetricKey) => void; onFinancialChange: (code: string, key: FinancialReferenceKey, value: string) => void; onRestoreFinancial: (code: string, key: FinancialReferenceKey) => void; onRetryGovernance: (code: string) => void; onGovernanceChange: (code: string, value: string) => void; onRestoreGovernance: (code: string) => void }) {
+  return <Card className="metric-card mt-6"><CardHeader><div className="market-table-heading"><div><CardTitle>Indicadores actualizados y estimaciones</CardTitle><CardDescription>PIB, IED, impuesto corporativo y FX se descargan al añadir el país. WGI se completa después. Use <strong>Editar</strong> para sustituir cifras por sus fuentes; la etiqueta Manual evita confundirlas con datos públicos.</CardDescription></div><Badge variant="outline">{candidates.length} mercado{candidates.length === 1 ? "" : "s"}</Badge></div></CardHeader><CardContent><div className="market-table-guide"><span><strong>Última actualización:</strong> fecha de la última carga pública por país.</span><span><strong>Reintentar WGI:</strong> no vuelve a consultar los demás indicadores.</span><span><strong>Restaurar:</strong> repone solo el campo público modificado.</span></div><div className="overflow-x-auto"><table className="metrics-table editable-metrics-table"><thead><tr><th>Mercado</th><th>Estado</th><th>PIB (US$)</th><th>PIB / hab. (US$)</th><th>PIB real</th><th>IED neta (US$)</th><th>IED / PIB</th><th>Imp. corp.</th><th>FX USD / local</th><th>WGI</th><th>Últ. actualización</th></tr></thead><tbody>{candidates.map((candidate) => {
+    const data = marketData[candidate.code] ?? blankData();
+    const finance = financialByCountry[candidate.code] ?? {};
+    const passes = true;
+    const governance = data.governance;
+    const governanceValues = governance ? [governance.politicalStability, governance.governmentEffectiveness, governance.regulatoryQuality, governance.ruleOfLaw, governance.controlOfCorruption].filter((value): value is number => value !== null) : [];
+    const governanceAverage = governanceValues.length ? governanceValues.reduce((sum, value) => sum + value, 0) / governanceValues.length : null;
+    const editing = editingCode === candidate.code;
+    const governanceLoading = governanceLoadingCodes.includes(candidate.code);
+    const governanceError = governanceErrors[candidate.code];
+    const manual = new Set(data.manualFields ?? []);
+    return <tr key={candidate.code} className={!passes ? "muted-row" : ""}><td className="market-name-cell"><strong>{candidate.name}</strong><span>{candidate.code}</span><Button size="sm" variant={editing ? "secondary" : "outline"} className="market-edit-button" onClick={() => onToggleEditing(editing ? null : candidate.code)}><Pencil className="mr-1 h-3 w-3" /> {editing ? "Cerrar" : "Editar"}</Button></td><td><StatusBadge status={data.sourceStatus} /></td><EditableMarketMetric editing={editing} value={data.gdpUsd} format={formatBillions} manual={manual.has("gdpUsd")} title="PIB corriente en US$" onChange={(value) => onMarketChange(candidate.code, "gdpUsd", value)} onRestore={() => onRestoreMarket(candidate.code, "gdpUsd")} /><EditableMarketMetric editing={editing} value={data.gdpPerCapita} format={(value) => value === null || value === undefined ? "—" : `US$ ${formatNumber(value, { maximumFractionDigits: 0 })}`} manual={manual.has("gdpPerCapita")} title="PIB corriente por habitante en US$" onChange={(value) => onMarketChange(candidate.code, "gdpPerCapita", value)} onRestore={() => onRestoreMarket(candidate.code, "gdpPerCapita")} /><EditableMarketMetric editing={editing} value={data.gdpGrowth} format={(value) => value === null || value === undefined ? "—" : `${formatNumber(value, { maximumFractionDigits: 1 })}%`} manual={manual.has("gdpGrowth")} title="Crecimiento anual del PIB real, en porcentaje" onChange={(value) => onMarketChange(candidate.code, "gdpGrowth", value)} onRestore={() => onRestoreMarket(candidate.code, "gdpGrowth")} /><EditableMarketMetric editing={editing} value={data.fdiInflowUsd} format={formatBillions} manual={manual.has("fdiInflowUsd")} title="Flujos netos de IED en US$" onChange={(value) => onMarketChange(candidate.code, "fdiInflowUsd", value)} onRestore={() => onRestoreMarket(candidate.code, "fdiInflowUsd")} /><EditableMarketMetric editing={editing} value={data.fdiInflowPctGdp} format={(value) => value === null || value === undefined ? "—" : `${formatNumber(value, { maximumFractionDigits: 1 })}%`} manual={manual.has("fdiInflowPctGdp")} title="IED neta como porcentaje del PIB" onChange={(value) => onMarketChange(candidate.code, "fdiInflowPctGdp", value)} onRestore={() => onRestoreMarket(candidate.code, "fdiInflowPctGdp")} /><EditableFinancialMetric editing={editing} value={finance.taxRatePct} format={(value) => value === null || value === undefined ? "—" : `${formatNumber(value, { maximumFractionDigits: 1 })}%`} manual={finance.taxRateDataMode === "manual"} title="Tasa corporativa estatutaria en porcentaje" onChange={(value) => onFinancialChange(candidate.code, "taxRatePct", value)} onRestore={() => onRestoreFinancial(candidate.code, "taxRatePct")} /><EditableFinancialMetric editing={editing} value={finance.fxRateToReportingCurrency} format={(value) => value === null || value === undefined ? "—" : `${formatNumber(value, { maximumFractionDigits: 4 })} ${finance.reportingCurrency || "USD"}/${finance.currency || "local"}`} manual={finance.fxRateDataMode === "manual"} title="Unidades de moneda de reporte por una unidad de moneda local" onChange={(value) => onFinancialChange(candidate.code, "fxRateToReportingCurrency", value)} onRestore={() => onRestoreFinancial(candidate.code, "fxRateToReportingCurrency")} /><td className="wgi-cell">{editing ? <EditableGovernanceMetric value={governanceAverage} manual={manual.has("governance")} onChange={(value) => onGovernanceChange(candidate.code, value)} onRestore={() => onRestoreGovernance(candidate.code)} /> : governanceLoading ? <span className="metric-loading"><Loader2 className="h-3 w-3 animate-spin" /> Cargando</span> : governanceError ? <div className="wgi-retry"><span>{governanceError}</span><Button size="sm" variant="outline" onClick={() => onRetryGovernance(candidate.code)}><RotateCcw className="mr-1 h-3 w-3" /> Reintentar WGI</Button></div> : governanceAverage === null ? "—" : <div className="metric-value"><strong>{formatNumber(governanceAverage, { maximumFractionDigits: 0 })}/100</strong>{manual && <Badge variant="outline" className="manual-badge">Manual</Badge>}<small>{governance?.sourceYear ?? ""}</small></div>}</td><td className="updated-at-cell"><strong>{formatUpdatedAt(data.lastUpdatedAt)}</strong>{data.manualFields?.length ? <small>{data.manualFields.length} ajuste{data.manualFields.length === 1 ? "" : "s"} manual{data.manualFields.length === 1 ? "" : "es"}</small> : <small>Fuente pública</small>}</td></tr>;
+  })}</tbody></table></div></CardContent></Card>;
+}
+
+function EditableMarketMetric({ editing, value, format, manual, title, onChange, onRestore }: { editing: boolean; value: number | null | undefined; format: (value: number | null | undefined) => string; manual: boolean; title: string; onChange: (value: string) => void; onRestore: () => void }) {
+  return <td title={title}>{editing ? <div className="metric-editor"><Input type="number" value={value ?? ""} onChange={(event) => onChange(event.target.value)} /><MetricSourceBadge manual={manual} onRestore={onRestore} /></div> : <div className="metric-value">{format(value)}{manual && <Badge variant="outline" className="manual-badge">Manual</Badge>}</div>}</td>;
+}
+function EditableGovernanceMetric({ value, manual, onChange, onRestore }: { value: number | null; manual: boolean; onChange: (value: string) => void; onRestore: () => void }) {
+  return <div className="metric-editor governance-editor"><Input type="number" min="0" max="100" value={value ?? ""} onChange={(event) => onChange(event.target.value)} /><MetricSourceBadge manual={manual} onRestore={onRestore} /></div>;
+}
+function EditableFinancialMetric({ editing, value, format, manual, title, onChange, onRestore }: { editing: boolean; value: number | null | undefined; format: (value: number | null | undefined) => string; manual: boolean; title: string; onChange: (value: string) => void; onRestore: () => void }) {
+  return <td title={title}>{editing ? <div className="metric-editor"><Input type="number" step="any" value={value ?? ""} onChange={(event) => onChange(event.target.value)} /><MetricSourceBadge manual={manual} onRestore={onRestore} /></div> : <div className="metric-value">{format(value)}{manual ? <Badge variant="outline" className="manual-badge">Manual</Badge> : <Badge variant="outline" className="public-badge">Público</Badge>}</div>}</td>;
+}
+function MetricSourceBadge({ manual, onRestore }: { manual: boolean; onRestore: () => void }) { return manual ? <Button type="button" size="icon" variant="ghost" className="metric-restore" title="Restaurar dato público" aria-label="Restaurar dato público" onClick={onRestore}><RotateCcw className="h-3.5 w-3.5" /></Button> : <span className="metric-public-label">Público</span>; }
 
 function CountryComparison({ countries }: { countries: { candidate: Candidate; data: MarketData; result?: CountryResult }[] }) {
   return <div className="comparison-board" style={{ gridTemplateColumns: `repeat(${Math.min(countries.length, 4)}, minmax(260px, 1fr))` }}>{countries.map(({ candidate, data, result }) => {
