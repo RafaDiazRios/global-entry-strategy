@@ -3,6 +3,7 @@ import * as db from "./db";
 import { sdk } from "./_core/sdk";
 import { evaluateStrategy, type EvaluationInput, type MarketData } from "./strategy/engine";
 import { getWorldBankMarketData } from "./strategy/worldBank";
+import { getCountryFinancialReference } from "./strategy/countryFinancialData";
 
 /** Refreshes the public macro data in all saved scenarios. It is deliberately idempotent. */
 export async function refreshScenarioDataHandler(req: Request, res: Response) {
@@ -19,10 +20,25 @@ export async function refreshScenarioDataHandler(req: Request, res: Response) {
         const input = scenario.inputJson as EvaluationInput;
         if (!input?.countryInputs?.length) continue;
         const marketData: Record<string, MarketData> = {};
+        const financialByCountry = { ...(input.financialByCountry ?? {}) };
         for (const country of input.countryInputs) {
           marketData[country.code] = await getWorldBankMarketData(country.code);
+          const previous = financialByCountry[country.code] ?? {};
+          const reportingCurrency = previous.reportingCurrency || "USD";
+          const reference = await getCountryFinancialReference(country.code, reportingCurrency);
+          financialByCountry[country.code] = {
+            ...previous,
+            currency: previous.currency ?? reference.fx.localCurrency,
+            reportingCurrency: previous.reportingCurrency ?? reference.fx.reportingCurrency,
+            taxReference: reference.tax,
+            fxReference: reference.fx,
+            taxRatePct: previous.taxRateDataMode === "manual" ? previous.taxRatePct : reference.tax.ratePct,
+            fxRateToReportingCurrency: previous.fxRateDataMode === "manual" ? previous.fxRateToReportingCurrency : reference.fx.rateToReportingCurrency,
+            taxRateDataMode: previous.taxRateDataMode === "manual" ? "manual" : "public",
+            fxRateDataMode: previous.fxRateDataMode === "manual" ? "manual" : "public",
+          };
         }
-        const refreshedInput: EvaluationInput = { ...input, marketData };
+        const refreshedInput: EvaluationInput = { ...input, marketData, financialByCountry };
         const result = evaluateStrategy(refreshedInput);
         await db.refreshStrategyScenario(scenario.id, refreshedInput, result);
         refreshed += 1;

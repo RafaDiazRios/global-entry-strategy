@@ -6,6 +6,7 @@ import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import * as db from "./db";
 import { evaluateStrategy, type EntryObjective, type EvaluationInput, type MarketData } from "./strategy/engine";
 import { getWorldBankMarketData, publicSources } from "./strategy/worldBank";
+import { financialPublicSources, getCountryFinancialReference } from "./strategy/countryFinancialData";
 
 const score = z.number().min(0).max(100);
 const calibrationSchema = z.object({
@@ -62,6 +63,22 @@ const modeFinancialProfileSchema = z.object({
   revenueCapturePct: z.number().min(0).max(100).nullable().optional(),
 });
 
+const financialDataProvenanceSchema = z.object({
+  sourceStatus: z.enum(["live", "partial", "unavailable"]),
+  sourceName: z.string().min(1).max(200),
+  sourceUrl: z.string().url(),
+  sourceYear: z.number().int().nullable().optional(),
+  observedAt: z.string().nullable().optional(),
+  retrievedAt: z.string().min(1).max(80),
+  note: z.string().min(1).max(1500),
+});
+
+const sensitivityScenarioSchema = z.object({
+  priceRevenuePct: z.number().min(-100).max(500).nullable().optional(),
+  operatingMarginPctPoints: z.number().min(-100).max(100).nullable().optional(),
+  fxRatePct: z.number().min(-100).max(500).nullable().optional(),
+});
+
 const financialAssumptionsSchema = z.object({
   currency: z.string().min(1).max(10).nullable().optional(),
   reportingCurrency: z.string().min(1).max(10).nullable().optional(),
@@ -73,9 +90,17 @@ const financialAssumptionsSchema = z.object({
   somPctHorizon: z.number().min(0).max(100).nullable().optional(),
   operatingMarginPct: z.number().min(-100).max(100).nullable().optional(),
   taxRatePct: z.number().min(0).max(100).nullable().optional(),
+  taxRateDataMode: z.enum(["public", "manual"]).optional(),
+  taxReference: financialDataProvenanceSchema.nullable().optional(),
   workingCapitalPctRevenue: z.number().min(-100).max(100).nullable().optional(),
   discountRatePct: z.number().min(0).max(100).nullable().optional(),
   terminalGrowthPct: z.number().min(-100).max(100).nullable().optional(),
+  fxRateDataMode: z.enum(["public", "manual"]).optional(),
+  fxReference: financialDataProvenanceSchema.nullable().optional(),
+  sensitivityScenarios: z.object({
+    optimistic: sensitivityScenarioSchema.optional(),
+    conservative: sensitivityScenarioSchema.optional(),
+  }).optional(),
   modeProfiles: z.object({
     greenfield: modeFinancialProfileSchema.optional(),
     acquisition: modeFinancialProfileSchema.optional(),
@@ -122,6 +147,38 @@ const evaluationSchema = z.object({
   }).optional(),
 });
 
+const approvalStatusSchema = z.enum(["not_started", "in_review", "approved", "changes_requested", "on_hold", "closed"]);
+const milestoneStatusSchema = z.enum(["pending", "in_progress", "blocked", "complete", "not_applicable"]);
+const approvalMilestoneSchema = z.object({
+  title: z.string().min(2).max(220),
+  responsible: z.string().max(160).nullable().optional(),
+  dueAt: z.number().int().positive().nullable().optional(),
+  status: milestoneStatusSchema.optional(),
+  evidence: z.string().max(4000).nullable().optional(),
+});
+
+function futureDate(base: Date, days: number) {
+  return new Date(base.getTime() + days * 24 * 60 * 60 * 1000);
+}
+
+function defaultApprovalMilestones(recommendation: "advance" | "test", responsible: string, reviewAt: Date) {
+  const first = recommendation === "advance"
+    ? "Confirmar tesis, regulación y estructura fiscal local"
+    : "Aprobar carta de prueba, hipótesis y límites de inversión";
+  const second = recommendation === "advance"
+    ? "Validar demanda, precio y economía unitaria con evidencia local"
+    : "Ejecutar prueba comercial y recoger evidencia de demanda y precio";
+  const third = recommendation === "advance"
+    ? "Cerrar plan operativo, socios críticos y riesgos de implementación"
+    : "Revisar resultados, aprendizaje y condiciones para escalar o abandonar";
+  return [
+    { title: first, responsible, dueAt: futureDate(reviewAt, -21), status: "pending" as const },
+    { title: second, responsible, dueAt: futureDate(reviewAt, -14), status: "pending" as const },
+    { title: third, responsible, dueAt: futureDate(reviewAt, -7), status: "pending" as const },
+    { title: "Revisión de gate y decisión documentada", responsible, dueAt: reviewAt, status: "pending" as const },
+  ];
+}
+
 export const appRouter = router({
   system: systemRouter,
   auth: router({
@@ -135,6 +192,7 @@ export const appRouter = router({
 
   strategy: router({
     getPublicSources: publicProcedure.query(() => publicSources),
+    getFinancialPublicSources: publicProcedure.query(() => financialPublicSources),
 
     fetchMarketData: protectedProcedure
       .input(z.object({ countryCodes: z.array(z.string().min(2).max(3)).min(1).max(12) }))
@@ -144,6 +202,14 @@ export const appRouter = router({
           normalizedCodes.map(async (code) => [code, await getWorldBankMarketData(code)] as const),
         );
         return Object.fromEntries(results) as Record<string, MarketData>;
+      }),
+
+    fetchCountryFinancialData: protectedProcedure
+      .input(z.object({ countryCodes: z.array(z.string().min(2).max(3)).min(1).max(12), reportingCurrency: z.string().min(3).max(3).default("USD") }))
+      .mutation(async ({ input }) => {
+        const normalizedCodes = Array.from(new Set(input.countryCodes.map((code) => code.toUpperCase())));
+        const results = await Promise.all(normalizedCodes.map(async (code) => [code, await getCountryFinancialReference(code, input.reportingCurrency.toUpperCase())] as const));
+        return Object.fromEntries(results);
       }),
 
     evaluate: protectedProcedure.input(evaluationSchema).mutation(({ input }) => {
@@ -171,6 +237,60 @@ export const appRouter = router({
       }),
 
     listScenarios: protectedProcedure.query(({ ctx }) => db.listStrategyScenarios(ctx.user.id)),
+
+    listApprovals: protectedProcedure
+      .input(z.object({ scenarioId: z.number().int().positive() }))
+      .query(({ ctx, input }) => db.listApprovalWorkflows(ctx.user.id, input.scenarioId)),
+
+    createApproval: protectedProcedure
+      .input(z.object({
+        scenarioId: z.number().int().positive(),
+        countryCode: z.string().min(2).max(3),
+        countryName: z.string().min(2).max(120),
+        recommendation: z.enum(["advance", "test"]),
+        responsible: z.string().min(2).max(160),
+        reviewer: z.string().max(160).nullable().optional(),
+        reviewAt: z.number().int().positive(),
+        notes: z.string().max(4000).nullable().optional(),
+        milestones: z.array(approvalMilestoneSchema).max(12).optional(),
+      }))
+      .mutation(({ ctx, input }) => {
+        const reviewAt = new Date(input.reviewAt);
+        if (!Number.isFinite(reviewAt.getTime())) throw new Error("Fecha de revisión inválida.");
+        return db.createApprovalWorkflow({
+          ...input,
+          userId: ctx.user.id,
+          reviewAt,
+          milestones: (input.milestones?.length ? input.milestones : defaultApprovalMilestones(input.recommendation, input.responsible, reviewAt)).map((milestone) => ({ ...milestone, dueAt: milestone.dueAt === null || milestone.dueAt === undefined ? null : new Date(milestone.dueAt) })),
+        });
+      }),
+
+    updateApproval: protectedProcedure
+      .input(z.object({
+        approvalId: z.number().int().positive(),
+        status: approvalStatusSchema.optional(),
+        responsible: z.string().min(2).max(160).optional(),
+        reviewer: z.string().max(160).nullable().optional(),
+        reviewAt: z.number().int().positive().optional(),
+        notes: z.string().max(4000).nullable().optional(),
+      }))
+      .mutation(({ ctx, input }) => {
+        const { approvalId, reviewAt, ...changes } = input;
+        return db.updateApprovalWorkflow(ctx.user.id, approvalId, { ...changes, reviewAt: reviewAt === undefined ? undefined : new Date(reviewAt) });
+      }),
+
+    updateApprovalMilestone: protectedProcedure
+      .input(z.object({
+        milestoneId: z.number().int().positive(),
+        status: milestoneStatusSchema.optional(),
+        responsible: z.string().max(160).nullable().optional(),
+        dueAt: z.number().int().positive().nullable().optional(),
+        evidence: z.string().max(4000).nullable().optional(),
+      }))
+      .mutation(({ ctx, input }) => {
+        const { milestoneId, dueAt, ...changes } = input;
+        return db.updateApprovalMilestone(ctx.user.id, milestoneId, { ...changes, dueAt: dueAt === undefined ? undefined : dueAt === null ? null : new Date(dueAt) });
+      }),
   }),
 });
 

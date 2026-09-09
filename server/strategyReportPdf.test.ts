@@ -27,6 +27,11 @@ describe("buildStrategyPdf", () => {
           assumptions: { taxRatePct: 25, workingCapitalPctRevenue: 10, discountRatePct: 10, terminalGrowthPct: 2 },
           market: { tamYearOne: 1_000_000, tamAtHorizon: 1_100_000, samAtHorizon: 330_000, somRevenueYearOne: 5_000, somRevenueAtHorizon: 13_200 },
           alternatives: [{ key: "digital", mode: "Entrada digital", status: "ok", roiPct: 45, npv: 25000, paybackYear: 2, initialInvestment: 10000, annualOperatingCost: 5000, revenueCapturePct: 100, cumulativeFreeCashFlow: 14500, terminalValue: 50000, presentValueTerminal: 37500, missingInputs: [], annualProjection: [{ year: 1, revenue: 5000, operatingProfit: 1500, taxes: 375, changeInWorkingCapital: 500, freeCashFlow: 625, presentValue: 568 }, { year: 2, revenue: 9000, operatingProfit: 2700, taxes: 675, changeInWorkingCapital: 400, freeCashFlow: 1625, presentValue: 1343 }] }],
+          scenarios: [
+            { key: "base", label: "Base", priceRevenuePct: 0, operatingMarginPctPoints: 0, fxRatePct: 0, status: "ok", financial: null, missingInputs: [], note: "Caso base." },
+            { key: "optimistic", label: "Optimista", priceRevenuePct: 10, operatingMarginPctPoints: 2, fxRatePct: 3, status: "ok", financial: null, missingInputs: [], note: "Caso optimista." },
+            { key: "conservative", label: "Conservador", priceRevenuePct: -10, operatingMarginPctPoints: -2, fxRatePct: -3, status: "ok", financial: null, missingInputs: [], note: "Caso conservador." },
+          ],
           missingInputs: [], methodology: "Método de prueba.",
         },
       }],

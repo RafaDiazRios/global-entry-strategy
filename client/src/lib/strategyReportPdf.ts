@@ -18,6 +18,21 @@ export type PdfAlternative = {
   missingInputs: string[];
 };
 
+export type PdfScenario = {
+  key: "base" | "optimistic" | "conservative";
+  label: string;
+  priceRevenuePct: number | null;
+  operatingMarginPctPoints: number | null;
+  fxRatePct: number | null;
+  status: string;
+  financial: {
+    currency: string | null;
+    alternatives: PdfAlternative[];
+  } | null;
+  missingInputs: string[];
+  note: string;
+};
+
 export type PdfCountry = {
   code: string;
   name: string;
@@ -36,6 +51,7 @@ export type PdfCountry = {
     assumptions: { taxRatePct: number | null; workingCapitalPctRevenue: number | null; discountRatePct: number | null; terminalGrowthPct: number | null };
     market: { tamYearOne: number | null; tamAtHorizon: number | null; samAtHorizon: number | null; somRevenueYearOne: number | null; somRevenueAtHorizon: number | null };
     alternatives: PdfAlternative[];
+    scenarios: PdfScenario[];
     missingInputs: string[];
     methodology: string;
   };
@@ -277,6 +293,23 @@ export function buildStrategyPdf(input: PdfReportInput) {
     });
     countryY = autoTableEndY(doc, countryY + 34) + 8;
 
+    countryY = ensureSpace(doc, countryY, 42);
+    countryY = sectionHeading(doc, "Sensibilidad de precio, margen y FX", countryY);
+    autoTable(doc, {
+      startY: countryY,
+      head: [["Caso", "Precio / ingreso", "Margen", "FX", "NPV alternativa", "ROI alternativa"]],
+      body: f.scenarios.map((scenario) => {
+        const alternative = scenario.financial?.alternatives.find((item) => item.mode === country.investmentRecommendation.selectedMode) ?? scenario.financial?.alternatives.find((item) => item.status === "ok");
+        return [scenario.label, scenario.priceRevenuePct === null ? "—" : `${number(scenario.priceRevenuePct)}%`, scenario.operatingMarginPctPoints === null ? "—" : `${number(scenario.operatingMarginPctPoints)} p.p.`, scenario.fxRatePct === null ? "—" : `${number(scenario.fxRatePct)}%`, alternative ? money(alternative.npv, scenario.financial?.currency) : scenario.status === "insufficient_data" ? "Completar" : "No significativo", alternative?.roiPct === null || alternative?.roiPct === undefined ? "—" : `${number(alternative.roiPct)}%`];
+      }),
+      theme: "grid",
+      headStyles: { fillColor: [53, 111, 82], textColor: [255, 255, 255], fontSize: 7.4 },
+      styles: { fontSize: 7.1, cellPadding: 1.6, overflow: "linebreak" },
+      columnStyles: { 0: { cellWidth: 25 }, 1: { cellWidth: 31 }, 2: { cellWidth: 25 }, 3: { cellWidth: 20 }, 4: { cellWidth: 42 }, 5: { cellWidth: 32 } },
+      alternateRowStyles: { fillColor: [245, 250, 246] },
+    });
+    countryY = autoTableEndY(doc, countryY + 30) + 8;
+
     const selected = f.alternatives.find((alternative) => alternative.key === country.investmentRecommendation.selectedMode?.toLowerCase()) || f.alternatives.find((alternative) => alternative.mode === country.investmentRecommendation.selectedMode);
     const detailed = selected ?? f.alternatives.find((alternative) => alternative.status === "ok");
     if (detailed?.annualProjection.length) {
@@ -310,7 +343,7 @@ export function buildStrategyPdf(input: PdfReportInput) {
   finalY = textBlock(doc, "El caso financiero usa flujos de caja libres después de impuestos y capital de trabajo, convierte importes a moneda de reporte cuando se informa un tipo de cambio y calcula el valor terminal con una perpetuidad de crecimiento. La fórmula exige que la tasa de descuento sea superior al crecimiento terminal; de lo contrario la alternativa se marca como no significativa.", 14, finalY, 182) + 7;
   finalY = textBlock(doc, "Los umbrales son reglas configurables de gobierno de inversión; no reemplazan la debida diligencia ni autorizan gasto, adquisición o entrada. ‘Avanzar’ exige superar todos los criterios de avance. ‘Probar’ admite una entrada reversible cuando supera la prueba mínima pero no el avance. ‘Descartar’ refleja que no se cumple el mínimo de prueba. ‘Completar evidencia’ se muestra cuando faltan datos o hay una incoherencia de moneda.", 14, finalY, 182) + 7;
   finalY = sectionHeading(doc, "Fuentes externas", finalY);
-  finalY = textBlock(doc, "World Bank Open Data: PIB, población, crecimiento, conectividad e inversión. UNCTAD (distribuida vía World Bank Open Data): flujos netos de inversión extranjera directa. Worldwide Governance Indicators, revisión 2025: estabilidad política, efectividad gubernamental, calidad regulatoria, estado de derecho y control de corrupción.", 14, finalY, 182) + 7;
+  finalY = textBlock(doc, "World Bank Open Data: PIB, población, crecimiento, conectividad e inversión. UNCTAD (distribuida vía World Bank Open Data): flujos netos de inversión extranjera directa. Worldwide Governance Indicators, revisión 2025: estabilidad política, efectividad gubernamental, calidad regulatoria, estado de derecho y control de corrupción. Tax Foundation, Corporate Tax Rates Around the World 2025: tasa corporativa estatutaria estándar, editable. Frankfurter: tipo de cambio de referencia de bancos centrales, editable y no ejecutable.", 14, finalY, 182) + 7;
   finalY = sectionHeading(doc, "Caveats obligatorios", finalY);
   textBlock(doc, input.portfolio.caveats.map((caveat) => `• ${caveat}`).join("\n"), 14, finalY, 182, [120, 90, 28]);
 

@@ -15,6 +15,13 @@
       "when": 1788972249601,
       "tag": "0001_giant_crusher_hogan",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1788979123273,
+      "tag": "0002_unknown_ultimo",
+      "breakpoints": true
     }
   ]
 }

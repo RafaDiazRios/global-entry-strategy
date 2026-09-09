@@ -13,6 +13,27 @@ export type ModeFinancialProfile = {
   revenueCapturePct?: number | null;
 };
 
+export type SensitivityScenarioKey = "base" | "optimistic" | "conservative";
+
+export type SensitivityScenario = {
+  /** Variation in price / revenue realization versus the base case, in percentage points. */
+  priceRevenuePct?: number | null;
+  /** Variation in operating margin, in percentage points rather than a percent change. */
+  operatingMarginPctPoints?: number | null;
+  /** Variation in reporting-currency units received per local-currency unit, in percentage points. */
+  fxRatePct?: number | null;
+};
+
+export type FinancialDataProvenance = {
+  sourceStatus: "live" | "partial" | "unavailable";
+  sourceName: string;
+  sourceUrl: string;
+  sourceYear?: number | null;
+  observedAt?: string | null;
+  retrievedAt: string;
+  note: string;
+};
+
 export type FinancialAssumptions = {
   /** Currency in which TAM, operating assumptions and investment are entered. */
   currency?: string | null;
@@ -27,9 +48,14 @@ export type FinancialAssumptions = {
   somPctHorizon?: number | null;
   operatingMarginPct?: number | null;
   taxRatePct?: number | null;
+  taxRateDataMode?: "public" | "manual";
+  taxReference?: FinancialDataProvenance | null;
   workingCapitalPctRevenue?: number | null;
   discountRatePct?: number | null;
   terminalGrowthPct?: number | null;
+  fxRateDataMode?: "public" | "manual";
+  fxReference?: FinancialDataProvenance | null;
+  sensitivityScenarios?: Partial<Record<Exclude<SensitivityScenarioKey, "base">, SensitivityScenario>>;
   modeProfiles?: Partial<Record<EntryModeKey, ModeFinancialProfile>>;
 };
 
@@ -89,7 +115,7 @@ export type FinancialModeResult = {
   missingInputs: string[];
 };
 
-export type FinancialResult = {
+export type FinancialCaseResult = {
   status: "ok" | "insufficient_data";
   /** Output currency retained for backward compatibility in the interface. */
   currency: string | null;
@@ -113,6 +139,22 @@ export type FinancialResult = {
   alternatives: FinancialModeResult[];
   missingInputs: string[];
   methodology: string;
+};
+
+export type FinancialScenarioResult = {
+  key: SensitivityScenarioKey;
+  label: string;
+  priceRevenuePct: number | null;
+  operatingMarginPctPoints: number | null;
+  fxRatePct: number | null;
+  status: "ok" | "insufficient_data" | "not_meaningful";
+  financial: FinancialCaseResult | null;
+  missingInputs: string[];
+  note: string;
+};
+
+export type FinancialResult = FinancialCaseResult & {
+  scenarios: FinancialScenarioResult[];
 };
 
 export type InvestmentRecommendation = {
@@ -208,6 +250,7 @@ function calculateMode(
   market: NonNullable<ReturnType<typeof calculateMarket>> | null,
   horizonYears: number,
   mode: ModeForFinance,
+  revenueMultiplier = 1,
 ): FinancialModeResult {
   const profile = assumptions.modeProfiles?.[mode.key] ?? {};
   const investment = asNumber(profile.initialInvestment);
@@ -251,7 +294,7 @@ function calculateMode(
   let paybackYear: number | null = null;
 
   const annualProjection = market!.annualRevenue.map((localSomRevenue, index) => {
-    const revenue = localSomRevenue * (capture! / 100) * fxRate!;
+    const revenue = localSomRevenue * (capture! / 100) * fxRate! * revenueMultiplier;
     const operatingProfit = revenue * (margin! / 100) - annualCostReporting;
     const taxes = Math.max(operatingProfit, 0) * (taxRate! / 100);
     const workingCapitalBalance = revenue * (workingCapitalPctRevenue! / 100);
@@ -306,16 +349,17 @@ function calculateMode(
   };
 }
 
-export function evaluateFinancials(
+function evaluateFinancialCase(
   assumptions: FinancialAssumptions | undefined,
   modeOptions: ModeForFinance[],
   horizonYears: number,
-): FinancialResult {
+  revenueMultiplier = 1,
+): FinancialCaseResult {
   const provided = assumptions ?? {};
   const missingInputs = missingCoreInputs(provided);
   const market = missingInputs.length ? null : calculateMarket(provided, horizonYears);
   const currencies = resolveCurrencies(provided);
-  const alternatives = modeOptions.map((mode) => calculateMode(provided, market, horizonYears, mode));
+  const alternatives = modeOptions.map((mode) => calculateMode(provided, market, horizonYears, mode, revenueMultiplier));
   return {
     status: market ? "ok" : "insufficient_data",
     currency: currencies.reportingCurrency,
@@ -336,6 +380,68 @@ export function evaluateFinancials(
     missingInputs,
     methodology: "TAM y SAM se proyectan con el crecimiento anual indicado; el SOM se interpola linealmente entre año 1 y el horizonte. Los flujos libres se calculan como EBIT después de impuestos menos el incremento de capital de trabajo; no se reconoce un activo fiscal por pérdidas. Los importes se convierten a moneda de reporte usando el tipo indicado. NPV descuenta los flujos libres y el valor terminal por perpetuidad: TV = FCF del año siguiente / (tasa de descuento − crecimiento terminal), incluido el incremento terminal de capital de trabajo. ROI usa flujo libre acumulado sin valor terminal.",
   };
+}
+
+const scenarioDefinition: { key: SensitivityScenarioKey; label: string; note: string }[] = [
+  { key: "base", label: "Base", note: "Caso sin variaciones respecto a los supuestos financieros de referencia." },
+  { key: "optimistic", label: "Optimista", note: "Caso hipotético: aplica las mejoras explícitas de precio/ingreso, margen y divisa." },
+  { key: "conservative", label: "Conservador", note: "Caso hipotético: aplica las variaciones adversas explícitas de precio/ingreso, margen y divisa." },
+];
+
+function scenarioStatus(financial: FinancialCaseResult): FinancialScenarioResult["status"] {
+  if (financial.status === "insufficient_data") return "insufficient_data";
+  if (financial.alternatives.some((alternative) => alternative.status === "ok")) return "ok";
+  if (financial.alternatives.some((alternative) => alternative.status === "not_meaningful")) return "not_meaningful";
+  return "insufficient_data";
+}
+
+function evaluateSensitivityScenario(
+  definition: { key: SensitivityScenarioKey; label: string; note: string },
+  assumptions: FinancialAssumptions | undefined,
+  modeOptions: ModeForFinance[],
+  horizonYears: number,
+): FinancialScenarioResult {
+  const provided = assumptions ?? {};
+  const adjustment = definition.key === "base" ? {} : (provided.sensitivityScenarios?.[definition.key] ?? {});
+  const priceRevenuePct = definition.key === "base" ? 0 : asNumber(adjustment.priceRevenuePct);
+  const operatingMarginPctPoints = definition.key === "base" ? 0 : asNumber(adjustment.operatingMarginPctPoints);
+  const fxRatePct = definition.key === "base" ? 0 : asNumber(adjustment.fxRatePct);
+  const missingInputs: string[] = [];
+  if (priceRevenuePct === null) missingInputs.push("variación de precio/ingreso");
+  if (operatingMarginPctPoints === null) missingInputs.push("variación de margen operativo");
+  if (fxRatePct === null) missingInputs.push("variación del tipo de cambio");
+  if (missingInputs.length) {
+    return { key: definition.key, label: definition.label, priceRevenuePct, operatingMarginPctPoints, fxRatePct, status: "insufficient_data", financial: null, missingInputs, note: `${definition.note} Complete las tres sensibilidades para calcular este escenario.` };
+  }
+  const currencies = resolveCurrencies(provided);
+  const baseMargin = asNumber(provided.operatingMarginPct);
+  const baseFx = currencies.fxRate;
+  const scenarioMargin = baseMargin === null ? null : baseMargin + operatingMarginPctPoints!;
+  const scenarioFx = baseFx === null ? null : (currencies.fxRequired ? baseFx * (1 + fxRatePct! / 100) : baseFx);
+  if (scenarioMargin !== null && (scenarioMargin < -100 || scenarioMargin > 100)) {
+    return { key: definition.key, label: definition.label, priceRevenuePct, operatingMarginPctPoints, fxRatePct, status: "not_meaningful", financial: null, missingInputs: ["El margen operativo resultante debe permanecer entre −100% y 100%."], note: definition.note };
+  }
+  if (scenarioFx !== null && scenarioFx <= 0) {
+    return { key: definition.key, label: definition.label, priceRevenuePct, operatingMarginPctPoints, fxRatePct, status: "not_meaningful", financial: null, missingInputs: ["El tipo de cambio resultante debe ser positivo."], note: definition.note };
+  }
+  const financial = evaluateFinancialCase(
+    { ...provided, operatingMarginPct: scenarioMargin, fxRateToReportingCurrency: scenarioFx },
+    modeOptions,
+    horizonYears,
+    1 + priceRevenuePct! / 100,
+  );
+  const noFxNote = !currencies.fxRequired && fxRatePct !== 0 ? " La sensibilidad FX no altera el resultado porque la moneda local y de reporte coinciden." : "";
+  return { key: definition.key, label: definition.label, priceRevenuePct, operatingMarginPctPoints, fxRatePct, status: scenarioStatus(financial), financial, missingInputs: financial.missingInputs, note: `${definition.note}${noFxNote}` };
+}
+
+export function evaluateFinancials(
+  assumptions: FinancialAssumptions | undefined,
+  modeOptions: ModeForFinance[],
+  horizonYears: number,
+): FinancialResult {
+  const baseCase = evaluateFinancialCase(assumptions, modeOptions, horizonYears);
+  const scenarios = scenarioDefinition.map((definition) => evaluateSensitivityScenario(definition, assumptions, modeOptions, horizonYears));
+  return { ...baseCase, scenarios };
 }
 
 export function recommendInvestmentAction(

@@ -54,6 +54,31 @@ describe("evaluateFinancials", () => {
     expect(result.alternatives[0].status).toBe("not_meaningful");
     expect(result.alternatives[0].missingInputs[0]).toContain("tasa de descuento");
   });
+
+  it("calculates base, optimistic and conservative cases with price, margin and FX sensitivity", () => {
+    const result = evaluateFinancials({
+      ...completeAssumptions,
+      currency: "MXN",
+      reportingCurrency: "USD",
+      fxRateToReportingCurrency: 0.05,
+      sensitivityScenarios: {
+        optimistic: { priceRevenuePct: 20, operatingMarginPctPoints: 5, fxRatePct: 10 },
+        conservative: { priceRevenuePct: -20, operatingMarginPctPoints: -5, fxRatePct: -10 },
+      },
+    }, [{ key: "greenfield", mode: "Filial propia / greenfield" }], 3);
+    const base = result.scenarios.find((scenario) => scenario.key === "base")!;
+    const optimistic = result.scenarios.find((scenario) => scenario.key === "optimistic")!;
+    const conservative = result.scenarios.find((scenario) => scenario.key === "conservative")!;
+
+    expect(result.scenarios).toHaveLength(3);
+    expect(base.status).toBe("ok");
+    expect(optimistic.status).toBe("ok");
+    expect(conservative.status).toBe("ok");
+    expect(optimistic.financial?.alternatives[0]?.npv).toBeGreaterThan(base.financial?.alternatives[0]?.npv ?? -Infinity);
+    expect(conservative.financial?.alternatives[0]?.npv).toBeLessThan(base.financial?.alternatives[0]?.npv ?? Infinity);
+    expect(optimistic.financial?.fxRateToReportingCurrency).toBeCloseTo(0.055);
+    expect(conservative.financial?.fxRateToReportingCurrency).toBeCloseTo(0.045);
+  });
 });
 
 describe("recommendInvestmentAction", () => {
