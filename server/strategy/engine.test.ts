@@ -40,7 +40,8 @@ describe("evaluateStrategy", () => {
       financialByCountry: {
         AA: {
           currency: "USD", tamYearOne: 1_000_000, annualMarketGrowthPct: 5, samPct: 40,
-          somPctYearOne: 2, somPctHorizon: 4, operatingMarginPct: 20, discountRatePct: 10,
+          somPctYearOne: 2, somPctHorizon: 4, operatingMarginPct: 20, taxRatePct: 25,
+          workingCapitalPctRevenue: 10, discountRatePct: 10, terminalGrowthPct: 2,
           modeProfiles: { digital: { initialInvestment: 50_000, annualOperatingCost: 25_000, revenueCapturePct: 100 } },
         },
       },
@@ -51,6 +52,8 @@ describe("evaluateStrategy", () => {
     expect(result.countries[0].entryModes.some((mode) => mode.mode === "Entrada digital o híbrida")).toBe(true);
     expect(result.portfolio.leadingCountry).toBe("Mercado A");
     expect(result.countries[0].financial.market.tamAtHorizon).toBeGreaterThan(1_000_000);
+    expect(result.countries[0].financial.alternatives).toHaveLength(7);
+    expect(result.countries[0].investmentRecommendation.action).not.toBe("insufficient_data");
   });
 
   it("identifies a limited-evidence situation without inventing data", () => {

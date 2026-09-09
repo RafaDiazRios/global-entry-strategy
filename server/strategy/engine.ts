@@ -1,4 +1,4 @@
-import { evaluateFinancials, type EntryModeKey, type FinancialAssumptions, type FinancialResult } from "./financialEngine";
+import { evaluateFinancials, recommendInvestmentAction, type EntryModeKey, type FinancialAssumptions, type FinancialResult, type InvestmentRecommendation, type InvestmentThresholds } from "./financialEngine";
 import type { GovernanceData } from "./wgi";
 
 export type EntryObjective = "market" | "resources" | "learning" | "coordination";
@@ -52,6 +52,7 @@ export type EvaluationInput = {
   countryInputs: CountryInput[];
   marketData: Record<string, MarketData>;
   financialByCountry?: Record<string, FinancialAssumptions>;
+  investmentThresholds?: InvestmentThresholds;
   weights?: Partial<ScoreWeights>;
 };
 
@@ -82,6 +83,7 @@ export type CountryResult = {
   };
   entryModes: EntryModeRecommendation[];
   financial: FinancialResult;
+  investmentRecommendation: InvestmentRecommendation;
   timing: TimingRecommendation;
   flags: string[];
 };
@@ -306,7 +308,7 @@ function calculateEntryModes(
     });
   }
 
-  return modes.sort((a, b) => b.score - a.score).slice(0, 3);
+  return modes.sort((a, b) => b.score - a.score);
 }
 
 function recommendTiming(attractiveness: number, safety: number, calibration: QualitativeCalibration): TimingRecommendation {
@@ -387,11 +389,18 @@ export function evaluateStrategy(input: EvaluationInput): EvaluationResult {
     if (calibration.competitionAttractiveness <= 35) flags.push("Contexto competitivo desfavorable: valide rivalidad, barreras y poder de canal antes de comprometer inversión.");
     if (data.sourceStatus !== "live") flags.push("Datos macroeconómicos incompletos o no disponibles: la puntuación se apoya más en calibración cualitativa.");
     if (governance?.sourceStatus === "unavailable") flags.push("Gobernanza WGI no disponible: el componente de gobierno y riesgo se apoya solo en la calibración cualitativa.");
-    const entryModes = calculateEntryModes(attractiveness, safety, calibration, input.objective, input.businessModel);
+    const modeRanking = calculateEntryModes(attractiveness, safety, calibration, input.objective, input.businessModel);
+    const entryModes = modeRanking.slice(0, 3);
     const financial = evaluateFinancials(
       input.financialByCountry?.[country.code],
-      entryModes.map(({ key, mode }) => ({ key, mode })),
+      modeRanking.map(({ key, mode }) => ({ key, mode })),
       input.horizonYears,
+    );
+    const investmentRecommendation = recommendInvestmentAction(
+      financial,
+      riskAdjusted,
+      calculateConfidence(data, calibration),
+      input.investmentThresholds,
     );
 
     return {
@@ -412,6 +421,7 @@ export function evaluateStrategy(input: EvaluationInput): EvaluationResult {
       },
       entryModes,
       financial,
+      investmentRecommendation,
       timing: recommendTiming(attractiveness, safety, calibration),
       flags,
     } satisfies CountryResult;
@@ -431,7 +441,7 @@ export function evaluateStrategy(input: EvaluationInput): EvaluationResult {
     portfolio: {
       leadingCountry: leader?.name,
       recommendation: leader
-        ? `${leader.name} lidera la comparación actual con una puntuación ajustada por riesgo de ${leader.scores.riskAdjusted}/100. El resultado es condicional a la calibración cualitativa y a los supuestos introducidos.`
+        ? `${leader.name} lidera la comparación actual con una puntuación ajustada por riesgo de ${leader.scores.riskAdjusted}/100. La política de inversión indica: ${leader.investmentRecommendation.label}. ${leader.investmentRecommendation.summary}`
         : "Añada al menos un país para construir una comparación.",
       caveats,
     },

@@ -64,13 +64,18 @@ const modeFinancialProfileSchema = z.object({
 
 const financialAssumptionsSchema = z.object({
   currency: z.string().min(1).max(10).nullable().optional(),
+  reportingCurrency: z.string().min(1).max(10).nullable().optional(),
+  fxRateToReportingCurrency: z.number().positive().nullable().optional(),
   tamYearOne: z.number().nonnegative().nullable().optional(),
   annualMarketGrowthPct: z.number().min(-100).max(500).nullable().optional(),
   samPct: z.number().min(0).max(100).nullable().optional(),
   somPctYearOne: z.number().min(0).max(100).nullable().optional(),
   somPctHorizon: z.number().min(0).max(100).nullable().optional(),
   operatingMarginPct: z.number().min(-100).max(100).nullable().optional(),
+  taxRatePct: z.number().min(0).max(100).nullable().optional(),
+  workingCapitalPctRevenue: z.number().min(-100).max(100).nullable().optional(),
   discountRatePct: z.number().min(0).max(100).nullable().optional(),
+  terminalGrowthPct: z.number().min(-100).max(100).nullable().optional(),
   modeProfiles: z.object({
     greenfield: modeFinancialProfileSchema.optional(),
     acquisition: modeFinancialProfileSchema.optional(),
@@ -80,6 +85,19 @@ const financialAssumptionsSchema = z.object({
     office: modeFinancialProfileSchema.optional(),
     digital: modeFinancialProfileSchema.optional(),
   }).optional(),
+});
+
+const investmentThresholdsSchema = z.object({
+  currency: z.string().min(1).max(10).nullable().optional(),
+  advanceMinRiskAdjusted: z.number().min(0).max(100).nullable().optional(),
+  testMinRiskAdjusted: z.number().min(0).max(100).nullable().optional(),
+  minConfidence: z.number().min(0).max(100).nullable().optional(),
+  advanceMinNpv: z.number().nullable().optional(),
+  testMinNpv: z.number().nullable().optional(),
+  advanceMinRoiPct: z.number().min(-100).max(10000).nullable().optional(),
+  testMinRoiPct: z.number().min(-100).max(10000).nullable().optional(),
+  advanceMaxPaybackYears: z.number().min(1).max(50).nullable().optional(),
+  testMaxInitialInvestment: z.number().nonnegative().nullable().optional(),
 });
 
 const evaluationSchema = z.object({
@@ -93,6 +111,7 @@ const evaluationSchema = z.object({
   countryInputs: z.array(countrySchema).min(1).max(12),
   marketData: z.record(z.string(), marketDataSchema),
   financialByCountry: z.record(z.string(), financialAssumptionsSchema).optional(),
+  investmentThresholds: investmentThresholdsSchema.optional(),
   weights: z.object({
     market: z.number().min(0).max(100).optional(),
     resources: z.number().min(0).max(100).optional(),

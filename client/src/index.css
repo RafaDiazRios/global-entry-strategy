@@ -297,3 +297,21 @@ button:active:not(:disabled) { transform: scale(.98); }
 .financial-alternative > div span { padding: 4px 5px; border-radius: 4px; background: #eaf6ed; color: #6a8375; font-size: 8.5px; }
 .financial-alternative > div b { color: #337653; }
 .financial-alternative p { margin: 3px 0 0; color: #9a7850; font-size: 9px; line-height: 1.35; }
+
+.threshold-card { border-color: #d0e3d6; background: linear-gradient(120deg,#fcfefd,#f2f9f4); box-shadow: 0 10px 30px rgba(30,63,46,.03); }
+.threshold-card [data-slot="card-header"] { padding: 23px 26px 13px; }
+.threshold-card [data-slot="card-content"] { padding: 12px 26px 25px; }
+.threshold-card [data-slot="card-description"] strong { color: #246647; }
+.threshold-rule { display: flex; gap: 9px; margin-top: 18px; padding: 12px; border: 1px solid #c9e3d3; border-radius: 8px; background: #ebf7ef; color: #35684e; }
+.threshold-rule svg { flex: 0 0 auto; margin-top: 1px; color: #2b845b; }
+.threshold-rule p { margin: 0; font-size: 11px; line-height: 1.48; }
+.investment-decision { margin-top: 15px; padding: 11px; border: 1px solid; border-radius: 8px; }
+.investment-decision > div { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.investment-decision span { color: inherit; font-size: 8.5px; font-weight: 800; letter-spacing: .07em; opacity: .75; text-transform: uppercase; }
+.investment-decision strong { font-family: Georgia, serif; font-size: 17px; font-weight: 500; }
+.investment-decision p { margin: 5px 0 0; font-size: 10px; line-height: 1.42; }
+.decision-advance { border-color: #a9d9ba; background: #ebf8ef; color: #23724c; }
+.decision-test { border-color: #ead08d; background: #fff8e7; color: #956b18; }
+.decision-discard { border-color: #edbfbb; background: #fff0ef; color: #a24e47; }
+.decision-incomplete { border-color: #d9e1dc; background: #f6f8f7; color: #65786d; }
+@media (max-width: 520px) { .financial-card [data-slot="card-header"], .threshold-card [data-slot="card-header"] { padding-left: 18px; padding-right: 18px; } .financial-card [data-slot="card-content"], .threshold-card [data-slot="card-content"] { padding-left: 18px; padding-right: 18px; } }

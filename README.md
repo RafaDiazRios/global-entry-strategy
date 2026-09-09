@@ -12,9 +12,10 @@ La herramienta no asigna un “mejor país” universal. Estructura una decisió
 | Mercados | Catálogo de países, filtros de exclusión, PIB, crecimiento y población |
 | Datos externos | World Bank Open Data, IED de fuente UNCTAD y gobernanza WGI 2025 |
 | Estrategia | Atractividad, riesgo, distancia CAGE, pesos configurables y modos de entrada |
-| Finanzas | TAM, SAM, SOM, beneficio operativo, ROI simple, NPV y año de recuperación por alternativa |
+| Finanzas | TAM, SAM, SOM, impuestos, capital de trabajo, tipo de cambio, ROI sobre flujo libre, NPV, valor terminal y recuperación por alternativa |
 | Comparación | Panel lado a lado de hasta cuatro países con evidencia, resultado y economía de entrada |
-| Historial | Escenarios personales autenticados, exportables en Markdown y actualizables |
+| Gobierno de inversión | Umbrales configurables que clasifican cada alternativa como Avanzar, Probar, Descartar o Completar evidencia |
+| Historial y reporte | Escenarios personales autenticados, informe PDF detallado y actualización de datos |
 
 ## Fuentes conectadas
 
@@ -31,10 +32,21 @@ Todos los supuestos de una comparación por país deben introducirse en una úni
 - `TAM horizonte = TAM año 1 × (1 + crecimiento anual)^(horizonte − 1)`
 - `SAM = TAM × % SAM`
 - `SOM ingresos = SAM × % SOM`
-- `ROI simple acumulado = (beneficio operativo acumulado − inversión inicial) / inversión inicial`
-- `NPV = −inversión inicial + Σ(beneficio operativo anual / (1 + tasa de descuento)^t)`
+- `FCF_t = EBIT_t − impuestos_t − Δcapital de trabajo_t`
+- `ROI acumulado = (FCF acumulado − inversión inicial) / inversión inicial`; no incluye valor terminal.
+- `NPV = −inversión inicial + Σ(FCF_t / (1 + tasa de descuento)^t) + VP(valor terminal)`
+- `Valor terminal = FCF_(n+1) / (tasa de descuento − crecimiento terminal)`; el modelo falla de forma explícita si la tasa de descuento no es superior al crecimiento terminal.
+- Cuando la moneda local y de reporte difieren, todos los importes del flujo se multiplican por el tipo de cambio introducido, expresado como unidades de moneda de reporte por una unidad de moneda local.
 
-El modelo no incluye por defecto impuestos, financiación, capital de trabajo, valor terminal, efectos de divisa ni costes de integración. Deben añadirse en un modelo corporativo completo cuando sean materiales. El ROI se muestra como estimación y nunca como una aprobación de inversión.
+El modelo no incluye financiación, depreciación, amortización, valor residual alternativo, cambios fiscales futuros, costes de integración ni coberturas de divisa. Deben añadirse en un modelo corporativo completo cuando sean materiales. El ROI se muestra como estimación y nunca como una aprobación de inversión.
+
+## Política de umbrales
+
+La política está visible y es modificable dentro de cada escenario. **Avanzar** exige que la alternativa con mejor NPV supere el riesgo ajustado, confianza de evidencia, NPV, ROI y recuperación máxima definidos. **Probar** permite una entrada reversible si supera los criterios mínimos de prueba y, opcionalmente, el límite de inversión. **Descartar** significa que no se cumple el mínimo de prueba. **Completar evidencia** se muestra cuando faltan supuestos financieros obligatorios o existe una inconsistencia entre la moneda de umbrales y la moneda de reporte. La herramienta no autoriza gastos ni sustituye a la debida diligencia.
+
+## Informe PDF
+
+El botón **PDF** genera localmente un informe detallado que incluye mandato, tabla comparativa, política de umbrales, puntuaciones, recomendación por mercado, supuestos financieros, alternativas, flujos de caja anuales, NPV, valor terminal, alertas, metodología y fuentes. El archivo no se transmite a terceros ni se guarda fuera del navegador por esta función.
 
 ## Desarrollo local
 
