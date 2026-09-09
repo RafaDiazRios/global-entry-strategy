@@ -6,6 +6,7 @@ import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import * as db from "./db";
 import { evaluateStrategy, type EntryObjective, type EvaluationInput, type MarketData } from "./strategy/engine";
 import { getWorldBankMarketData, publicSources } from "./strategy/worldBank";
+import { getWgiGovernanceData } from "./strategy/wgi";
 import { financialPublicSources, getCountryFinancialReference } from "./strategy/countryFinancialData";
 
 const score = z.number().min(0).max(100);
@@ -199,9 +200,17 @@ export const appRouter = router({
       .mutation(async ({ input }) => {
         const normalizedCodes = Array.from(new Set(input.countryCodes.map((code) => code.toUpperCase())));
         const results = await Promise.all(
-          normalizedCodes.map(async (code) => [code, await getWorldBankMarketData(code)] as const),
+          normalizedCodes.map(async (code) => [code, await getWorldBankMarketData(code, false)] as const),
         );
         return Object.fromEntries(results) as Record<string, MarketData>;
+      }),
+
+    fetchGovernanceData: protectedProcedure
+      .input(z.object({ countryCodes: z.array(z.string().min(2).max(3)).min(1).max(12) }))
+      .mutation(async ({ input }) => {
+        const normalizedCodes = Array.from(new Set(input.countryCodes.map((code) => code.toUpperCase())));
+        const results = await Promise.all(normalizedCodes.map(async (code) => [code, await getWgiGovernanceData(code)] as const));
+        return Object.fromEntries(results);
       }),
 
     fetchCountryFinancialData: protectedProcedure

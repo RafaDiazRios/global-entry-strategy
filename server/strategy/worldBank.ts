@@ -26,7 +26,7 @@ async function latestValue(countryCode: string, indicator: string): Promise<{ va
   return { value: latest?.value ?? null, year: latest?.date ? Number(latest.date) : null };
 }
 
-export async function getWorldBankMarketData(countryCode: string): Promise<MarketData> {
+export async function getWorldBankMarketData(countryCode: string, includeGovernance = true): Promise<MarketData> {
   const entries = await Promise.all(
     Object.entries(indicators).map(async ([field, indicator]) => {
       try { return [field, await latestValue(countryCode, indicator)] as const; }
@@ -34,7 +34,9 @@ export async function getWorldBankMarketData(countryCode: string): Promise<Marke
     }),
   );
   const mapped = Object.fromEntries(entries) as Record<string, { value: number | null; year: number | null }>;
-  const governance = await getWgiGovernanceData(countryCode);
+  const governance = includeGovernance
+    ? await getWgiGovernanceData(countryCode)
+    : { politicalStability: null, governmentEffectiveness: null, regulatoryQuality: null, ruleOfLaw: null, controlOfCorruption: null, sourceYear: null, sourceStatus: "unavailable" as const };
   const values = Object.values(mapped);
   const available = values.filter((entry) => entry.value !== null).length;
   const years = [...values.map((entry) => entry.year), governance.sourceYear].filter((year): year is number => year !== null);

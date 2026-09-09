@@ -11,7 +11,7 @@ El modelo está diseñado para estructurar el juicio de entrada internacional, n
 | Fase | Acción del usuario | Qué hace la herramienta | Resultado esperado |
 |---|---|---|---|
 | 1. Mandato | Introducir empresa, país base, industria, modelo de negocio, objetivo y horizonte. | Conserva el contexto que da significado a todas las puntuaciones posteriores. | Un mandato definido y visible en el caso. |
-| 2. Mercados | Añadir países, definir filtros y pulsar **Actualizar mercado y fiscal**. | Descarga macrodatos, IED, WGI, tasa corporativa estatutaria y tipo de cambio de referencia. | Una base factual comparable; los campos sin datos permanecen vacíos. |
+| 2. Mercados | Añadir países y, si desea volver a consultar todos, pulsar **Actualizar mercado y fiscal**. | Al añadir un país descarga automáticamente macrodatos, IED, tasa corporativa estatutaria y tipo de cambio; WGI se completa en segundo plano. | Una base factual comparable; los campos sin datos permanecen vacíos. |
 | 3. Calibración | Elegir cada país y ajustar factores cualitativos de 0 a 100. | Traduce la evidencia local y el juicio de dirección en atractividad, riesgo y encaje. | Supuestos estratégicos explícitos por país. |
 | 4. Economía | Completar TAM/SAM/SOM, costes, inversiones, capital de trabajo, descuento y perfiles de entrada. | Calcula flujo libre, ROI, NPV, recuperación y valor terminal de cada alternativa. | Una evaluación económica por alternativa. |
 | 5. Escenarios | Definir las variaciones optimista y conservadora. | Recalcula el efecto de precio/ingreso, margen y tipo de cambio. | La sensibilidad de ROI y NPV alrededor del caso base. |
@@ -20,7 +20,9 @@ El modelo está diseñado para estructurar el juicio de entrada internacional, n
 
 ## Cómo actualizar las fuentes públicas
 
-En la fase **Mercados**, pulse **Actualizar mercado y fiscal** después de añadir los países. La acción se ejecuta para todos los candidatos del borrador y actualiza los indicadores macroeconómicos, la IED de UNCTAD distribuida a través de World Bank, los indicadores WGI, la tasa corporativa estatutaria de Tax Foundation y el tipo de cambio de referencia de Frankfurter. La aplicación confirma con una notificación cuántos perfiles macroeconómicos, tasas fiscales y pares de divisa están disponibles.
+En la fase **Mercados**, los indicadores macroeconómicos, la IED de UNCTAD distribuida a través de World Bank, la tasa corporativa estatutaria de Tax Foundation y el tipo de cambio de referencia de Frankfurter se solicitan automáticamente al añadir cada país. No es necesario pulsar Enter ni guardar primero. El botón **Actualizar mercado y fiscal** permite volver a consultar todos los candidatos del borrador cuando quiera. La aplicación confirma cuántos perfiles macroeconómicos, tasas fiscales y pares de divisa están disponibles.
+
+Los indicadores de gobernanza WGI se descargan en segundo plano porque el archivo oficial es más pesado. La tabla muestra **Cargando** en la columna WGI hasta que llegue la respuesta. Los demás indicadores se deben ver antes, sin esperar a WGI.
 
 La actualización no sustituye campos que usted haya editado deliberadamente como manuales para impuesto o FX. En la fase Economía, una etiqueta **Público** identifica la cifra descargada y una etiqueta **Manual** identifica una cifra sobrescrita. Las fuentes, la fecha y sus límites se muestran bajo cada campo.
 

@@ -413,3 +413,5 @@ button:active:not(:disabled) { transform: scale(.98); }
 
 @media (max-width: 1000px) { .guide-steps { grid-template-columns: repeat(3,minmax(0,1fr)); } .guide-arrow { display: none; } }
 @media (max-width: 700px) { .guide-steps, .scenario-input-grid { grid-template-columns: 1fr; } .guide-footnote { align-items: flex-start; flex-wrap: wrap; } .guide-footnote [data-slot="badge"] { margin-left: 0; } .scenario-outcome-grid { grid-template-columns: 1fr; } .approval-intro, .approval-card-heading, .approval-create-footer { align-items: flex-start; flex-direction: column; } .approval-status { width: 100%; } .approval-create-card [data-slot="card-header"], .approval-create-card [data-slot="card-content"] { padding-left: 18px; padding-right: 18px; } }
+
+.metric-loading { display: inline-flex; align-items: center; gap: 4px; color: #4e8066; font-size: 10px; font-weight: 700; }

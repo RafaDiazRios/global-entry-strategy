@@ -11,7 +11,7 @@ export default function OnboardingGuide({ mandateReady, candidateCount, dataRead
   if (!visible) return <Button variant="outline" size="sm" className="guide-reopen" onClick={() => setVisible(true)}><HelpCircle className="mr-2 h-4 w-4" /> Ver guía de uso</Button>;
   const steps: GuideStep[] = [
     { tab: "brief", number: "1", title: "Defina el mandato", text: "Empresa, país base, industria y modelo de negocio.", ready: mandateReady },
-    { tab: "screen", number: "2", title: "Añada y actualice mercados", text: `${candidateCount ? `${candidateCount} candidato${candidateCount === 1 ? "" : "s"} añadido${candidateCount === 1 ? "" : "s"}` : "Seleccione países y pulse Actualizar datos."}`, ready: candidateCount > 0 && dataReady },
+    { tab: "screen", number: "2", title: "Añada y actualice mercados", text: `${candidateCount ? `${candidateCount} candidato${candidateCount === 1 ? "" : "s"} añadido${candidateCount === 1 ? "" : "s"}; los datos cargan automáticamente.` : "Seleccione países; los datos se cargarán automáticamente."}`, ready: candidateCount > 0 && dataReady },
     { tab: "calibrate", number: "3", title: "Calibre factores locales", text: "Ajuste oportunidad, distancia, riesgo y capacidades de ejecución.", ready: candidateCount > 0 },
     { tab: "finance", number: "4", title: "Complete economía y escenarios", text: "Introduzca TAM/SAM/SOM, costes y sensibilidades antes de comparar retornos.", ready: financialReady },
     { tab: "decision", number: "5", title: "Genere la evaluación", text: "Revise umbrales, alternativas y alertas; guarde el escenario para activar gates.", ready: evaluationReady },

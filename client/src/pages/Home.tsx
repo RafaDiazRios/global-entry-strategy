@@ -198,6 +198,7 @@ export default function Home() {
   const [comparisonCodes, setComparisonCodes] = useState<string[]>([]);
   const [result, setResult] = useState<Evaluation | null>(null);
   const [savedScenarioId, setSavedScenarioId] = useState<number | null>(null);
+  const [governanceLoadingCodes, setGovernanceLoadingCodes] = useState<string[]>([]);
   const [popMin, setPopMin] = useState("0");
   const [gdpMin, setGdpMin] = useState("0");
   const [growthMin, setGrowthMin] = useState("-100");
@@ -209,6 +210,7 @@ export default function Home() {
   const scenariosQuery = trpc.strategy.listScenarios.useQuery(undefined, { enabled: isAuthenticated });
   const fetchData = trpc.strategy.fetchMarketData.useMutation();
   const fetchFinancialData = trpc.strategy.fetchCountryFinancialData.useMutation();
+  const fetchGovernanceData = trpc.strategy.fetchGovernanceData.useMutation();
   const evaluation = trpc.strategy.evaluate.useMutation();
   const saveScenario = trpc.strategy.saveScenario.useMutation();
 
@@ -243,6 +245,7 @@ export default function Home() {
     setActiveCountry(candidate.code);
     setSelectedCode("");
     setResult(null);
+    void refreshCountryData([candidate.code], false);
   }
 
   function removeCandidate(code: string) {
@@ -317,16 +320,14 @@ export default function Home() {
       : current.length >= 4 ? (toast.info("La vista lado a lado admite hasta cuatro países."), current) : [...current, code]);
   }
 
-  async function refreshData() {
-    if (!candidates.length) { toast.error("Añada primero al menos un país candidato."); return; }
+  async function refreshCountryData(countryCodes: string[], showFeedback: boolean) {
     try {
-      const countryCodes = candidates.map((candidate) => candidate.code);
       const [fresh, financialReferences] = await Promise.all([
         fetchData.mutateAsync({ countryCodes }),
         fetchFinancialData.mutateAsync({ countryCodes, reportingCurrency: "USD" }),
       ]);
-      setMarketData(fresh);
-      setFinancialByCountry((current) => Object.fromEntries(countryCodes.map((code) => {
+      setMarketData((current) => ({ ...current, ...fresh }));
+      setFinancialByCountry((current) => ({ ...current, ...Object.fromEntries(countryCodes.map((code) => {
         const reference = financialReferences[code];
         const existing = current[code] ?? {};
         return [code, {
@@ -340,16 +341,31 @@ export default function Home() {
           taxRateDataMode: existing.taxRateDataMode === "manual" ? "manual" : "public",
           fxRateDataMode: existing.fxRateDataMode === "manual" ? "manual" : "public",
         }];
-      })));
+      })) }));
       setResult(null);
       setSavedScenarioId(null);
-      const liveCount = Object.values(fresh).filter((data) => data.sourceStatus === "live").length;
-      const taxCount = Object.values(financialReferences).filter((reference) => reference.tax.sourceStatus === "live").length;
-      const fxCount = Object.values(financialReferences).filter((reference) => reference.fx.sourceStatus === "live").length;
-      toast.success(`Actualización completada: ${liveCount}/${candidates.length} perfiles macro, ${taxCount} impuestos y ${fxCount} FX.`);
+      setGovernanceLoadingCodes((current) => Array.from(new Set([...current, ...countryCodes])));
+      void fetchGovernanceData.mutateAsync({ countryCodes }).then((governance) => {
+        setMarketData((current) => Object.fromEntries(Object.entries(current).map(([code, data]) => [code, governance[code] ? { ...data, governance: governance[code], sourceYear: Math.max(data.sourceYear ?? 0, governance[code].sourceYear ?? 0) || null } : data])));
+      }).catch(() => {
+        if (showFeedback) toast.warning("Los indicadores macro y financieros se actualizaron; WGI no respondió y se puede intentar de nuevo.");
+      }).finally(() => {
+        setGovernanceLoadingCodes((current) => current.filter((code) => !countryCodes.includes(code)));
+      });
+      if (showFeedback) {
+        const liveCount = Object.values(fresh).filter((data) => data.sourceStatus === "live").length;
+        const taxCount = Object.values(financialReferences).filter((reference) => reference.tax.sourceStatus === "live").length;
+        const fxCount = Object.values(financialReferences).filter((reference) => reference.fx.sourceStatus === "live").length;
+        toast.success(`Indicadores visibles: ${liveCount}/${countryCodes.length} macro, ${taxCount} impuestos y ${fxCount} FX. WGI sigue cargando en segundo plano.`);
+      }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "No se pudieron actualizar los datos públicos.");
     }
+  }
+
+  async function refreshData() {
+    if (!candidates.length) { toast.error("Añada primero al menos un país candidato."); return; }
+    await refreshCountryData(candidates.map((candidate) => candidate.code), true);
   }
 
   function buildInput() {
@@ -463,7 +479,7 @@ export default function Home() {
               </CardContent></Card>
               <Card className="data-card"><CardHeader><div className="flex items-center justify-between"><div><div className="step-tag">DATOS EXTERNOS</div><CardTitle>Base factual</CardTitle></div><Database className="h-6 w-6 text-sky-700" /></div><CardDescription>Los indicadores macroeconómicos, fiscales y de divisa se actualizan desde fuentes públicas. Los factores estratégicos se califican separadamente para no fingir una precisión inexistente.</CardDescription></CardHeader><CardContent className="space-y-3">{[...(sourcesQuery.data ?? []), ...(financialSourcesQuery.data ?? [])].map((source) => <a key={source.name} href={source.url} target="_blank" rel="noreferrer" className="source-row"><div><strong>{source.name}</strong><p>{source.coverage}</p></div><Badge variant="outline" className={source.status === "Conectado" ? "source-live" : ""}>{source.status}</Badge></a>)}</CardContent></Card>
             </div>
-            {candidates.length > 0 && <Card className="metric-card mt-6"><CardHeader><CardTitle>Indicadores actualizados</CardTitle><CardDescription>Valores más recientes disponibles. La IED proviene de UNCTAD mediante World Bank Open Data; los indicadores de gobernanza se descargan de la revisión WGI 2025.</CardDescription></CardHeader><CardContent><div className="overflow-x-auto"><table className="metrics-table"><thead><tr><th>Mercado</th><th>Estado</th><th>PIB</th><th>PIB / hab.</th><th>PIB real</th><th>IED neta</th><th>IED / PIB</th><th>WGI</th><th>Año</th></tr></thead><tbody>{candidates.map((candidate) => { const data = marketData[candidate.code] ?? blankData(); const passes = screenedCandidates.some((item) => item.code === candidate.code); const governance = data.governance; const governanceAverage = governance ? [governance.politicalStability, governance.governmentEffectiveness, governance.regulatoryQuality, governance.ruleOfLaw, governance.controlOfCorruption].filter((value): value is number => value !== null).reduce((sum, value, _, all) => sum + value / all.length, 0) : null; return <tr key={candidate.code} className={!passes ? "muted-row" : ""}><td><strong>{candidate.name}</strong><span>{candidate.code}</span></td><td><StatusBadge status={data.sourceStatus} /></td><td>{formatBillions(data.gdpUsd)}</td><td>{data.gdpPerCapita ? `US$ ${formatNumber(data.gdpPerCapita, { maximumFractionDigits: 0 })}` : "—"}</td><td>{data.gdpGrowth !== null && data.gdpGrowth !== undefined ? `${formatNumber(data.gdpGrowth, { maximumFractionDigits: 1 })}%` : "—"}</td><td>{formatBillions(data.fdiInflowUsd)}</td><td>{data.fdiInflowPctGdp !== null && data.fdiInflowPctGdp !== undefined ? `${formatNumber(data.fdiInflowPctGdp, { maximumFractionDigits: 1 })}%` : "—"}</td><td>{governanceAverage === null ? "—" : `${formatNumber(governanceAverage, { maximumFractionDigits: 0 })}/100`}</td><td>{data.sourceYear ?? "—"}</td></tr>; })}</tbody></table></div></CardContent></Card>}
+            {candidates.length > 0 && <Card className="metric-card mt-6"><CardHeader><CardTitle>Indicadores actualizados</CardTitle><CardDescription>PIB, crecimiento, IED, impuesto y FX se muestran en primer lugar. WGI se carga después porque la fuente oficial es más pesada; la celda indicará “Cargando” mientras llega.</CardDescription></CardHeader><CardContent><div className="overflow-x-auto"><table className="metrics-table"><thead><tr><th>Mercado</th><th>Estado</th><th>PIB</th><th>PIB / hab.</th><th>PIB real</th><th>IED neta</th><th>IED / PIB</th><th>WGI</th><th>Año</th></tr></thead><tbody>{candidates.map((candidate) => { const data = marketData[candidate.code] ?? blankData(); const passes = screenedCandidates.some((item) => item.code === candidate.code); const governance = data.governance; const governanceAverage = governance ? [governance.politicalStability, governance.governmentEffectiveness, governance.regulatoryQuality, governance.ruleOfLaw, governance.controlOfCorruption].filter((value): value is number => value !== null).reduce((sum, value, _, all) => sum + value / all.length, 0) : null; const governanceLoading = governanceLoadingCodes.includes(candidate.code); return <tr key={candidate.code} className={!passes ? "muted-row" : ""}><td><strong>{candidate.name}</strong><span>{candidate.code}</span></td><td><StatusBadge status={data.sourceStatus} /></td><td>{formatBillions(data.gdpUsd)}</td><td>{data.gdpPerCapita ? `US$ ${formatNumber(data.gdpPerCapita, { maximumFractionDigits: 0 })}` : "—"}</td><td>{data.gdpGrowth !== null && data.gdpGrowth !== undefined ? `${formatNumber(data.gdpGrowth, { maximumFractionDigits: 1 })}%` : "—"}</td><td>{formatBillions(data.fdiInflowUsd)}</td><td>{data.fdiInflowPctGdp !== null && data.fdiInflowPctGdp !== undefined ? `${formatNumber(data.fdiInflowPctGdp, { maximumFractionDigits: 1 })}%` : "—"}</td><td>{governanceLoading ? <span className="metric-loading"><Loader2 className="h-3 w-3 animate-spin" /> Cargando</span> : governanceAverage === null ? "—" : `${formatNumber(governanceAverage, { maximumFractionDigits: 0 })}/100`}</td><td>{data.sourceYear ?? "—"}</td></tr>; })}</tbody></table></div></CardContent></Card>}
           </TabsContent>
 
           <TabsContent value="calibrate" className="tab-enter">
