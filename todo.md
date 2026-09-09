@@ -19,12 +19,9 @@
 - [x] Validación en vivo de la tasa corporativa mexicana y MXN/USD.
 - [x] Suite Vitest, comprobación TypeScript, compilación de producción y revisión visual del PDF.
 
-## Pendientes deliberados
+## Consideraciones para la siguiente evolución
 
-- [ ] Configurar una tarea programada de producción para actualizar escenarios guardados en una cadencia definida por el propietario. Requiere publicación de la aplicación y una decisión de frecuencia.
-- [ ] Ampliar el catálogo de países y la correspondencia ISO 4217 antes de habilitar países fuera del catálogo actual.
-- [ ] Integrar fuentes sectoriales o de pago solo cuando se conozcan la industria y los mercados prioritarios.
-- [ ] Definir una licencia de repositorio y normas de contribución para desarrollo colaborativo.
+La actualización programada de escenarios guardados debe configurarse únicamente después de publicar la aplicación y fijar una frecuencia de actualización. El catálogo de moneda ISO 4217 debe ampliarse antes de habilitar mercados que no estén incluidos actualmente. Las fuentes sectoriales o de pago y la licencia del repositorio requieren decisiones del propietario y están fuera de la presente entrega.
 
 ## Incidencias conocidas
 
