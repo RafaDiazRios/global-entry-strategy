@@ -37,12 +37,20 @@ describe("evaluateStrategy", () => {
         AA: { gdpUsd: 2_000_000_000_000, gdpPerCapita: 45_000, gdpGrowth: 3.4, population: 80_000_000, urbanization: 80, internetUse: 95, tradeOpenness: 85, investmentRate: 25, sourceYear: 2024, sourceStatus: "live" },
         BB: { gdpUsd: 90_000_000_000, gdpPerCapita: 3_500, gdpGrowth: -1.2, population: 9_000_000, urbanization: 35, internetUse: 28, tradeOpenness: 35, investmentRate: 12, sourceYear: 2024, sourceStatus: "live" },
       },
+      financialByCountry: {
+        AA: {
+          currency: "USD", tamYearOne: 1_000_000, annualMarketGrowthPct: 5, samPct: 40,
+          somPctYearOne: 2, somPctHorizon: 4, operatingMarginPct: 20, discountRatePct: 10,
+          modeProfiles: { digital: { initialInvestment: 50_000, annualOperatingCost: 25_000, revenueCapturePct: 100 } },
+        },
+      },
     });
 
     expect(result.countries[0].code).toBe("AA");
     expect(result.countries[0].scores.riskAdjusted).toBeGreaterThan(result.countries[1].scores.riskAdjusted);
     expect(result.countries[0].entryModes.some((mode) => mode.mode === "Entrada digital o híbrida")).toBe(true);
     expect(result.portfolio.leadingCountry).toBe("Mercado A");
+    expect(result.countries[0].financial.market.tamAtHorizon).toBeGreaterThan(1_000_000);
   });
 
   it("identifies a limited-evidence situation without inventing data", () => {
