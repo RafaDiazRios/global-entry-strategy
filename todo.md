@@ -15,6 +15,7 @@
 - [x] Carga automática y progresiva de indicadores al añadir mercados, sin bloquear la tabla por WGI.
 - [x] Tabla de Mercados con impuesto corporativo, FX, fecha de última actualización, edición manual y restauración selectiva.
 - [x] Reintento específico de WGI por país, sin volver a consultar los demás indicadores.
+- [x] Cola de cargas, reintentos automáticos y límite de concurrencia para evitar saturación al añadir varios países.
 
 ## Verificación completada
 

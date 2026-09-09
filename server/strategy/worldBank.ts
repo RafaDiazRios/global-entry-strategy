@@ -4,6 +4,52 @@ import { getWgiGovernanceData } from "./wgi";
 type WorldBankRow = { date?: string; value?: number | null };
 type WorldBankResponse = [unknown, WorldBankRow[]?];
 
+const transientStatuses = new Set([429, 500, 502, 503, 504]);
+
+function delay(milliseconds: number) {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
+async function readWorldBankJson(url: string, indicator: string): Promise<WorldBankResponse> {
+  let lastError: Error | null = null;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      const response = await fetch(url, { headers: { Accept: "application/json" } });
+      if (!response.ok) {
+        if (transientStatuses.has(response.status) && attempt < 2) {
+          await delay(250 * (attempt + 1));
+          continue;
+        }
+        throw new Error(`World Bank request failed for ${indicator}: ${response.status}`);
+      }
+      const text = await response.text();
+      try {
+        return JSON.parse(text) as WorldBankResponse;
+      } catch {
+        throw new Error(`World Bank returned a non-JSON response for ${indicator}`);
+      }
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error("World Bank request failed");
+      if (attempt < 2) await delay(250 * (attempt + 1));
+    }
+  }
+  throw lastError ?? new Error(`World Bank request failed for ${indicator}`);
+}
+
+async function mapWithConcurrency<T, R>(items: T[], limit: number, mapper: (item: T) => Promise<R>) {
+  const results: R[] = new Array(items.length);
+  let cursor = 0;
+  async function worker() {
+    while (cursor < items.length) {
+      const index = cursor;
+      cursor += 1;
+      results[index] = await mapper(items[index]);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, () => worker()));
+  return results;
+}
+
 const indicators = {
   gdpUsd: "NY.GDP.MKTP.CD",
   gdpPerCapita: "NY.GDP.PCAP.CD",
@@ -19,19 +65,19 @@ const indicators = {
 
 async function latestValue(countryCode: string, indicator: string): Promise<{ value: number | null; year: number | null }> {
   const url = `https://api.worldbank.org/v2/country/${encodeURIComponent(countryCode)}/indicator/${indicator}?format=json&per_page=8&date=2018:2025`;
-  const response = await fetch(url, { headers: { Accept: "application/json" } });
-  if (!response.ok) throw new Error(`World Bank request failed for ${indicator}: ${response.status}`);
-  const body = (await response.json()) as WorldBankResponse;
+  const body = await readWorldBankJson(url, indicator);
   const latest = (body[1] ?? []).find((row) => row.value !== null && row.value !== undefined);
   return { value: latest?.value ?? null, year: latest?.date ? Number(latest.date) : null };
 }
 
 export async function getWorldBankMarketData(countryCode: string, includeGovernance = true): Promise<MarketData> {
-  const entries = await Promise.all(
-    Object.entries(indicators).map(async ([field, indicator]) => {
+  const entries = await mapWithConcurrency(
+    Object.entries(indicators),
+    3,
+    async ([field, indicator]) => {
       try { return [field, await latestValue(countryCode, indicator)] as const; }
       catch { return [field, { value: null, year: null }] as const; }
-    }),
+    },
   );
   const mapped = Object.fromEntries(entries) as Record<string, { value: number | null; year: number | null }>;
   const governance = includeGovernance

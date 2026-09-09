@@ -21,4 +21,20 @@ describe("getWorldBankMarketData", () => {
     expect(data.governance.sourceStatus).toBe("unavailable");
     expect(data.lastUpdatedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
   });
+
+  it("retries a temporary service-unavailable response before populating indicators", async () => {
+    let calls = 0;
+    vi.stubGlobal("fetch", vi.fn(async () => {
+      calls += 1;
+      return calls === 1
+        ? new Response("Service Unavailable", { status: 503 })
+        : new Response(JSON.stringify([{}, [{ date: "2025", value: 77 }]]), { status: 200, headers: { "content-type": "application/json" } });
+    }));
+
+    const data = await getWorldBankMarketData("DE", false);
+
+    expect(calls).toBeGreaterThan(10);
+    expect(data.gdpUsd).toBe(77);
+    expect(data.sourceStatus).toBe("live");
+  });
 });

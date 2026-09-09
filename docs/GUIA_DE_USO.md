@@ -22,6 +22,8 @@ El modelo está diseñado para estructurar el juicio de entrada internacional, n
 
 En la fase **Mercados**, los indicadores macroeconómicos, la IED de UNCTAD distribuida a través de World Bank, la tasa corporativa estatutaria de Tax Foundation y el tipo de cambio de referencia de Frankfurter se solicitan automáticamente al añadir cada país. No es necesario pulsar Enter ni guardar primero. El botón **Actualizar mercado y fiscal** permite volver a consultar todos los candidatos del borrador cuando quiera. La aplicación confirma cuántos perfiles macroeconómicos, tasas fiscales y pares de divisa están disponibles.
 
+Si añade varios países seguidos, las solicitudes se colocan en una cola breve para no saturar las fuentes públicas. El estado de la tabla muestra **Actualizando** mientras cada país espera o consulta datos. Si una fuente externa devuelve una indisponibilidad temporal, la herramienta reintenta una vez de forma automática y conserva el país en el borrador; el mensaje mostrado evita exponer errores técnicos del proveedor.
+
 Los indicadores de gobernanza WGI se descargan en segundo plano porque el archivo oficial es más pesado. La tabla muestra **Cargando** en la columna WGI hasta que llegue la respuesta. Los demás indicadores se deben ver antes, sin esperar a WGI.
 
 La actualización no sustituye campos que usted haya editado deliberadamente como manuales para impuesto o FX. En la fase Economía, una etiqueta **Público** identifica la cifra descargada y una etiqueta **Manual** identifica una cifra sobrescrita. Las fuentes, la fecha y sus límites se muestran bajo cada campo.

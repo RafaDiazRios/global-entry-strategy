@@ -45,7 +45,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 type Objective = "market" | "resources" | "learning" | "coordination";
@@ -208,7 +208,9 @@ export default function Home() {
   const [savedScenarioId, setSavedScenarioId] = useState<number | null>(null);
   const [governanceLoadingCodes, setGovernanceLoadingCodes] = useState<string[]>([]);
   const [governanceErrors, setGovernanceErrors] = useState<Record<string, string>>({});
+  const [marketLoadingCodes, setMarketLoadingCodes] = useState<string[]>([]);
   const [editingMarketCode, setEditingMarketCode] = useState<string | null>(null);
+  const marketRefreshQueue = useRef<Promise<unknown>>(Promise.resolve());
   const [popMin, setPopMin] = useState("0");
   const [gdpMin, setGdpMin] = useState("0");
   const [growthMin, setGrowthMin] = useState("-100");
@@ -255,7 +257,7 @@ export default function Home() {
     setActiveCountry(candidate.code);
     setSelectedCode("");
     setResult(null);
-    void refreshCountryData([candidate.code], false);
+    void enqueueCountryRefresh(candidate.code);
   }
 
   function removeCandidate(code: string) {
@@ -383,7 +385,7 @@ export default function Home() {
       : current.length >= 4 ? (toast.info("La vista lado a lado admite hasta cuatro países."), current) : [...current, code]);
   }
 
-  async function refreshCountryData(countryCodes: string[], showFeedback: boolean, restoreMetric?: MarketMetricKey, restoreFinancialMetric?: FinancialReferenceKey) {
+  async function refreshCountryData(countryCodes: string[], showFeedback: boolean, restoreMetric?: MarketMetricKey, restoreFinancialMetric?: FinancialReferenceKey, attempt = 0): Promise<void> {
     try {
       const [fresh, financialReferences] = await Promise.all([
         fetchData.mutateAsync({ countryCodes }),
@@ -438,13 +440,29 @@ export default function Home() {
         toast.success(`Indicadores visibles: ${liveCount}/${countryCodes.length} macro, ${taxCount} impuestos y ${fxCount} FX. WGI sigue cargando en segundo plano.`);
       }
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "No se pudieron actualizar los datos públicos.");
+      const message = error instanceof Error ? error.message : "";
+      const temporary = /service unavailable|unexpected token|failed to fetch|network/i.test(message);
+      if (temporary && attempt < 1) {
+        await new Promise((resolve) => setTimeout(resolve, 900));
+        return refreshCountryData(countryCodes, showFeedback, restoreMetric, restoreFinancialMetric, attempt + 1);
+      }
+      toast.error(temporary
+        ? "La fuente pública no está disponible temporalmente. El país se mantiene añadido; vuelva a actualizarlo en unos instantes."
+        : "No se pudieron actualizar los datos públicos. Revise la conexión e inténtelo de nuevo.");
     }
   }
 
   async function refreshData() {
     if (!candidates.length) { toast.error("Añada primero al menos un país candidato."); return; }
     await refreshCountryData(candidates.map((candidate) => candidate.code), true);
+  }
+
+  function enqueueCountryRefresh(code: string) {
+    setMarketLoadingCodes((current) => Array.from(new Set([...current, code])));
+    marketRefreshQueue.current = marketRefreshQueue.current
+      .catch(() => undefined)
+      .then(() => refreshCountryData([code], false))
+      .finally(() => setMarketLoadingCodes((current) => current.filter((item) => item !== code)));
   }
 
   async function retryGovernance(code: string, restoreManual = false) {
@@ -587,7 +605,7 @@ export default function Home() {
               </CardContent></Card>
               <Card className="data-card"><CardHeader><div className="flex items-center justify-between"><div><div className="step-tag">DATOS EXTERNOS</div><CardTitle>Base factual</CardTitle></div><Database className="h-6 w-6 text-sky-700" /></div><CardDescription>Los indicadores macroeconómicos, fiscales y de divisa se actualizan desde fuentes públicas. Los factores estratégicos se califican separadamente para no fingir una precisión inexistente.</CardDescription></CardHeader><CardContent className="space-y-3">{[...(sourcesQuery.data ?? []), ...(financialSourcesQuery.data ?? [])].map((source) => <a key={source.name} href={source.url} target="_blank" rel="noreferrer" className="source-row"><div><strong>{source.name}</strong><p>{source.coverage}</p></div><Badge variant="outline" className={source.status === "Conectado" ? "source-live" : ""}>{source.status}</Badge></a>)}</CardContent></Card>
             </div>
-            {candidates.length > 0 && <MarketComparisonTable candidates={candidates} marketData={marketData} financialByCountry={financialByCountry} governanceLoadingCodes={governanceLoadingCodes} governanceErrors={governanceErrors} editingCode={editingMarketCode} onToggleEditing={setEditingMarketCode} onMarketChange={updateMarketMetric} onRestoreMarket={restorePublicMarketMetric} onFinancialChange={updateCountryFinancialMetric} onRestoreFinancial={restorePublicFinancialMetric} onRetryGovernance={retryGovernance} onGovernanceChange={updateGovernanceMetric} onRestoreGovernance={restorePublicGovernance} />}
+            {candidates.length > 0 && <MarketComparisonTable candidates={candidates} marketData={marketData} financialByCountry={financialByCountry} governanceLoadingCodes={governanceLoadingCodes} marketLoadingCodes={marketLoadingCodes} governanceErrors={governanceErrors} editingCode={editingMarketCode} onToggleEditing={setEditingMarketCode} onMarketChange={updateMarketMetric} onRestoreMarket={restorePublicMarketMetric} onFinancialChange={updateCountryFinancialMetric} onRestoreFinancial={restorePublicFinancialMetric} onRetryGovernance={retryGovernance} onGovernanceChange={updateGovernanceMetric} onRestoreGovernance={restorePublicGovernance} />}
           </TabsContent>
 
           <TabsContent value="calibrate" className="tab-enter">
@@ -641,7 +659,7 @@ export default function Home() {
   );
 }
 
-function MarketComparisonTable({ candidates, marketData, financialByCountry, governanceLoadingCodes, governanceErrors, editingCode, onToggleEditing, onMarketChange, onRestoreMarket, onFinancialChange, onRestoreFinancial, onRetryGovernance, onGovernanceChange, onRestoreGovernance }: { candidates: Candidate[]; marketData: Record<string, MarketData>; financialByCountry: Record<string, FinancialAssumptions>; governanceLoadingCodes: string[]; governanceErrors: Record<string, string>; editingCode: string | null; onToggleEditing: (code: string | null) => void; onMarketChange: (code: string, key: MarketMetricKey, value: string) => void; onRestoreMarket: (code: string, key: MarketMetricKey) => void; onFinancialChange: (code: string, key: FinancialReferenceKey, value: string) => void; onRestoreFinancial: (code: string, key: FinancialReferenceKey) => void; onRetryGovernance: (code: string) => void; onGovernanceChange: (code: string, value: string) => void; onRestoreGovernance: (code: string) => void }) {
+function MarketComparisonTable({ candidates, marketData, financialByCountry, governanceLoadingCodes, marketLoadingCodes, governanceErrors, editingCode, onToggleEditing, onMarketChange, onRestoreMarket, onFinancialChange, onRestoreFinancial, onRetryGovernance, onGovernanceChange, onRestoreGovernance }: { candidates: Candidate[]; marketData: Record<string, MarketData>; financialByCountry: Record<string, FinancialAssumptions>; governanceLoadingCodes: string[]; marketLoadingCodes: string[]; governanceErrors: Record<string, string>; editingCode: string | null; onToggleEditing: (code: string | null) => void; onMarketChange: (code: string, key: MarketMetricKey, value: string) => void; onRestoreMarket: (code: string, key: MarketMetricKey) => void; onFinancialChange: (code: string, key: FinancialReferenceKey, value: string) => void; onRestoreFinancial: (code: string, key: FinancialReferenceKey) => void; onRetryGovernance: (code: string) => void; onGovernanceChange: (code: string, value: string) => void; onRestoreGovernance: (code: string) => void }) {
   return <Card className="metric-card mt-6"><CardHeader><div className="market-table-heading"><div><CardTitle>Indicadores actualizados y estimaciones</CardTitle><CardDescription>PIB, IED, impuesto corporativo y FX se descargan al añadir el país. WGI se completa después. Use <strong>Editar</strong> para sustituir cifras por sus fuentes; la etiqueta Manual evita confundirlas con datos públicos.</CardDescription></div><Badge variant="outline">{candidates.length} mercado{candidates.length === 1 ? "" : "s"}</Badge></div></CardHeader><CardContent><div className="market-table-guide"><span><strong>Última actualización:</strong> fecha de la última carga pública por país.</span><span><strong>Reintentar WGI:</strong> no vuelve a consultar los demás indicadores.</span><span><strong>Restaurar:</strong> repone solo el campo público modificado.</span></div><div className="overflow-x-auto"><table className="metrics-table editable-metrics-table"><thead><tr><th>Mercado</th><th>Estado</th><th>PIB (US$)</th><th>PIB / hab. (US$)</th><th>PIB real</th><th>IED neta (US$)</th><th>IED / PIB</th><th>Imp. corp.</th><th>FX USD / local</th><th>WGI</th><th>Últ. actualización</th></tr></thead><tbody>{candidates.map((candidate) => {
     const data = marketData[candidate.code] ?? blankData();
     const finance = financialByCountry[candidate.code] ?? {};
@@ -653,7 +671,7 @@ function MarketComparisonTable({ candidates, marketData, financialByCountry, gov
     const governanceLoading = governanceLoadingCodes.includes(candidate.code);
     const governanceError = governanceErrors[candidate.code];
     const manual = new Set(data.manualFields ?? []);
-    return <tr key={candidate.code} className={!passes ? "muted-row" : ""}><td className="market-name-cell"><strong>{candidate.name}</strong><span>{candidate.code}</span><Button size="sm" variant={editing ? "secondary" : "outline"} className="market-edit-button" onClick={() => onToggleEditing(editing ? null : candidate.code)}><Pencil className="mr-1 h-3 w-3" /> {editing ? "Cerrar" : "Editar"}</Button></td><td><StatusBadge status={data.sourceStatus} /></td><EditableMarketMetric editing={editing} value={data.gdpUsd} format={formatBillions} manual={manual.has("gdpUsd")} title="PIB corriente en US$" onChange={(value) => onMarketChange(candidate.code, "gdpUsd", value)} onRestore={() => onRestoreMarket(candidate.code, "gdpUsd")} /><EditableMarketMetric editing={editing} value={data.gdpPerCapita} format={(value) => value === null || value === undefined ? "—" : `US$ ${formatNumber(value, { maximumFractionDigits: 0 })}`} manual={manual.has("gdpPerCapita")} title="PIB corriente por habitante en US$" onChange={(value) => onMarketChange(candidate.code, "gdpPerCapita", value)} onRestore={() => onRestoreMarket(candidate.code, "gdpPerCapita")} /><EditableMarketMetric editing={editing} value={data.gdpGrowth} format={(value) => value === null || value === undefined ? "—" : `${formatNumber(value, { maximumFractionDigits: 1 })}%`} manual={manual.has("gdpGrowth")} title="Crecimiento anual del PIB real, en porcentaje" onChange={(value) => onMarketChange(candidate.code, "gdpGrowth", value)} onRestore={() => onRestoreMarket(candidate.code, "gdpGrowth")} /><EditableMarketMetric editing={editing} value={data.fdiInflowUsd} format={formatBillions} manual={manual.has("fdiInflowUsd")} title="Flujos netos de IED en US$" onChange={(value) => onMarketChange(candidate.code, "fdiInflowUsd", value)} onRestore={() => onRestoreMarket(candidate.code, "fdiInflowUsd")} /><EditableMarketMetric editing={editing} value={data.fdiInflowPctGdp} format={(value) => value === null || value === undefined ? "—" : `${formatNumber(value, { maximumFractionDigits: 1 })}%`} manual={manual.has("fdiInflowPctGdp")} title="IED neta como porcentaje del PIB" onChange={(value) => onMarketChange(candidate.code, "fdiInflowPctGdp", value)} onRestore={() => onRestoreMarket(candidate.code, "fdiInflowPctGdp")} /><EditableFinancialMetric editing={editing} value={finance.taxRatePct} format={(value) => value === null || value === undefined ? "—" : `${formatNumber(value, { maximumFractionDigits: 1 })}%`} manual={finance.taxRateDataMode === "manual"} title="Tasa corporativa estatutaria en porcentaje" onChange={(value) => onFinancialChange(candidate.code, "taxRatePct", value)} onRestore={() => onRestoreFinancial(candidate.code, "taxRatePct")} /><EditableFinancialMetric editing={editing} value={finance.fxRateToReportingCurrency} format={(value) => value === null || value === undefined ? "—" : `${formatNumber(value, { maximumFractionDigits: 4 })} ${finance.reportingCurrency || "USD"}/${finance.currency || "local"}`} manual={finance.fxRateDataMode === "manual"} title="Unidades de moneda de reporte por una unidad de moneda local" onChange={(value) => onFinancialChange(candidate.code, "fxRateToReportingCurrency", value)} onRestore={() => onRestoreFinancial(candidate.code, "fxRateToReportingCurrency")} /><td className="wgi-cell">{editing ? <EditableGovernanceMetric value={governanceAverage} manual={manual.has("governance")} onChange={(value) => onGovernanceChange(candidate.code, value)} onRestore={() => onRestoreGovernance(candidate.code)} /> : governanceLoading ? <span className="metric-loading"><Loader2 className="h-3 w-3 animate-spin" /> Cargando</span> : governanceError ? <div className="wgi-retry"><span>{governanceError}</span><Button size="sm" variant="outline" onClick={() => onRetryGovernance(candidate.code)}><RotateCcw className="mr-1 h-3 w-3" /> Reintentar WGI</Button></div> : governanceAverage === null ? "—" : <div className="metric-value"><strong>{formatNumber(governanceAverage, { maximumFractionDigits: 0 })}/100</strong>{manual && <Badge variant="outline" className="manual-badge">Manual</Badge>}<small>{governance?.sourceYear ?? ""}</small></div>}</td><td className="updated-at-cell"><strong>{formatUpdatedAt(data.lastUpdatedAt)}</strong>{data.manualFields?.length ? <small>{data.manualFields.length} ajuste{data.manualFields.length === 1 ? "" : "s"} manual{data.manualFields.length === 1 ? "" : "es"}</small> : <small>Fuente pública</small>}</td></tr>;
+    return <tr key={candidate.code} className={!passes ? "muted-row" : ""}><td className="market-name-cell"><strong>{candidate.name}</strong><span>{candidate.code}</span><Button size="sm" variant={editing ? "secondary" : "outline"} className="market-edit-button" onClick={() => onToggleEditing(editing ? null : candidate.code)}><Pencil className="mr-1 h-3 w-3" /> {editing ? "Cerrar" : "Editar"}</Button></td><td>{marketLoadingCodes.includes(candidate.code) ? <span className="metric-loading"><Loader2 className="h-3 w-3 animate-spin" /> Actualizando</span> : <StatusBadge status={data.sourceStatus} />}</td><EditableMarketMetric editing={editing} value={data.gdpUsd} format={formatBillions} manual={manual.has("gdpUsd")} title="PIB corriente en US$" onChange={(value) => onMarketChange(candidate.code, "gdpUsd", value)} onRestore={() => onRestoreMarket(candidate.code, "gdpUsd")} /><EditableMarketMetric editing={editing} value={data.gdpPerCapita} format={(value) => value === null || value === undefined ? "—" : `US$ ${formatNumber(value, { maximumFractionDigits: 0 })}`} manual={manual.has("gdpPerCapita")} title="PIB corriente por habitante en US$" onChange={(value) => onMarketChange(candidate.code, "gdpPerCapita", value)} onRestore={() => onRestoreMarket(candidate.code, "gdpPerCapita")} /><EditableMarketMetric editing={editing} value={data.gdpGrowth} format={(value) => value === null || value === undefined ? "—" : `${formatNumber(value, { maximumFractionDigits: 1 })}%`} manual={manual.has("gdpGrowth")} title="Crecimiento anual del PIB real, en porcentaje" onChange={(value) => onMarketChange(candidate.code, "gdpGrowth", value)} onRestore={() => onRestoreMarket(candidate.code, "gdpGrowth")} /><EditableMarketMetric editing={editing} value={data.fdiInflowUsd} format={formatBillions} manual={manual.has("fdiInflowUsd")} title="Flujos netos de IED en US$" onChange={(value) => onMarketChange(candidate.code, "fdiInflowUsd", value)} onRestore={() => onRestoreMarket(candidate.code, "fdiInflowUsd")} /><EditableMarketMetric editing={editing} value={data.fdiInflowPctGdp} format={(value) => value === null || value === undefined ? "—" : `${formatNumber(value, { maximumFractionDigits: 1 })}%`} manual={manual.has("fdiInflowPctGdp")} title="IED neta como porcentaje del PIB" onChange={(value) => onMarketChange(candidate.code, "fdiInflowPctGdp", value)} onRestore={() => onRestoreMarket(candidate.code, "fdiInflowPctGdp")} /><EditableFinancialMetric editing={editing} value={finance.taxRatePct} format={(value) => value === null || value === undefined ? "—" : `${formatNumber(value, { maximumFractionDigits: 1 })}%`} manual={finance.taxRateDataMode === "manual"} title="Tasa corporativa estatutaria en porcentaje" onChange={(value) => onFinancialChange(candidate.code, "taxRatePct", value)} onRestore={() => onRestoreFinancial(candidate.code, "taxRatePct")} /><EditableFinancialMetric editing={editing} value={finance.fxRateToReportingCurrency} format={(value) => value === null || value === undefined ? "—" : `${formatNumber(value, { maximumFractionDigits: 4 })} ${finance.reportingCurrency || "USD"}/${finance.currency || "local"}`} manual={finance.fxRateDataMode === "manual"} title="Unidades de moneda de reporte por una unidad de moneda local" onChange={(value) => onFinancialChange(candidate.code, "fxRateToReportingCurrency", value)} onRestore={() => onRestoreFinancial(candidate.code, "fxRateToReportingCurrency")} /><td className="wgi-cell">{editing ? <EditableGovernanceMetric value={governanceAverage} manual={manual.has("governance")} onChange={(value) => onGovernanceChange(candidate.code, value)} onRestore={() => onRestoreGovernance(candidate.code)} /> : governanceLoading ? <span className="metric-loading"><Loader2 className="h-3 w-3 animate-spin" /> Cargando</span> : governanceError ? <div className="wgi-retry"><span>{governanceError}</span><Button size="sm" variant="outline" onClick={() => onRetryGovernance(candidate.code)}><RotateCcw className="mr-1 h-3 w-3" /> Reintentar WGI</Button></div> : governanceAverage === null ? "—" : <div className="metric-value"><strong>{formatNumber(governanceAverage, { maximumFractionDigits: 0 })}/100</strong>{manual && <Badge variant="outline" className="manual-badge">Manual</Badge>}<small>{governance?.sourceYear ?? ""}</small></div>}</td><td className="updated-at-cell"><strong>{formatUpdatedAt(data.lastUpdatedAt)}</strong>{data.manualFields?.length ? <small>{data.manualFields.length} ajuste{data.manualFields.length === 1 ? "" : "s"} manual{data.manualFields.length === 1 ? "" : "es"}</small> : <small>Fuente pública</small>}</td></tr>;
   })}</tbody></table></div></CardContent></Card>;
 }
 
