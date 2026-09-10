@@ -124,7 +124,16 @@ preparado en el motor: añadir la oficial es una entrada más en `CONVENTIONS`.
 - [x] El escenario queda vinculado al caso activo mediante `caseId`, que existía en la base desde la Fase 5 y no se usaba.
 
 ## Fases siguientes del blueprint v2
-- [ ] Fase 4 — capítulos 7 y 8: fases de ventana, ritmo, opción real, build-borrow-buy, cuatro encajes, socio, integración y modelos económicos de adquisición y JV.
+### Fase 4a — capítulo 7, primera parte
+
+- [x] Objetivos de entrada de la Tabla 7.1 con sus expectativas, indicadores, momento, tipo de país y modos típicos.
+- [x] Las cuatro fases de la ventana (pp. 261-262) con los modos que el libro considera apropiados en cada una, y la Tabla 7.2 de primer entrante.
+- [x] Ritmo de entrada: los seis factores de la p. 262 sintetizados en un índice que se presenta como síntesis propia, no como fórmula del libro.
+- [x] Elección de modo con el mapa de la Fig. 7.3 y la rejilla de la Fig. 7.1, sobre los perfiles de la Tabla 7.4 que ya existían desde la Fase 1. Modelos de entrada digital de la Tabla 7.5.
+- [x] Seis reglas de coherencia: modo fuera de fase, inversión fuerte en fase prematura, primer entrante cuando la ventana ya se cerró, primer entrante sin justificar, ritmo gradual contra modo de compromiso alto y modo fuera del mapa.
+
+- [ ] Fase 4b — opción real, mini-caso 7.3 (Lubricador SA) con los modelos económicos por modo, y capítulo 8 completo: build-borrow-buy, cuatro encajes, análisis de socio, diseño e integración.
+- [ ] Fase 4 (original) — capítulos 7 y 8: fases de ventana, ritmo, opción real, build-borrow-buy, cuatro encajes, socio, integración y modelos económicos de adquisición y JV.
 - [ ] Fase 6 — motor de coherencia, índice de exhaustividad e informe ampliado.
 
 ## Consideraciones para la siguiente evolución

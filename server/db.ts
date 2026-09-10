@@ -380,7 +380,7 @@ export async function deleteEvidence(userId: number, evidenceId: number) {
 /* Módulos de análisis del caso                                                          */
 /* ------------------------------------------------------------------------------------ */
 
-export type CaseModuleKey = "ambition" | "positioning";
+export type CaseModuleKey = "ambition" | "positioning" | "entry";
 
 export async function getCaseModule(userId: number, caseId: number, moduleKey: CaseModuleKey) {
   const db = await ensureCaseOwnership(userId, caseId);

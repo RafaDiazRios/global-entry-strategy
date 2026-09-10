@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { AlertTriangle, Compass, Layers, Loader2, Save } from "lucide-react";
+import { AlertTriangle, Compass, DoorOpen, Layers, Loader2, Save } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,6 +16,7 @@ import {
   type AmbitionInput,
   type RegionSetId,
 } from "@shared/domain/globalAmbition";
+import { emptyEntryStrategyInput, type Band, type ClimateBand, type EntryStrategyInput } from "@shared/domain/entryStrategy";
 import {
   emptyPositioningInput,
   VALUE_CHAIN_FUNCTIONS,
@@ -67,9 +68,11 @@ function Loaded({ caseId }: { caseId: number }) {
       <TabsList>
         <TabsTrigger value="ambition"><Compass className="mr-2 h-4 w-4" />Ambición global</TabsTrigger>
         <TabsTrigger value="positioning"><Layers className="mr-2 h-4 w-4" />Posicionamiento</TabsTrigger>
+        <TabsTrigger value="entry"><DoorOpen className="mr-2 h-4 w-4" />Entrada</TabsTrigger>
       </TabsList>
       <TabsContent value="ambition"><AmbitionBlock caseId={caseId} reference={reference.data} /></TabsContent>
       <TabsContent value="positioning"><PositioningBlock caseId={caseId} reference={reference.data} /></TabsContent>
+      <TabsContent value="entry"><EntryBlock caseId={caseId} reference={reference.data} /></TabsContent>
     </Tabs>
   );
 }
@@ -653,6 +656,240 @@ function SaveBar({ dirty, pending, completeness, onSave }: {
         {pending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
         {dirty ? "Guardar" : "Guardado"}
       </Button>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------------------------ */
+/* M4 — Estrategia de entrada (capítulo 7, primera parte)                                */
+/* ------------------------------------------------------------------------------------ */
+
+function EntryBlock({ caseId, reference }: { caseId: number; reference: Reference }) {
+  const utils = trpc.useUtils();
+  const query = trpc.globalStrategy.getEntryStrategy.useQuery({ caseId });
+  const [draft, setDraft] = useState<EntryStrategyInput>(emptyEntryStrategyInput());
+  const [dirty, setDirty] = useState(false);
+
+  useEffect(() => {
+    if (query.data && !dirty) setDraft(query.data.input);
+  }, [query.data, dirty]);
+
+  const save = trpc.globalStrategy.saveEntryStrategy.useMutation({
+    onSuccess: () => {
+      setDirty(false);
+      utils.globalStrategy.getEntryStrategy.invalidate({ caseId });
+      toast.success("Estrategia de entrada guardada");
+    },
+    onError: (error) => toast.error(error.message),
+  });
+
+  const analysis = query.data;
+  const update = (patch: Partial<EntryStrategyInput>) => { setDraft((current) => ({ ...current, ...patch })); setDirty(true); };
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>Por qué entrar</CardTitle>
+          <CardDescription>{reference.entryObjectivesProvenance}. El objetivo condiciona el tipo de país, el momento y el modo.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="max-w-[10rem]">
+            <Label>País</Label>
+            <Input value={draft.countryCode ?? ""} maxLength={3} placeholder="CHN" onChange={(event) => update({ countryCode: event.target.value.toUpperCase() || null })} />
+          </div>
+          {reference.entryObjectives.map((objective) => {
+            const entry = draft.objectives.find((item) => item.id === objective.id) ?? { id: objective.id, selected: false, justification: null };
+            return (
+              <div key={objective.id} className="space-y-2 rounded-md border p-3">
+                <label className="flex items-start gap-2 text-sm font-medium">
+                  <input
+                    type="checkbox"
+                    className="mt-1"
+                    checked={entry.selected}
+                    onChange={(event) => update({ objectives: reference.entryObjectives.map((option) => {
+                      const existing = draft.objectives.find((item) => item.id === option.id) ?? { id: option.id, selected: false, justification: null };
+                      return option.id === objective.id ? { ...existing, selected: event.target.checked } : existing;
+                    }) as EntryStrategyInput["objectives"] })}
+                  />
+                  <span>
+                    {objective.label}
+                    <span className="ml-2 text-xs font-normal text-muted-foreground">Indicadores: {objective.kpis.join(", ")}. Momento: {objective.timing.toLowerCase()}.</span>
+                  </span>
+                </label>
+                {entry.selected && (
+                  <Input value={entry.justification ?? ""} placeholder="Qué busca la empresa aquí, en concreto" onChange={(event) => update({ objectives: draft.objectives.map((item) => (item.id === objective.id ? { ...item, justification: event.target.value } : item)) })} />
+                )}
+              </div>
+            );
+          })}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Cuándo entrar</CardTitle>
+          <CardDescription>Las cuatro fases de la ventana de oportunidad, {reference.windowPhasesProvenance}.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <Label>Fase de la ventana</Label>
+              <select className={select} value={draft.phase ?? ""} onChange={(event) => update({ phase: (event.target.value || null) as EntryStrategyInput["phase"] })}>
+                <option value="">Sin determinar</option>
+                {reference.windowPhases.map((phase) => <option key={phase.id} value={phase.id}>{phase.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <Label>Posición ante el momento</Label>
+              <select className={select} value={draft.timingStance ?? ""} onChange={(event) => update({ timingStance: (event.target.value || null) as EntryStrategyInput["timingStance"] })}>
+                <option value="">Sin decidir</option>
+                {reference.timingStances.map((stance) => <option key={stance.id} value={stance.id}>{stance.label}</option>)}
+              </select>
+            </div>
+          </div>
+          {analysis?.phase && (
+            <div className="rounded-md border bg-muted/40 p-3 text-sm">
+              <p className="text-muted-foreground">{analysis.phase.signal}</p>
+              <p className="mt-1">{analysis.phase.guidance}</p>
+            </div>
+          )}
+          <div>
+            <Label>Evidencia que sostiene esa fase</Label>
+            <Textarea rows={2} value={draft.phaseEvidence ?? ""} placeholder="Crecimiento del mercado, número y cuota de competidores, madurez del producto" onChange={(event) => update({ phaseEvidence: event.target.value })} />
+          </div>
+          <div>
+            <Label>Por qué esa posición</Label>
+            <Textarea rows={2} value={draft.timingRationale ?? ""} placeholder="Si es primer entrante: qué recurso se pre-empta y quién se beneficiaría del trabajo de apertura" onChange={(event) => update({ timingRationale: event.target.value })} />
+          </div>
+          <div className="grid gap-3 text-xs text-muted-foreground sm:grid-cols-2">
+            <div>
+              <div className="font-semibold uppercase">Ventajas de ser primero</div>
+              <ul className="mt-1 space-y-1">{reference.firstMover.advantages.map((item) => <li key={item}>{item}</li>)}</ul>
+            </div>
+            <div>
+              <div className="font-semibold uppercase">Desventajas</div>
+              <ul className="mt-1 space-y-1">{reference.firstMover.disadvantages.map((item) => <li key={item}>{item}</li>)}</ul>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Ritmo de entrada</CardTitle>
+          <CardDescription>{reference.paceProvenance}. Escala 0 a 4.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {reference.paceFactors.map((factor) => (
+            <div key={factor.id} className="grid gap-2 sm:grid-cols-[1fr_6rem]">
+              <div>
+                <div className="text-sm font-medium">{factor.label}</div>
+                <div className="text-xs text-muted-foreground">{factor.question} Un valor alto empuja a un compromiso {factor.direction === "faster" ? "rápido" : "gradual"}.</div>
+              </div>
+              <Input
+                type="number"
+                min={0}
+                max={4}
+                value={draft.paceFactors[factor.id] ?? ""}
+                onChange={(event) => {
+                  const raw = event.target.value;
+                  const value = raw === "" ? null : Math.max(0, Math.min(4, Number(raw)));
+                  update({ paceFactors: { ...draft.paceFactors, [factor.id]: Number.isNaN(value as number) ? null : value } });
+                }}
+              />
+            </div>
+          ))}
+          {analysis?.pace.index !== null && analysis?.pace.recommendation && (
+            <div className="rounded-md border bg-muted/40 p-3 text-sm">
+              Con {analysis.pace.answered} de {analysis.pace.total} factores contestados, el perfil apunta a un compromiso{" "}
+              <strong>{analysis.pace.recommendation === "rapido" ? "rápido" : analysis.pace.recommendation}</strong> (índice {analysis.pace.index?.toFixed(2)}).
+              <p className="mt-1 text-xs text-muted-foreground">
+                Es una síntesis de los seis factores de la p. 262, no una fórmula del libro: el libro los enumera sin ponderarlos.
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Cómo entrar</CardTitle>
+          <CardDescription>El mapa de la {reference.modeMappingProvenance} propone modos según atractivo y clima de inversión; la elección sigue siendo suya.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div>
+              <Label>Atractivo del mercado</Label>
+              <select className={select} value={draft.marketAttractiveness ?? ""} onChange={(event) => update({ marketAttractiveness: (event.target.value || null) as Band | null })}>
+                <option value="">—</option>
+                <option value="low">Bajo</option>
+                <option value="medium">Medio</option>
+                <option value="high">Alto</option>
+              </select>
+            </div>
+            <div>
+              <Label>Clima político de inversión</Label>
+              <select className={select} value={draft.politicalClimate ?? ""} onChange={(event) => update({ politicalClimate: (event.target.value || null) as ClimateBand | null })}>
+                <option value="">—</option>
+                <option value="poor">Malo</option>
+                <option value="medium">Medio</option>
+                <option value="good">Bueno</option>
+              </select>
+            </div>
+            <div>
+              <Label>Modo preferido</Label>
+              <select className={select} value={draft.preferredMode ?? ""} onChange={(event) => update({ preferredMode: event.target.value || null })}>
+                <option value="">Sin decidir</option>
+                {reference.entryModes.map((mode) => <option key={mode.key} value={mode.key}>{mode.label}</option>)}
+              </select>
+            </div>
+          </div>
+
+          {analysis?.shortlist && (
+            <div className="rounded-md border bg-muted/40 p-3 text-sm">
+              El mapa apunta a: {analysis.shortlist.modes.join(", ")}.
+              <span className="ml-2 text-xs text-muted-foreground">{analysis.shortlist.provenance}</span>
+            </div>
+          )}
+
+          <div>
+            <Label>Por qué ese modo</Label>
+            <Textarea rows={2} value={draft.modeRationale ?? ""} onChange={(event) => update({ modeRationale: event.target.value })} />
+          </div>
+          <div>
+            <Label>Requisitos del gobierno que condicionan el modo</Label>
+            <Textarea rows={2} value={draft.governmentRequirements ?? ""} placeholder="Participación local obligatoria, aprobaciones, contenido local, restricciones sectoriales" onChange={(event) => update({ governmentRequirements: event.target.value })} />
+          </div>
+          <div className="max-w-sm">
+            <Label>Modelo de entrada digital (opcional)</Label>
+            <select className={select} value={draft.digitalModel ?? ""} onChange={(event) => update({ digitalModel: event.target.value || null })}>
+              <option value="">No aplica</option>
+              {reference.digitalEntryModels.map((model) => <option key={model.id} value={model.id}>{model.label}</option>)}
+            </select>
+            <p className="mt-1 text-xs text-muted-foreground">{reference.digitalEntryProvenance}</p>
+          </div>
+        </CardContent>
+      </Card>
+
+      {analysis && analysis.warnings.length > 0 && (
+        <Card>
+          <CardHeader><CardTitle className="text-base">Coherencia</CardTitle></CardHeader>
+          <CardContent className="space-y-2">
+            {analysis.warnings.map((warning) => (
+              <div key={warning.id} className="flex gap-2 rounded-md border p-3 text-sm">
+                <AlertTriangle className={`mt-0.5 h-4 w-4 shrink-0 ${warning.severity === "block" ? "text-destructive" : "text-amber-500"}`} />
+                <div>
+                  <p>{warning.message}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{warning.provenance}</p>
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      <SaveBar dirty={dirty} pending={save.isPending} completeness={analysis?.completeness ?? null} onSave={() => save.mutate({ caseId, payload: draft })} />
     </div>
   );
 }

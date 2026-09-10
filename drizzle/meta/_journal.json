@@ -22,6 +22,13 @@
       "when": 1789063783238,
       "tag": "0002_modulos_de_caso",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1789063784238,
+      "tag": "0003_modulo_de_entrada",
+      "breakpoints": true
     }
   ]
 }

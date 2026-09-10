@@ -13,7 +13,10 @@ import { storageGetSignedUrl, storagePut } from "./storage";
 import { getWgiGovernanceData } from "./strategy/wgi";
 import { ambitionCompleteness, ambitionGap, computeIndices, CONVENTIONS, DEFAULT_THRESHOLDS, positionOnAmbitionMap } from "./strategy/globalAmbition";
 import { diagnoseValueChain, diagnoseValueCurve, positioningCompleteness, positioningWarnings, resolvePositioning, resourceGap } from "./strategy/globalPositioning";
-import { ambitionInputSchema, parseAmbition, parsePositioning, positioningInputSchema } from "./strategy/globalStrategySchemas";
+import { ambitionInputSchema, entryStrategyInputSchema, parseAmbition, parseEntryStrategy, parsePositioning, positioningInputSchema } from "./strategy/globalStrategySchemas";
+import { entryStrategyCompleteness, entryStrategyWarnings, mappingShortlist, paceProfile, phaseDefinition } from "./strategy/entryStrategy";
+import * as entryDomain from "@shared/domain/entryStrategy";
+import { entryModes } from "@shared/domain/entryModes";
 import * as ambitionDomain from "@shared/domain/globalAmbition";
 import * as positioningDomain from "@shared/domain/globalPositioning";
 import { financialPublicSources, getCountryFinancialReference } from "./strategy/countryFinancialData";
@@ -308,6 +311,17 @@ function analyseAmbition(input: ambitionDomain.AmbitionInput) {
     completeness: ambitionCompleteness(input, indices),
     thresholds: DEFAULT_THRESHOLDS,
     convention: CONVENTIONS[0],
+  };
+}
+
+function analyseEntryStrategy(input: entryDomain.EntryStrategyInput) {
+  return {
+    input,
+    phase: phaseDefinition(input.phase),
+    pace: paceProfile(input),
+    shortlist: mappingShortlist(input.marketAttractiveness, input.politicalClimate),
+    warnings: entryStrategyWarnings(input),
+    completeness: entryStrategyCompleteness(input),
   };
 }
 
@@ -766,6 +780,21 @@ export const appRouter = router({
       buyerUtilityLevers: positioningDomain.BUYER_UTILITY_LEVERS,
       buyerUtilityProvenance: positioningDomain.BUYER_UTILITY_PROVENANCE,
       indicesConventions: CONVENTIONS,
+      entryObjectives: entryDomain.ENTRY_OBJECTIVES,
+      entryObjectivesProvenance: entryDomain.ENTRY_OBJECTIVES_PROVENANCE,
+      windowPhases: entryDomain.WINDOW_PHASES,
+      windowPhasesProvenance: entryDomain.WINDOW_PHASES_PROVENANCE,
+      firstMover: entryDomain.FIRST_MOVER,
+      timingStances: entryDomain.TIMING_STANCES,
+      paceFactors: entryDomain.PACE_FACTORS,
+      paceProvenance: entryDomain.PACE_PROVENANCE,
+      modeGrid: entryDomain.MODE_GRID,
+      modeGridProvenance: entryDomain.MODE_GRID_PROVENANCE,
+      modeMappingProvenance: entryDomain.MODE_MAPPING_PROVENANCE,
+      modeFactors: entryDomain.MODE_FACTORS,
+      digitalEntryModels: entryDomain.DIGITAL_ENTRY_MODELS,
+      digitalEntryProvenance: entryDomain.DIGITAL_ENTRY_PROVENANCE,
+      entryModes: entryModes.map((mode) => ({ key: mode.key, label: mode.label })),
     })),
 
     getAmbition: protectedProcedure
@@ -780,6 +809,20 @@ export const appRouter = router({
       .mutation(async ({ ctx, input }) => {
         await db.saveCaseModule(ctx.user.id, input.caseId, "ambition", input.payload);
         return analyseAmbition(input.payload as ambitionDomain.AmbitionInput);
+      }),
+
+    getEntryStrategy: protectedProcedure
+      .input(z.object({ caseId: z.number().int().positive() }))
+      .query(async ({ ctx, input }) => {
+        const stored = await db.getCaseModule(ctx.user.id, input.caseId, "entry");
+        return analyseEntryStrategy(parseEntryStrategy(stored?.payload));
+      }),
+
+    saveEntryStrategy: protectedProcedure
+      .input(z.object({ caseId: z.number().int().positive(), payload: entryStrategyInputSchema }))
+      .mutation(async ({ ctx, input }) => {
+        await db.saveCaseModule(ctx.user.id, input.caseId, "entry", input.payload);
+        return analyseEntryStrategy(input.payload as entryDomain.EntryStrategyInput);
       }),
 
     getPositioning: protectedProcedure

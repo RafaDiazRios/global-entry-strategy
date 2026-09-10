@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { emptyAmbitionInput, type AmbitionInput } from "@shared/domain/globalAmbition";
 import { emptyPositioningInput, type PositioningInput } from "@shared/domain/globalPositioning";
+import { emptyEntryStrategyInput, type EntryStrategyInput } from "@shared/domain/entryStrategy";
 
 /**
  * Validación de los bloques del capítulo 5 antes de guardarlos.
@@ -101,4 +102,37 @@ export function parseAmbition(payload: unknown): AmbitionInput {
 export function parsePositioning(payload: unknown): PositioningInput {
   const parsed = positioningInputSchema.safeParse(payload);
   return parsed.success ? (parsed.data as PositioningInput) : emptyPositioningInput();
+}
+
+export const entryStrategyInputSchema = z.object({
+  countryCode: z.string().min(2).max(3).nullable(),
+  objectives: z.array(z.object({
+    id: z.enum(["market", "resources", "learning", "coordination"]),
+    selected: z.boolean(),
+    justification: text(1200),
+  })).max(4),
+  phase: z.enum(["premature", "window", "competitive_growth", "mature"]).nullable(),
+  phaseEvidence: text(1500),
+  timingStance: z.enum(["first_mover", "follower", "acquirer"]).nullable(),
+  timingRationale: text(1500),
+  // Parcial a propósito: un factor sin contestar no es cero, es una casilla vacía.
+  paceFactors: z.object({
+    past_experience: z.number().min(0).max(4).nullable().optional(),
+    cultural_distance: z.number().min(0).max(4).nullable().optional(),
+    country_risk: z.number().min(0).max(4).nullable().optional(),
+    available_resources: z.number().min(0).max(4).nullable().optional(),
+    entry_dispersion: z.number().min(0).max(4).nullable().optional(),
+    resources_at_stake: z.number().min(0).max(4).nullable().optional(),
+  }),
+  marketAttractiveness: z.enum(["low", "medium", "high"]).nullable(),
+  politicalClimate: z.enum(["poor", "medium", "good"]).nullable(),
+  preferredMode: z.string().max(40).nullable(),
+  modeRationale: text(1500),
+  digitalModel: z.string().max(40).nullable(),
+  governmentRequirements: text(1500),
+});
+
+export function parseEntryStrategy(payload: unknown): EntryStrategyInput {
+  const parsed = entryStrategyInputSchema.safeParse(payload);
+  return parsed.success ? (parsed.data as EntryStrategyInput) : emptyEntryStrategyInput();
 }
