@@ -11,9 +11,11 @@ La herramienta no asigna un “mejor país” universal. Estructura una decisió
 | Mandato | Empresa, país base, industria, modelo de negocio, propuesta de valor, objetivo y horizonte |
 | Mercados | Catálogo de países, filtros de exclusión, PIB, crecimiento y población |
 | Datos externos | World Bank Open Data, IED de fuente UNCTAD y gobernanza WGI 2025 |
-| Estrategia | Atractividad, riesgo, distancia CAGE, pesos configurables y modos de entrada |
+| Estrategia | Atractividad, riesgo, distancia CAGE, pesos configurables y modos de entrada puntuados con la Tabla 7.4 del libro |
 | Finanzas | TAM, SAM, SOM, impuestos, capital de trabajo, tipo de cambio, ROI sobre flujo libre, NPV, valor terminal y recuperación por alternativa |
-| Sensibilidad | Casos base, optimista y conservador para variaciones de precio/ingreso, margen operativo y tipo de cambio |
+| Sensibilidad | Casos base, optimista y conservador, más un tornado de ocho palancas ordenadas por amplitud de NPV |
+| Modelos económicos | Operador, royalty, canal y solo coste, según el modo de entrada |
+| Elegibilidad | Criterios eliminatorios de riesgo, distancia y evidencia que cierran un mercado antes de cualquier ponderación |
 | Comparación | Panel lado a lado de hasta cuatro países con evidencia, resultado y economía de entrada |
 | Gobierno de inversión | Umbrales configurables que clasifican cada alternativa como Avanzar, Probar, Descartar o Completar evidencia |
 | Gates | Hitos editables, responsables y fecha de revisión para decisiones de Probar o Avanzar vinculadas a un escenario guardado |
@@ -38,6 +40,10 @@ Todos los supuestos de una comparación por país deben introducirse en una úni
 - `SOM ingresos = SAM × % SOM`
 - `FCF_t = EBIT_t − impuestos_t − Δcapital de trabajo_t`
 - `ROI acumulado = (FCF acumulado − inversión inicial) / inversión inicial`; no incluye valor terminal.
+- `ROI incluyendo valor terminal = (NPV + inversión inicial) / inversión inicial − 1`. La política de umbrales declara con `roiBasis` cuál de las dos bases se compara, para no medir el ROI y el NPV sobre magnitudes distintas.
+- Los impuestos reconocen el arrastre de bases imponibles negativas salvo que se desactive con `taxLossCarryforward: false`.
+- La rampa de cuota admite `linear`, `s_curve` o `manual` con la serie año a año.
+- La recuperación se interpola dentro del año en que el flujo acumulado cruza cero.
 - `NPV = −inversión inicial + Σ(FCF_t / (1 + tasa de descuento)^t) + VP(valor terminal)`
 - `Valor terminal = FCF_(n+1) / (tasa de descuento − crecimiento terminal)`; el modelo falla de forma explícita si la tasa de descuento no es superior al crecimiento terminal.
 - Cuando la moneda local y de reporte difieren, todos los importes del flujo se multiplican por el tipo de cambio introducido, expresado como unidades de moneda de reporte por una unidad de moneda local.
@@ -58,7 +64,7 @@ La banda “Cómo funciona el flujo” muestra las cinco acciones principales y 
 
 ## Política de umbrales
 
-La política está visible y es modificable dentro de cada escenario. **Avanzar** exige que la alternativa con mejor NPV supere el riesgo ajustado, confianza de evidencia, NPV, ROI y recuperación máxima definidos. **Probar** permite una entrada reversible si supera los criterios mínimos de prueba y, opcionalmente, el límite de inversión. **Descartar** significa que no se cumple el mínimo de prueba. **Completar evidencia** se muestra cuando faltan supuestos financieros obligatorios o existe una inconsistencia entre la moneda de umbrales y la moneda de reporte. La herramienta no autoriza gastos ni sustituye a la debida diligencia.
+La política está visible y es modificable dentro de cada escenario. **Avanzar** exige que la alternativa con mejor NPV supere el riesgo ajustado, confianza de evidencia, NPV, ROI y recuperación máxima definidos. **Probar** permite una entrada reversible si supera los criterios mínimos de prueba y, opcionalmente, el límite de inversión. **Descartar** significa que no se cumple el mínimo de prueba, o que el mercado incumple un criterio eliminatorio. **Completar evidencia** se muestra cuando faltan supuestos financieros obligatorios, cuando existe una inconsistencia entre la moneda de umbrales y la moneda de reporte, o cuando la cobertura de evidencia queda por debajo del mínimo: la ausencia de base para decidir no es lo mismo que una decisión negativa. La herramienta no autoriza gastos ni sustituye a la debida diligencia.
 
 ## Informe PDF
 
@@ -98,7 +104,10 @@ pnpm drizzle-kit migrate
 client/src/pages/Home.tsx            Interfaz, supuestos, comparación y exportación
 client/src/components/OnboardingGuide.tsx  Guía de primera evaluación y estados de progreso
 client/src/components/ApprovalWorkspace.tsx Gates, responsables e hitos de revisión
-server/strategy/engine.ts            Motor de atractividad, riesgo, modos y combinación financiera
+shared/domain/countries.ts           Catálogo único de países, regiones y monedas
+shared/domain/entryModes.ts          Modos de entrada y su perfil según la Tabla 7.4 del libro
+server/strategy/entryModeScoring.ts  Puntuación de modos con procedencia por criterio
+server/strategy/engine.ts            Motor de atractividad, riesgo, elegibilidad, modos y combinación financiera
 server/strategy/financialEngine.ts   TAM/SAM/SOM, escenarios, ROI, NPV y recuperación
 server/strategy/worldBank.ts         Indicadores macro e IED de fuente UNCTAD
 server/strategy/wgi.ts               Descarga, lectura y caché de WGI 2025

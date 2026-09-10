@@ -445,3 +445,10 @@ button:active:not(:disabled) { transform: scale(.98); }
 .updated-at-cell strong { display: block; color: #426651; font-size: 10px; font-weight: 700; }
 .updated-at-cell small { display: block; margin-top: 3px; color: #84938b; font-size: 8.5px; }
 @media (max-width: 620px) { .market-table-heading { align-items: flex-start; flex-direction: column; } .market-table-guide { display: grid; gap: 5px; } }
+
+/* Justificación por factor de calibración: la cobertura de evidencia se mide sobre estos campos. */
+.calibration-rationale {
+  margin-top: 0.5rem;
+  font-size: 0.8125rem;
+  background: color-mix(in srgb, var(--muted) 40%, transparent);
+}

@@ -26,10 +26,43 @@ const calibrationSchema = z.object({
   ipSensitivity: score.optional(),
 });
 
+const calibrationNoteSchema = z.object({
+  rationale: z.string().max(1200).nullable().optional(),
+  sourceLabel: z.string().max(300).nullable().optional(),
+});
+
+const calibrationNotesSchema = z.object({
+  demandQuality: calibrationNoteSchema.optional(),
+  resourceFit: calibrationNoteSchema.optional(),
+  competitionAttractiveness: calibrationNoteSchema.optional(),
+  governmentOpenness: calibrationNoteSchema.optional(),
+  cageDistance: calibrationNoteSchema.optional(),
+  politicalRisk: calibrationNoteSchema.optional(),
+  economicRisk: calibrationNoteSchema.optional(),
+  competitiveRisk: calibrationNoteSchema.optional(),
+  operationalRisk: calibrationNoteSchema.optional(),
+  internalReadiness: calibrationNoteSchema.optional(),
+  timePressure: calibrationNoteSchema.optional(),
+  controlNeed: calibrationNoteSchema.optional(),
+  ipSensitivity: calibrationNoteSchema.optional(),
+});
+
+const knockOutPolicySchema = z.object({
+  maxPoliticalRisk: score.nullable().optional(),
+  maxEconomicRisk: score.nullable().optional(),
+  maxCompetitiveRisk: score.nullable().optional(),
+  maxOperationalRisk: score.nullable().optional(),
+  maxCageDistance: score.nullable().optional(),
+  minSafety: score.nullable().optional(),
+  requireGovernanceEvidence: z.boolean().nullable().optional(),
+});
+
 const countrySchema = z.object({
   code: z.string().min(2).max(3),
   name: z.string().min(2).max(100).optional(),
   calibration: calibrationSchema.optional(),
+  calibrationNotes: calibrationNotesSchema.optional(),
+  knockOuts: knockOutPolicySchema.optional(),
 });
 
 const governanceSchema = z.object({
@@ -64,6 +97,11 @@ const modeFinancialProfileSchema = z.object({
   initialInvestment: z.number().nonnegative().nullable().optional(),
   annualOperatingCost: z.number().nonnegative().nullable().optional(),
   revenueCapturePct: z.number().min(0).max(100).nullable().optional(),
+  economicModel: z.enum(["operator", "royalty", "channel", "cost_only"]).nullable().optional(),
+  royaltyRatePct: z.number().min(0).max(100).nullable().optional(),
+  upfrontFee: z.number().nonnegative().nullable().optional(),
+  componentMarginPct: z.number().min(0).max(100).nullable().optional(),
+  channelMarginPct: z.number().min(0).max(100).nullable().optional(),
 });
 
 const financialDataProvenanceSchema = z.object({
@@ -91,8 +129,11 @@ const financialAssumptionsSchema = z.object({
   samPct: z.number().min(0).max(100).nullable().optional(),
   somPctYearOne: z.number().min(0).max(100).nullable().optional(),
   somPctHorizon: z.number().min(0).max(100).nullable().optional(),
+  somRampShape: z.enum(["linear", "s_curve", "manual"]).nullable().optional(),
+  somPctByYear: z.array(z.number().min(0).max(100).nullable()).max(25).nullable().optional(),
   operatingMarginPct: z.number().min(-100).max(100).nullable().optional(),
   taxRatePct: z.number().min(0).max(100).nullable().optional(),
+  taxLossCarryforward: z.boolean().nullable().optional(),
   taxRateDataMode: z.enum(["public", "manual"]).optional(),
   taxReference: financialDataProvenanceSchema.nullable().optional(),
   workingCapitalPctRevenue: z.number().min(-100).max(100).nullable().optional(),
@@ -117,6 +158,7 @@ const financialAssumptionsSchema = z.object({
 
 const investmentThresholdsSchema = z.object({
   currency: z.string().min(1).max(10).nullable().optional(),
+  roiBasis: z.enum(["operating_horizon", "including_terminal"]).nullable().optional(),
   advanceMinRiskAdjusted: z.number().min(0).max(100).nullable().optional(),
   testMinRiskAdjusted: z.number().min(0).max(100).nullable().optional(),
   minConfidence: z.number().min(0).max(100).nullable().optional(),
@@ -148,6 +190,19 @@ const evaluationSchema = z.object({
     distance: z.number().min(0).max(100).optional(),
     risk: z.number().min(0).max(100).optional(),
   }).optional(),
+  entryDeliveryModel: z.enum(["relational", "digital", "hybrid"]).optional(),
+  entryModeWeights: z.object({
+    upFrontInvestment: z.number().min(0).max(100).optional(),
+    speedOfEntry: z.number().min(0).max(100).optional(),
+    marketPenetration: z.number().min(0).max(100).optional(),
+    marketControl: z.number().min(0).max(100).optional(),
+    politicalRiskExposure: z.number().min(0).max(100).optional(),
+    technologicalLeakage: z.number().min(0).max(100).optional(),
+    managerialComplexity: z.number().min(0).max(100).optional(),
+    financialReturnPotential: z.number().min(0).max(100).optional(),
+  }).optional(),
+  knockOuts: knockOutPolicySchema.optional(),
+  tornadoDeltaPct: z.number().min(1).max(90).optional(),
 });
 
 const approvalStatusSchema = z.enum(["not_started", "in_review", "approved", "changes_requested", "on_hold", "closed"]);

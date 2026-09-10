@@ -47,6 +47,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
+import { countryCatalog } from "@shared/domain/countries";
 
 type Objective = "market" | "resources" | "learning" | "coordination";
 type Status = "live" | "partial" | "unavailable";
@@ -93,7 +94,8 @@ type Calibration = {
   ipSensitivity: number;
 };
 
-type Candidate = { code: string; name: string; region: string; calibration: Calibration };
+type CalibrationNotes = Partial<Record<keyof Calibration, { rationale?: string }>>;
+type Candidate = { code: string; name: string; region: string; calibration: Calibration; notes: CalibrationNotes };
 type ModeKey = "greenfield" | "acquisition" | "alliance" | "licensing" | "distributor" | "office" | "digital";
 type FinancialProfile = { initialInvestment?: number | null; annualOperatingCost?: number | null; revenueCapturePct?: number | null };
 type Provenance = { sourceStatus: Status; sourceName: string; sourceUrl: string; sourceYear?: number | null; observedAt?: string | null; retrievedAt: string; note: string };
@@ -119,12 +121,7 @@ type CountryResult = {
 
 type Evaluation = { generatedAt: string; methodology: string; countries: CountryResult[]; portfolio: { leadingCountry?: string; recommendation: string; caveats: string[] } };
 
-const catalog = [
-  ["DE", "Alemania", "Europa"], ["FR", "Francia", "Europa"], ["GB", "Reino Unido", "Europa"], ["ES", "España", "Europa"], ["PL", "Polonia", "Europa"], ["IT", "Italia", "Europa"],
-  ["US", "Estados Unidos", "Américas"], ["CA", "Canadá", "Américas"], ["MX", "México", "Américas"], ["BR", "Brasil", "Américas"], ["CL", "Chile", "Américas"], ["CO", "Colombia", "Américas"],
-  ["CN", "China", "Asia-Pacífico"], ["JP", "Japón", "Asia-Pacífico"], ["KR", "Corea del Sur", "Asia-Pacífico"], ["IN", "India", "Asia-Pacífico"], ["ID", "Indonesia", "Asia-Pacífico"], ["SG", "Singapur", "Asia-Pacífico"], ["AU", "Australia", "Asia-Pacífico"],
-  ["AE", "Emiratos Árabes Unidos", "Oriente Medio y África"], ["SA", "Arabia Saudí", "Oriente Medio y África"], ["ZA", "Sudáfrica", "Oriente Medio y África"], ["NG", "Nigeria", "Oriente Medio y África"], ["EG", "Egipto", "Oriente Medio y África"],
-] as const;
+const catalog = countryCatalog.map((entry) => [entry.code, entry.name, entry.region] as const);
 
 const neutralCalibration: Calibration = {
   demandQuality: 50, resourceFit: 50, competitionAttractiveness: 50, governmentOpenness: 50, cageDistance: 50, politicalRisk: 50, economicRisk: 50, competitiveRisk: 50, operationalRisk: 50, internalReadiness: 50, timePressure: 50, controlNeed: 50, ipSensitivity: 50,
@@ -166,6 +163,7 @@ const calibrationFields: { key: keyof Calibration; label: string; group: string;
 type MarketMetricKey = "gdpUsd" | "gdpPerCapita" | "gdpGrowth" | "fdiInflowUsd" | "fdiInflowPctGdp";
 type MarketManualKey = MarketMetricKey | "governance";
 type FinancialReferenceKey = "taxRatePct" | "fxRateToReportingCurrency";
+function documentedCount(candidate: Candidate) { return calibrationFields.filter((field) => (candidate.notes[field.key]?.rationale ?? "").trim().length > 0).length; }
 function blankData(): MarketData { return { sourceStatus: "unavailable", manualFields: [] }; }
 function formatNumber(value: number | null | undefined, options: Intl.NumberFormatOptions = {}) { return value === null || value === undefined ? "—" : new Intl.NumberFormat("es-ES", options).format(value); }
 function formatBillions(value: number | null | undefined) { return value === null || value === undefined ? "—" : `US$ ${new Intl.NumberFormat("es-ES", { notation: "compact", maximumFractionDigits: 1 }).format(value)}`; }
@@ -252,7 +250,7 @@ export default function Home() {
     if (!found) return;
     if (candidates.some((candidate) => candidate.code === found[0])) { toast.info("El país ya está en la comparación."); return; }
     if (candidates.length >= 12) { toast.error("El análisis admite hasta 12 países por escenario."); return; }
-    const candidate = { code: found[0], name: found[1], region: found[2], calibration: { ...neutralCalibration } };
+    const candidate = { code: found[0], name: found[1], region: found[2], calibration: { ...neutralCalibration }, notes: {} as CalibrationNotes };
     setCandidates((current) => [...current, candidate]);
     setActiveCountry(candidate.code);
     setSelectedCode("");
@@ -264,6 +262,12 @@ export default function Home() {
     setCandidates((current) => current.filter((candidate) => candidate.code !== code));
     if (activeCountry === code) setActiveCountry(undefined);
     setResult(null);
+  }
+
+  function updateCalibrationNote(key: keyof Calibration, rationale: string) {
+    if (!activeCandidate) return;
+    setResult(null);
+    setCandidates((current) => current.map((candidate) => candidate.code === activeCandidate.code ? { ...candidate, notes: { ...candidate.notes, [key]: { rationale } } } : candidate));
   }
 
   function updateCalibration(key: keyof Calibration, value: number) {
@@ -497,7 +501,7 @@ export default function Home() {
   function buildInput() {
     return {
       companyName: companyName.trim(), homeCountry: homeCountry.trim(), industry: industry.trim(), businessModel: businessModel.trim(), valueProposition: valueProposition.trim(), objective, horizonYears: Number(horizonYears) || 3,
-      countryInputs: screenedCandidates.map(({ code, name, calibration }) => ({ code, name, calibration })),
+      countryInputs: screenedCandidates.map(({ code, name, calibration, notes }) => ({ code, name, calibration, calibrationNotes: notes })),
       marketData: Object.fromEntries(screenedCandidates.map((candidate) => [candidate.code, marketData[candidate.code] ?? blankData()])),
       financialByCountry: Object.fromEntries(screenedCandidates.map((candidate) => [candidate.code, financialByCountry[candidate.code] ?? {}])),
       investmentThresholds,
@@ -613,7 +617,7 @@ export default function Home() {
               <Card className="strategic-card"><CardHeader><div className="step-tag">CONTEXTUALICE LA EVIDENCIA</div><CardTitle>Calibre los factores no reducibles a macrodatos</CardTitle><CardDescription>Use una escala de 0 a 100. Los factores de riesgo y distancia se leen como exposición: 100 equivale a la exposición más alta.</CardDescription></CardHeader><CardContent>{candidates.length ? <div className="space-y-3">{candidates.map((candidate) => <button key={candidate.code} onClick={() => setActiveCountry(candidate.code)} className={`country-selector ${activeCandidate?.code === candidate.code ? "selected" : ""}`}><span className="country-code">{candidate.code}</span><span><strong>{candidate.name}</strong><small>{candidate.region}</small></span><ChevronRight className="ml-auto h-4 w-4" /></button>)}</div> : <EmptyState icon={Globe2} title="Primero defina los mercados" text="Añada candidatos en la fase 2 para poder calibrar su atractivo estratégico." />}
                 <div className="method-box"><FileCheck2 className="h-5 w-5" /><p><strong>Disciplina analítica:</strong> cada puntuación debe poder justificarse con una fuente, entrevista, prueba de mercado, asesor local o supuesto explícito.</p></div>
               </CardContent></Card>
-              <Card className="calibration-card"><CardHeader><div className="flex items-center justify-between"><div><div className="step-tag">PAÍS ACTIVO</div><CardTitle>{activeCandidate ? activeCandidate.name : "Seleccione un país"}</CardTitle></div>{activeCandidate && <Badge className="country-badge">{activeCandidate.code}</Badge>}</div></CardHeader><CardContent>{activeCandidate ? <div className="space-y-8">{["Oportunidad", "Distancia y riesgo", "Entrada"].map((group) => <section key={group}><h3 className="calibration-group">{group}</h3><div className="space-y-5">{calibrationFields.filter((field) => field.group === group).map((field) => <div key={field.key} className="slider-row"><div className="slider-meta"><div><strong>{field.label}</strong><span>{field.help}</span></div><output className={field.reverse ? "risk-output" : ""}>{activeCandidate.calibration[field.key]}</output></div><Slider min={0} max={100} step={5} value={[activeCandidate.calibration[field.key]]} onValueChange={([value]) => updateCalibration(field.key, value)} /></div>)}</div></section>)}</div> : <EmptyState icon={SlidersHorizontal} title="Sin país activo" text="Seleccione un mercado candidato para asignar los supuestos específicos del caso." />}</CardContent></Card>
+              <Card className="calibration-card"><CardHeader><div className="flex items-center justify-between"><div><div className="step-tag">PAÍS ACTIVO</div><CardTitle>{activeCandidate ? activeCandidate.name : "Seleccione un país"}</CardTitle></div>{activeCandidate && <div className="flex items-center gap-2"><Badge variant="outline">{documentedCount(activeCandidate)}/{calibrationFields.length} justificados</Badge><Badge className="country-badge">{activeCandidate.code}</Badge></div>}</div></CardHeader><CardContent>{activeCandidate ? <div className="space-y-8">{["Oportunidad", "Distancia y riesgo", "Entrada"].map((group) => <section key={group}><h3 className="calibration-group">{group}</h3><div className="space-y-5">{calibrationFields.filter((field) => field.group === group).map((field) => <div key={field.key} className="slider-row"><div className="slider-meta"><div><strong>{field.label}</strong><span>{field.help}</span></div><output className={field.reverse ? "risk-output" : ""}>{activeCandidate.calibration[field.key]}</output></div><Slider min={0} max={100} step={5} value={[activeCandidate.calibration[field.key]]} onValueChange={([value]) => updateCalibration(field.key, value)} /><Input className="calibration-rationale" value={activeCandidate.notes[field.key]?.rationale ?? ""} onChange={(event) => updateCalibrationNote(field.key, event.target.value)} placeholder="Fuente u observación que sostiene este juicio" aria-label={`Justificación de ${field.label}`} /></div>)}</div></section>)}</div> : <EmptyState icon={SlidersHorizontal} title="Sin país activo" text="Seleccione un mercado candidato para asignar los supuestos específicos del caso." />}</CardContent></Card>
             </div>
             <Card className="weights-card mt-6"><CardHeader><div className="flex items-center justify-between"><div><div className="step-tag">LÓGICA DE PONDERACIÓN</div><CardTitle>Exprese las prioridades del mandato</CardTitle><CardDescription>Los pesos no son “verdad”; hacen visibles los trade-offs. El motor normaliza los pesos automáticamente.</CardDescription></div><Badge variant="outline">Total: {Object.values(weights).reduce((sum, value) => sum + value, 0)}</Badge></div></CardHeader><CardContent><div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">{([ ["market", "Mercado"], ["resources", "Recursos"], ["competition", "Competencia"], ["government", "Gobierno"], ["distance", "Encaje CAGE"], ["risk", "Seguridad / riesgo"] ] as [keyof typeof weights, string][]).map(([key, label]) => <div key={key} className="weight-control"><div><span>{label}</span><strong>{weights[key]}%</strong></div><Slider min={0} max={50} step={1} value={[weights[key]]} onValueChange={([value]) => { setWeights((current) => ({ ...current, [key]: value })); setResult(null); }} /></div>)}</div></CardContent></Card>
           </TabsContent>

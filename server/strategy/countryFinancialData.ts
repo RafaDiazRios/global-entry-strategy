@@ -1,3 +1,4 @@
+import { currencyForCountry } from "@shared/domain/countries";
 export type PublicDataStatus = "live" | "partial" | "unavailable";
 
 export type TaxReference = {
@@ -38,13 +39,14 @@ const cacheLifetimeMs = 24 * 60 * 60 * 1000;
 let taxCache: { loadedAt: number; data: Map<string, TaxRow> } | null = null;
 let taxFetchInProgress: Promise<Map<string, TaxRow>> | null = null;
 
-/** ISO 4217 codes for the maintained country catalogue. Unmapped codes stay editable and require a manual currency entry. */
-const countryCurrencies: Record<string, string> = {
-  DE: "EUR", FR: "EUR", GB: "GBP", ES: "EUR", PL: "PLN", IT: "EUR",
-  US: "USD", CA: "CAD", MX: "MXN", BR: "BRL", CL: "CLP", CO: "COP",
-  CN: "CNY", JP: "JPY", KR: "KRW", IN: "INR", ID: "IDR", SG: "SGD", AU: "AUD",
-  AE: "AED", SA: "SAR", ZA: "ZAR", NG: "NGN", EG: "EGP",
-};
+/**
+ * Monedas del catálogo. La lista vive ahora en `shared/domain/countries.ts` para que
+ * servidor y cliente no mantengan dos catálogos que se desalinean.
+ * Un código fuera del catálogo sigue siendo utilizable con moneda y tipo de cambio manuales.
+ */
+function currencyFor(countryCode: string) {
+  return currencyForCountry(countryCode);
+}
 
 function parseCsvLine(line: string) {
   const fields: string[] = [];
@@ -109,8 +111,7 @@ export async function getCorporateTaxReference(countryCode: string): Promise<Tax
 }
 
 export async function getCountryCurrency(countryCode: string) {
-  const normalized = countryCode.trim().toUpperCase();
-  return countryCurrencies[normalized] ?? null;
+  return currencyFor(countryCode);
 }
 
 export async function getExchangeRateReference(countryCode: string, reportingCurrency = "USD"): Promise<FxReference> {

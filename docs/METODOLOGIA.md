@@ -54,11 +54,24 @@ La **atractividad** combina mercado, recursos, competencia, gobierno y encaje CA
 
 > La puntuación es una representación de preferencias y evidencia disponible, no una predicción de retorno ni una recomendación de inversión autónoma.
 
-La confianza de evidencia no indica probabilidad de éxito. Refleja la cobertura de los indicadores públicos y el grado de especificación de los factores cualitativos. Una puntuación alta con baja confianza debe llevar a más investigación, no a más compromiso.
+### Cobertura de evidencia
+
+La confianza de evidencia no indica probabilidad de éxito y no se calcula contando deslizadores movidos. Se calcula sobre dos componentes:
+
+- **Cobertura pública (45%)**: proporción de los quince indicadores disponibles, corregida por antigüedad del dato (1,00 hasta dos años; 0,85 hasta cinco; 0,70 si es más antiguo o se desconoce el año).
+- **Cobertura de juicio (55%)**: proporción de los trece factores cualitativos que llevan una justificación o una fuente escrita. Un factor evaluado en 50 tras estudiar el caso, con su razón anotada, cuenta como documentado; uno movido sin justificación, no.
+
+Cuando la cobertura queda por debajo del mínimo de la política, la herramienta no emite veredicto de inversión: devuelve **Completar evidencia**. Antes degradaba a *Descartar*, lo que hacía indistinguible un mercado malo de un mercado sin documentar.
+
+### Criterios eliminatorios
+
+La aceptabilidad del riesgo es una pregunta de sí o no, no un sumando más.[^10] La política admite umbrales eliminatorios sobre riesgo político, económico, competitivo y operativo, distancia CAGE, seguridad agregada y disponibilidad de gobernanza. Un mercado que incumple cualquiera de ellos queda marcado como no elegible con el motivo concreto, no encabeza la comparación y no puede recibir una recomendación de avanzar por alta que sea su puntuación agregada.
 
 ### 6. Timing y modo de entrada
 
 El modelo clasifica la situación en tres lecturas: **actuar**, **entrada gradual como opción real** u **observar y aprender**. La lógica reconoce que una entrada de bajo compromiso puede ser una inversión de aprendizaje que conserva la opción de ampliar, transformar o detener la presencia según evolucione la evidencia.[^8]
+
+Los modos se ordenan cruzando el perfil de cada modo en la **Tabla 7.4** del libro[^11] —inversión inicial, velocidad de entrada, penetración de mercado, control del mercado, exposición a riesgo político, fuga tecnológica, complejidad de gestión y retorno potencial— con las necesidades y restricciones del caso. Cada punto de la puntuación es rastreable: la interfaz y el informe muestran, por criterio, el valor del modo en la tabla, la necesidad del caso frente a la que se contrasta, la conveniencia resultante y el peso aplicado. Los ocho pesos son editables. La tabla del libro no incluye la entrada digital: su perfil está derivado por analogía de la Tabla 7.5 y así se declara en la procedencia.
 
 Después presenta tres modos iniciales por país, ordenados por encaje relativo:
 
@@ -80,9 +93,28 @@ Los escenarios guardados conservan las entradas, los resultados y la fecha de ú
 
 Las reglas de gobierno recomendadas son sencillas: conservar la fuente y fecha de cada afirmación importante; separar hechos de supuestos; revisar pesos cuando cambie el mandato; y documentar los criterios para subir el nivel de compromiso o abandonar una opción. Las puntuaciones no deben utilizarse para aprobar automáticamente inversión, adquisiciones o entrada en jurisdicciones sensibles.
 
-## Límites de la primera versión
+## Modelos económicos por modo
 
-La versión inicial está diseñada para la etapa de filtrado y diseño de estrategia. No calcula TAM/SAM/SOM, proyecciones de ingresos, coste de entrada, WACC, NPV, ROI ni valoración de una adquisición. Tampoco descarga automáticamente inteligencia competitiva sectorial, requisitos regulatorios específicos o perfiles de socios. Estas extensiones requieren definir primero la industria, la unidad económica, la fuente de datos y los criterios de decisión que el usuario autorice.
+Cada modo de entrada tiene una economía distinta y se calcula como tal. Aplicar el mismo descuento de flujos a los siete modos, cambiando solo inversión, coste y captura, producía cifras que no representaban ninguna de las alternativas reales.
+
+| Modelo | Modos | Cómo se construye el flujo |
+|---|---|---|
+| Operador | Filial propia, adquisición, joint venture, entrada digital | Margen operativo sobre las ventas capturadas, con capital de trabajo propio |
+| Royalty | Licencia y franquicia | Pago inicial único más porcentaje sobre las ventas del licenciatario y margen en componentes; sin capital de trabajo. El pago inicial no se perpetúa en el valor terminal |
+| Canal | Agente o distribuidor | Margen de canal sobre las ventas que pasan por el distribuidor |
+| Solo coste | Oficina de representación u observatorio | Sin ingresos ni valor terminal; no compite por NPV, porque su valor es la opción que abre |
+
+Otras convenciones del motor financiero:
+
+- Se reconoce el **arrastre de bases imponibles negativas**: una entrada con pérdidas iniciales no tributa hasta compensarlas. Puede desactivarse de forma explícita.
+- La **rampa de cuota** entre año 1 y horizonte admite tres formas: lineal, curva en S —coherente con las curvas de penetración del capítulo 6— o definida año a año. La forma manual exige la serie completa.
+- Se publican **dos bases de retorno**: ROI sobre el flujo libre del horizonte, sin valor terminal, y ROI incluyendo el valor presente del valor terminal. La política de umbrales declara cuál usa, de modo que el umbral de ROI y el de NPV no midan magnitudes distintas.
+- La **recuperación se interpola** dentro del año en que el flujo acumulado cruza cero.
+- Además de los tres escenarios de sensibilidad, se calcula un **tornado** que mueve una palanca cada vez —precio, cuota, margen, inversión, coste operativo, tasa de descuento, tipo de cambio e impuesto— y las ordena por amplitud de NPV.
+
+## Límites de la versión actual
+
+La herramienta cubre la selección de país, la elección de modo y el caso económico. **No** cubre todavía el capítulo 5 (ambición global, posicionamiento, sistema de negocio) ni el capítulo 8 (encajes, análisis de socio, valoración de adquisición con sinergias, integración), ni la ingesta de casos de estudio. Tampoco descarga inteligencia competitiva sectorial, requisitos regulatorios específicos ni perfiles de socios. El plan de incorporación por fases está en el blueprint del proyecto.
 
 ## Referencias
 
@@ -95,3 +127,7 @@ La versión inicial está diseñada para la etapa de filtrado y diseño de estra
 [^7]: Lasserre y Monteiro, *Global Strategic Management*, 5.ª ed., figura 6.12, pp. 244–246.
 [^8]: Ibid., pp. 261–270.
 [^9]: Ibid., capítulos 7 y 8, pp. 263–350.
+
+[^10]: Ibid., capítulo 6, p. 227: «¿son los riesgos de operar en ese país aceptables para accionistas y empleados?».
+
+[^11]: Ibid., tabla 7.4, p. 271.
