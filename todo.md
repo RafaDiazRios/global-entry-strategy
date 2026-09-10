@@ -145,6 +145,13 @@ administrativos de «1.200 millones de yuanes» contra un mercado de 175 millone
 fija margen y coste anual como supuesto propio y lo dice, en lugar de reconstruir una
 función de costes que el caso no determina.
 
+### Ruta guiada
+
+- [x] Doce pasos en el orden del libro, encima de las pestañas, que responden en todo momento a «¿qué hago ahora?».
+- [x] Cada paso dice qué se decide, por qué importa, un ejemplo del propio libro con su página y qué distingue una respuesta buena de una vacía.
+- [x] El progreso se calcula en vivo a partir del estado de los módulos y del formulario, no del último guardado.
+- [x] No bloquea: se puede trabajar fuera de orden y la ruta refleja lo que queda pendiente en lugar de impedirlo.
+
 ## Fases siguientes del blueprint v2
 - [ ] Fase 6 — motor de coherencia, índice de exhaustividad e informe ampliado.
 

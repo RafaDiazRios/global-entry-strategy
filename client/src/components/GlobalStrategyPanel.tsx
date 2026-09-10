@@ -36,9 +36,16 @@ import {
 const select =
   "h-9 w-full rounded-md border border-input bg-background px-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring";
 
-type Props = { caseId: number | null };
+type SubTab = "ambition" | "positioning" | "entry" | "partnering";
 
-export function GlobalStrategyPanel({ caseId }: Props) {
+type Props = {
+  caseId: number | null;
+  /** Pestaña activa, controlada desde fuera para que la ruta guiada pueda llevar aquí. */
+  subTab?: SubTab;
+  onSubTabChange?: (tab: SubTab) => void;
+};
+
+export function GlobalStrategyPanel({ caseId, subTab, onSubTabChange }: Props) {
   if (caseId === null) {
     return (
       <Card>
@@ -52,10 +59,10 @@ export function GlobalStrategyPanel({ caseId }: Props) {
       </Card>
     );
   }
-  return <Loaded caseId={caseId} />;
+  return <Loaded caseId={caseId} subTab={subTab} onSubTabChange={onSubTabChange} />;
 }
 
-function Loaded({ caseId }: { caseId: number }) {
+function Loaded({ caseId, subTab, onSubTabChange }: { caseId: number; subTab?: SubTab; onSubTabChange?: (tab: SubTab) => void }) {
   const reference = trpc.globalStrategy.reference.useQuery();
   if (reference.isLoading || !reference.data) {
     return (
@@ -65,7 +72,7 @@ function Loaded({ caseId }: { caseId: number }) {
     );
   }
   return (
-    <Tabs defaultValue="ambition" className="space-y-6">
+    <Tabs value={subTab ?? "ambition"} onValueChange={(value) => onSubTabChange?.(value as SubTab)} className="space-y-6">
       <TabsList>
         <TabsTrigger value="ambition"><Compass className="mr-2 h-4 w-4" />Ambición global</TabsTrigger>
         <TabsTrigger value="positioning"><Layers className="mr-2 h-4 w-4" />Posicionamiento</TabsTrigger>

@@ -20,6 +20,7 @@ import { countryCatalog } from "@shared/domain/countries";
 import { CountryAssessmentPanel, assessmentProgress, emptyAssessment, type CountryAssessmentState } from "@/components/CountryAssessmentPanel";
 import { CaseWorkspace } from "@/components/CaseWorkspace";
 import { GlobalStrategyPanel } from "@/components/GlobalStrategyPanel";
+import { GuidedRoutePanel } from "@/components/GuidedRoutePanel";
 import { ScenarioArchive } from "@/components/ScenarioArchive";
 
 type Objective = "market" | "resources" | "learning" | "coordination";
@@ -157,6 +158,7 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState("brief");
   const [caseId, setCaseId] = useState<number | null>(null);
   const [caseDocumentId, setCaseDocumentId] = useState<number | null>(null);
+  const [strategySubTab, setStrategySubTab] = useState<"ambition" | "positioning" | "entry" | "partnering">("ambition");
   const [scenarioName, setScenarioName] = useState("Nuevo análisis");
   const [companyName, setCompanyName] = useState("");
   const [homeCountry, setHomeCountry] = useState("");
@@ -208,6 +210,10 @@ export default function Home() {
   const duplicateScenario = trpc.strategy.duplicateScenario.useMutation();
   const deleteScenario = trpc.strategy.deleteScenario.useMutation();
   const trpcUtils = trpc.useUtils();
+  const approvalsQuery = trpc.strategy.listApprovals.useQuery(
+    { scenarioId: savedScenarioId ?? 0 },
+    { enabled: isAuthenticated && savedScenarioId !== null }
+  );
   const proposeBlock = trpc.ai.proposeBlock.useMutation();
   const critiqueBlock = trpc.ai.critique.useMutation();
 
@@ -640,6 +646,28 @@ export default function Home() {
         <div className="mt-5"><OnboardingGuide mandateReady={Boolean(companyName.trim() && homeCountry.trim() && industry.trim() && businessModel.trim())} candidateCount={candidates.length} dataReady={candidates.some((candidate) => marketData[candidate.code]?.sourceStatus !== "unavailable")} financialReady={candidates.some((candidate) => financialByCountry[candidate.code]?.tamYearOne !== null && financialByCountry[candidate.code]?.tamYearOne !== undefined)} evaluationReady={Boolean(result)} onNavigate={setActiveTab} /></div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-7">
+          <GuidedRoutePanel
+            caseId={caseId}
+            scenario={{
+              briefComplete: Boolean(formValid),
+              candidateCount: candidates.length,
+              screenedCount: screenedCandidates.length,
+              // Se cuenta como evaluado el país cuyo marco del capítulo 6 llega al 80%:
+              // exigir el 100% dejaría la ruta parada por un ítem sin evidencia disponible.
+              assessedCountries: screenedCandidates.filter((candidate) => assessmentProgress(candidate.assessment).pct >= 80).length,
+              financialReady: screenedCandidates.some((candidate) => {
+                const assumptions = financialByCountry[candidate.code];
+                return Boolean(assumptions?.tamYearOne && assumptions?.operatingMarginPct !== undefined && assumptions?.discountRatePct);
+              }),
+              hasResult: result !== null,
+              approvalCount: approvalsQuery.data?.length ?? 0,
+            }}
+            onGo={(target, subTab) => {
+              if (subTab) setStrategySubTab(subTab);
+              setActiveTab(target);
+            }}
+          />
+
           <TabsList className="studio-tabs">
             <TabsTrigger value="case"><FileText className="mr-2 h-4 w-4" /> 0. Caso</TabsTrigger>
             <TabsTrigger value="brief"><Building2 className="mr-2 h-4 w-4" /> 1. Mandato</TabsTrigger>
@@ -653,7 +681,7 @@ export default function Home() {
           </TabsList>
 
           <TabsContent value="case" className="mt-6"><CaseWorkspace caseId={caseId} onCaseSelected={setCaseId} decisionContext={[companyName, industry, valueProposition].filter(Boolean).join(" · ")} defaults={{ companyName, homeCountry, industry }} activeDocumentId={caseDocumentId} onActiveDocumentChange={setCaseDocumentId} /></TabsContent>
-          <TabsContent value="ambition" className="mt-6"><GlobalStrategyPanel caseId={caseId} /></TabsContent>
+          <TabsContent value="ambition" className="mt-6"><GlobalStrategyPanel caseId={caseId} subTab={strategySubTab} onSubTabChange={setStrategySubTab} /></TabsContent>
               <TabsContent value="brief" className="tab-enter">
             <div className="grid gap-6 xl:grid-cols-[1.45fr_.8fr]">
               <Card className="strategic-card"><CardHeader><div className="step-tag">PARTE II · CAPÍTULO 5</div><CardTitle>Defina el mandato antes de puntuar países</CardTitle><CardDescription>El resultado depende de la ambición, la propuesta de valor y las capacidades de la empresa, no solo de la macroeconomía.</CardDescription></CardHeader><CardContent className="space-y-6">

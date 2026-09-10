@@ -482,3 +482,10 @@ button:active:not(:disabled) { transform: scale(.98); }
 .assessment-copilot { margin-top: 18px; padding-top: 14px; border-top: 1px dashed var(--border); }
 .assessment-proposal { padding: 10px 12px; border: 1px dashed var(--border); border-radius: 8px; background: color-mix(in srgb, var(--muted) 30%, transparent); }
 .assessment-objection { display: flex; align-items: flex-start; gap: 8px; font-size: 12.5px; line-height: 1.5; }
+
+/* Ruta guiada: se separa de las pestañas sin competir con ellas por la atención. */
+.guided-route {
+  margin-bottom: 1.5rem;
+  border-color: hsl(var(--border));
+  background: linear-gradient(to bottom, hsl(var(--card)), hsl(var(--muted) / 0.35));
+}
