@@ -16,6 +16,7 @@ export const milestoneStatus = entryStrategy.enum("milestoneStatus", ["pending",
 export const evidenceKind = entryStrategy.enum("evidenceKind", ["document", "public_data", "interview", "assumption", "ai_extraction"]);
 export const evidenceAuthor = entryStrategy.enum("evidenceAuthor", ["user", "ai"]);
 export const evidenceStatus = entryStrategy.enum("evidenceStatus", ["accepted", "suggested", "rejected"]);
+export const caseModuleKey = entryStrategy.enum("caseModuleKey", ["ambition", "positioning"]);
 
 /** Usuario de la aplicación. `openId` es el identificador estable del proveedor de acceso. */
 export const users = entryStrategy.table("users", {
@@ -159,3 +160,22 @@ export const strategyEvidence = entryStrategy.table("strategyEvidence", {
   createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull().$onUpdate(() => new Date()),
 }, (table) => [index("strategyEvidence_caseId_status_idx").on(table.caseId, table.status)]);
+
+/**
+ * Bloques de análisis de un caso, uno por módulo del blueprint.
+ *
+ * Cada módulo guarda su propio documento JSON en lugar de repartirse en columnas: la forma
+ * de cada bloque la fija `shared/domain`, cambia con cada fase y se valida con zod al
+ * entrar. Una tabla por módulo obligaría a una migración por cada campo nuevo.
+ */
+export const strategyCaseModules = entryStrategy.table("strategyCaseModules", {
+  id: serial("id").primaryKey(),
+  caseId: integer("caseId").notNull(),
+  userId: integer("userId").notNull(),
+  moduleKey: caseModuleKey("moduleKey").notNull(),
+  payload: jsonb("payload").notNull(),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull().$onUpdate(() => new Date()),
+}, (table) => [uniqueIndex("strategyCaseModules_case_module_uq").on(table.caseId, table.moduleKey)]);
+
+export type StrategyCaseModule = typeof strategyCaseModules.$inferSelect;

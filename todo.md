@@ -102,8 +102,21 @@ pooler de sesión de Supabase, `JWT_SECRET` de al menos 32 caracteres y `ALLOWED
 copiloto necesita además `LLM_API_KEY` y `LLM_MODEL`, y los PDF de casos un bucket S3 o
 compatible. Las migraciones ya están aplicadas: no hay que ejecutar nada contra la base.
 
+### Fase 3 — capítulo 5 completo
+
+- [x] M1: motivos de globalización (p. 181), roles globales (pp. 181-182), etapas (p. 219) y diseño organizativo de la Tabla 5.8.
+- [x] Tabla 5.2 (p. 183) cargada como semilla editable, con traslación automática entre el reparto de cuatro regiones y el de tres del learning assignment.
+- [x] GRI y GCI con convención propia declarada en pantalla, más el mapa de ambición de la Fig. 5.5 y la brecha entre rol declarado, rol observado y rol objetivo.
+- [x] Roles de país de las pp. 187-188 con criterio justificado.
+- [x] M2: los ocho posicionamientos de la Tabla 5.4, curva de valor con rejilla ERRC deducida de las dos curvas, matriz 6×3 de configuración de la cadena de valor (Fig. 5.12), Transfer-Adapt-Create (Fig. 5.14) con la brecha de recursos que abre el módulo 5, tipología de capacidades (Tabla 5.5) y vías de sostenibilidad (Tabla 5.7).
+- [x] Liability of foreignness como campo bloqueante en los dos módulos (p. 198).
+- [x] Test de aceptación: el learning assignment 1 del capítulo 5 (Air Liquide, p. 220) da GRI 0,953 y GCI 0,785, y lo sitúa como jugador global.
+
+**Pendiente de tu criterio:** la fórmula oficial de GRI/GCI del Online Appendix 5.1. Mientras no esté,
+la herramienta usa el índice de solapamiento y lo dice en pantalla. El selector de convención está
+preparado en el motor: añadir la oficial es una entrada más en `CONVENTIONS`.
+
 ## Fases siguientes del blueprint v2
-- [ ] Fase 3 — capítulo 5: ambición global, GRI/GCI, roles de país, posicionamiento, cadena de valor y Transfer-Adapt-Create.
 - [ ] Fase 4 — capítulos 7 y 8: fases de ventana, ritmo, opción real, build-borrow-buy, cuatro encajes, socio, integración y modelos económicos de adquisición y JV.
 - [ ] Fase 6 — motor de coherencia, índice de exhaustividad e informe ampliado.
 

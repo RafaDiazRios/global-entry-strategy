@@ -19,6 +19,7 @@ import { toast } from "sonner";
 import { countryCatalog } from "@shared/domain/countries";
 import { CountryAssessmentPanel, assessmentProgress, emptyAssessment, type CountryAssessmentState } from "@/components/CountryAssessmentPanel";
 import { CaseWorkspace } from "@/components/CaseWorkspace";
+import { GlobalStrategyPanel } from "@/components/GlobalStrategyPanel";
 
 type Objective = "market" | "resources" | "learning" | "coordination";
 type Status = "live" | "partial" | "unavailable";
@@ -565,15 +566,17 @@ export default function Home() {
           <TabsList className="studio-tabs">
             <TabsTrigger value="case"><FileText className="mr-2 h-4 w-4" /> 0. Caso</TabsTrigger>
             <TabsTrigger value="brief"><Building2 className="mr-2 h-4 w-4" /> 1. Mandato</TabsTrigger>
-            <TabsTrigger value="screen"><Globe2 className="mr-2 h-4 w-4" /> 2. Mercados</TabsTrigger>
-            <TabsTrigger value="calibrate"><SlidersHorizontal className="mr-2 h-4 w-4" /> 3. Calibración</TabsTrigger>
-            <TabsTrigger value="finance"><CircleDollarSign className="mr-2 h-4 w-4" /> 4. Economía</TabsTrigger>
-            <TabsTrigger value="compare"><Columns3 className="mr-2 h-4 w-4" /> 5. Comparar</TabsTrigger>
-            <TabsTrigger value="decision"><Target className="mr-2 h-4 w-4" /> 6. Decisión</TabsTrigger>
-            <TabsTrigger value="approval"><ClipboardCheck className="mr-2 h-4 w-4" /> 7. Gates</TabsTrigger>
+            <TabsTrigger value="ambition"><Compass className="mr-2 h-4 w-4" /> 2. Estrategia global</TabsTrigger>
+            <TabsTrigger value="screen"><Globe2 className="mr-2 h-4 w-4" /> 3. Mercados</TabsTrigger>
+            <TabsTrigger value="calibrate"><SlidersHorizontal className="mr-2 h-4 w-4" /> 4. Calibración</TabsTrigger>
+            <TabsTrigger value="finance"><CircleDollarSign className="mr-2 h-4 w-4" /> 5. Economía</TabsTrigger>
+            <TabsTrigger value="compare"><Columns3 className="mr-2 h-4 w-4" /> 6. Comparar</TabsTrigger>
+            <TabsTrigger value="decision"><Target className="mr-2 h-4 w-4" /> 7. Decisión</TabsTrigger>
+            <TabsTrigger value="approval"><ClipboardCheck className="mr-2 h-4 w-4" /> 8. Gates</TabsTrigger>
           </TabsList>
 
           <TabsContent value="case" className="mt-6"><CaseWorkspace caseId={caseId} onCaseSelected={setCaseId} decisionContext={[companyName, industry, valueProposition].filter(Boolean).join(" · ")} defaults={{ companyName, homeCountry, industry }} activeDocumentId={caseDocumentId} onActiveDocumentChange={setCaseDocumentId} /></TabsContent>
+          <TabsContent value="ambition" className="mt-6"><GlobalStrategyPanel caseId={caseId} /></TabsContent>
               <TabsContent value="brief" className="tab-enter">
             <div className="grid gap-6 xl:grid-cols-[1.45fr_.8fr]">
               <Card className="strategic-card"><CardHeader><div className="step-tag">PARTE II · CAPÍTULO 5</div><CardTitle>Defina el mandato antes de puntuar países</CardTitle><CardDescription>El resultado depende de la ambición, la propuesta de valor y las capacidades de la empresa, no solo de la macroeconomía.</CardDescription></CardHeader><CardContent className="space-y-6">

@@ -11,6 +11,11 @@ import { critiqueAssessment, extractCaseEvidence, proposeAssessmentBlock, type C
 import { extractPdfText } from "./ai/pdfText";
 import { storageGetSignedUrl, storagePut } from "./storage";
 import { getWgiGovernanceData } from "./strategy/wgi";
+import { ambitionCompleteness, ambitionGap, computeIndices, CONVENTIONS, DEFAULT_THRESHOLDS, positionOnAmbitionMap } from "./strategy/globalAmbition";
+import { diagnoseValueChain, diagnoseValueCurve, positioningCompleteness, positioningWarnings, resolvePositioning, resourceGap } from "./strategy/globalPositioning";
+import { ambitionInputSchema, parseAmbition, parsePositioning, positioningInputSchema } from "./strategy/globalStrategySchemas";
+import * as ambitionDomain from "@shared/domain/globalAmbition";
+import * as positioningDomain from "@shared/domain/globalPositioning";
 import { financialPublicSources, getCountryFinancialReference } from "./strategy/countryFinancialData";
 
 const score = z.number().min(0).max(100);
@@ -279,6 +284,43 @@ async function loadCaseSource(userId: number, documentId: number): Promise<CaseS
   if (!document.storageKey) throw new Error("El documento no tiene contenido utilizable.");
   const signedUrl = await storageGetSignedUrl(document.storageKey);
   return { documentUrl: signedUrl, mimeType: document.mimeType, label: document.filename };
+}
+
+
+/* ------------------------------------------------------------------------------------ */
+/* Capítulo 5 — ambición y posicionamiento                                               */
+/* ------------------------------------------------------------------------------------ */
+
+/**
+ * El análisis derivado se calcula siempre en el servidor y nunca se guarda: lo guardado son
+ * las respuestas del analista, y todo lo demás se vuelve a deducir de ellas. Así una
+ * corrección del motor alcanza a los casos ya archivados en lugar de dejarlos con cifras
+ * viejas.
+ */
+function analyseAmbition(input: ambitionDomain.AmbitionInput) {
+  const indices = computeIndices(input);
+  const position = indices.gri !== null && indices.gci !== null ? positionOnAmbitionMap(indices.gri, indices.gci) : null;
+  return {
+    input,
+    indices,
+    position,
+    gap: ambitionGap(input, indices),
+    completeness: ambitionCompleteness(input, indices),
+    thresholds: DEFAULT_THRESHOLDS,
+    convention: CONVENTIONS[0],
+  };
+}
+
+function analysePositioning(input: positioningDomain.PositioningInput) {
+  return {
+    input,
+    positioning: resolvePositioning(input),
+    valueCurve: diagnoseValueCurve(input),
+    valueChain: diagnoseValueChain(input),
+    resourceGap: resourceGap(input),
+    warnings: positioningWarnings(input),
+    completeness: positioningCompleteness(input),
+  };
 }
 
 export const appRouter = router({
@@ -647,6 +689,66 @@ export const appRouter = router({
       .mutation(async ({ ctx, input }) => {
         const source = await loadCaseSource(ctx.user.id, input.documentId);
         return critiqueAssessment(input.blockKey, input.ratings, source, { countryName: input.countryName });
+      }),
+  }),
+
+  globalStrategy: router({
+    /** Tablas del libro que el cliente necesita para pintar los formularios. */
+    reference: publicProcedure.query(() => ({
+      regionSets: ambitionDomain.REGION_SETS,
+      industryDemand: ambitionDomain.INDUSTRY_DEMAND_TABLE,
+      industryDemandProvenance: ambitionDomain.INDUSTRY_DEMAND_PROVENANCE,
+      motives: ambitionDomain.GLOBALIZATION_MOTIVES,
+      globalRoles: ambitionDomain.GLOBAL_ROLES,
+      countryRoles: ambitionDomain.COUNTRY_ROLES,
+      stages: ambitionDomain.GLOBALIZATION_STAGES,
+      organizationalDesigns: ambitionDomain.ORGANIZATIONAL_DESIGNS,
+      valuePropositionDimensions: positioningDomain.VALUE_PROPOSITION_DIMENSIONS,
+      positionings: positioningDomain.POSITIONINGS,
+      positioningsProvenance: positioningDomain.POSITIONINGS_PROVENANCE,
+      capabilityTypes: positioningDomain.CAPABILITY_TYPES,
+      capabilityTypesProvenance: positioningDomain.CAPABILITY_TYPES_PROVENANCE,
+      sustainabilityTypes: positioningDomain.SUSTAINABILITY_TYPES,
+      buildingModes: positioningDomain.BUILDING_MODES,
+      sustainabilityMatrix: positioningDomain.SUSTAINABILITY_MATRIX,
+      valueChainFunctions: positioningDomain.VALUE_CHAIN_FUNCTIONS,
+      valueChainLevels: positioningDomain.VALUE_CHAIN_LEVELS,
+      configurations: positioningDomain.CONFIGURATIONS,
+      tacTags: positioningDomain.TAC_TAGS,
+      capabilityKinds: positioningDomain.CAPABILITY_KINDS,
+      errcActions: positioningDomain.ERRC_ACTIONS,
+      buyerExperienceStages: positioningDomain.BUYER_EXPERIENCE_STAGES,
+      buyerUtilityLevers: positioningDomain.BUYER_UTILITY_LEVERS,
+      buyerUtilityProvenance: positioningDomain.BUYER_UTILITY_PROVENANCE,
+      indicesConventions: CONVENTIONS,
+    })),
+
+    getAmbition: protectedProcedure
+      .input(z.object({ caseId: z.number().int().positive() }))
+      .query(async ({ ctx, input }) => {
+        const stored = await db.getCaseModule(ctx.user.id, input.caseId, "ambition");
+        return analyseAmbition(parseAmbition(stored?.payload));
+      }),
+
+    saveAmbition: protectedProcedure
+      .input(z.object({ caseId: z.number().int().positive(), payload: ambitionInputSchema }))
+      .mutation(async ({ ctx, input }) => {
+        await db.saveCaseModule(ctx.user.id, input.caseId, "ambition", input.payload);
+        return analyseAmbition(input.payload as ambitionDomain.AmbitionInput);
+      }),
+
+    getPositioning: protectedProcedure
+      .input(z.object({ caseId: z.number().int().positive() }))
+      .query(async ({ ctx, input }) => {
+        const stored = await db.getCaseModule(ctx.user.id, input.caseId, "positioning");
+        return analysePositioning(parsePositioning(stored?.payload));
+      }),
+
+    savePositioning: protectedProcedure
+      .input(z.object({ caseId: z.number().int().positive(), payload: positioningInputSchema }))
+      .mutation(async ({ ctx, input }) => {
+        await db.saveCaseModule(ctx.user.id, input.caseId, "positioning", input.payload);
+        return analysePositioning(input.payload as positioningDomain.PositioningInput);
       }),
   }),
 });

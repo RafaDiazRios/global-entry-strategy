@@ -1,7 +1,7 @@
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import { InsertStrategyScenario, InsertUser, strategyApprovalMilestones, strategyApprovals, strategyCaseDocuments, strategyCases, strategyEvidence, strategyScenarios, users } from "../drizzle/schema";
+import { InsertStrategyScenario, InsertUser, strategyApprovalMilestones, strategyApprovals, strategyCaseDocuments, strategyCaseModules, strategyCases, strategyEvidence, strategyScenarios, users } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -309,4 +309,36 @@ export async function deleteEvidence(userId: number, evidenceId: number) {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
   await db.delete(strategyEvidence).where(and(eq(strategyEvidence.id, evidenceId), eq(strategyEvidence.userId, userId)));
+}
+
+/* ------------------------------------------------------------------------------------ */
+/* Módulos de análisis del caso                                                          */
+/* ------------------------------------------------------------------------------------ */
+
+export type CaseModuleKey = "ambition" | "positioning";
+
+export async function getCaseModule(userId: number, caseId: number, moduleKey: CaseModuleKey) {
+  const db = await ensureCaseOwnership(userId, caseId);
+  const rows = await db
+    .select()
+    .from(strategyCaseModules)
+    .where(and(eq(strategyCaseModules.caseId, caseId), eq(strategyCaseModules.moduleKey, moduleKey)))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+/**
+ * Un módulo por caso: el índice único de la base lo garantiza, así que dos pestañas
+ * abiertas sobre el mismo caso no pueden dejar dos filas contradictorias.
+ */
+export async function saveCaseModule(userId: number, caseId: number, moduleKey: CaseModuleKey, payload: unknown) {
+  const db = await ensureCaseOwnership(userId, caseId);
+  await db
+    .insert(strategyCaseModules)
+    .values({ caseId, userId, moduleKey, payload })
+    .onConflictDoUpdate({
+      target: [strategyCaseModules.caseId, strategyCaseModules.moduleKey],
+      set: { payload, updatedAt: new Date() },
+    });
+  return getCaseModule(userId, caseId, moduleKey);
 }
