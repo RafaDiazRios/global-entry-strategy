@@ -8,7 +8,9 @@ if (!connectionString) {
 export default defineConfig({
   schema: "./drizzle/schema.ts",
   out: "./drizzle",
-  dialect: "mysql",
+  dialect: "postgresql",
+  // Las tablas no viven en `public`: la base puede alojar otras aplicaciones.
+  schemaFilter: ["entry_strategy"],
   dbCredentials: {
     url: connectionString,
   },
