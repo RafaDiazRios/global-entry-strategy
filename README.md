@@ -11,6 +11,7 @@ La herramienta no asigna un “mejor país” universal. Estructura una decisió
 | Mandato | Empresa, país base, industria, modelo de negocio, propuesta de valor, objetivo y horizonte |
 | Mercados | Catálogo de países, filtros de exclusión, PIB, crecimiento y población |
 | Datos externos | World Bank Open Data, IED de fuente UNCTAD y gobernanza WGI 2025 |
+| Caso de estudio | Documentos del caso en texto o PDF, libro de evidencias con cita y localizador, y copiloto que propone puntuaciones sin decidir |
 | Evaluación de país | 71 ítems del capítulo 6: mercado, recursos, seis fuerzas y diamante, 21 dimensiones CAGE y 23 componentes de riesgo, más 29 instrumentos de incentivo y el filtro ambiental y social |
 | Demanda | Curva de penetración frente a renta per cápita con su R, y efecto clase media sobre distribución lognormal calibrada por Gini |
 | Síntesis de país | Perfil estratégico (hub, gigante emergente, industrialización rápida, en desarrollo, OCDE, rico en recursos) y posición en la matriz oportunidades x riesgos |
@@ -93,6 +94,11 @@ pnpm build
 
 ### Migraciones de base de datos
 
+> **Al actualizar a esta versión hay que migrar.** Se añaden `strategyCases`,
+> `strategyCaseDocuments` y `strategyEvidence`, más la columna `caseId` en
+> `strategyScenarios`. La migración es aditiva y no toca datos existentes:
+> `pnpm drizzle-kit migrate` (o `pnpm db:push`).
+
 La tabla `strategyScenarios` almacena escenarios y resultados. Para cambios de esquema:
 
 ```bash
@@ -112,6 +118,8 @@ shared/domain/entryModes.ts          Modos de entrada y su perfil según la Tabl
 shared/domain/countryAssessment.ts   Marcos del capítulo 6 como datos: CAGE, riesgo, fuerzas, incentivos y perfiles
 server/strategy/countryAssessment.ts Derivación de la calibración, perfil de país y matriz oportunidades x riesgos
 server/strategy/marketCurves.ts      Curvas de penetración y efecto clase media
+server/ai/caseCopilot.ts             Extracción con cita verificada, propuesta de puntuación y revisión crítica
+client/src/components/CaseWorkspace.tsx           Casos, documentos y libro de evidencias
 client/src/components/CountryAssessmentPanel.tsx  Panel de evaluación detallada generado desde los marcos
 server/strategy/entryModeScoring.ts  Puntuación de modos con procedencia por criterio
 server/strategy/engine.ts            Motor de atractividad, riesgo, elegibilidad, modos y combinación financiera

@@ -60,10 +60,26 @@ Los escenarios guardados antes de esta fase no llevan justificaciones por factor
 
 El blueprint decía 22 dimensiones CAGE y 14 componentes de riesgo. Contados uno a uno sobre las figuras 6.11 y 6.12, son **21** y **23**. Corregido en el documento.
 
+## Fase 5 del blueprint v2 — copiloto de caso (completada)
+
+- [x] Modelo de caso: `strategyCases`, `strategyCaseDocuments` y `strategyEvidence`, más `caseId` en `strategyScenarios`. Migración aditiva `0003`.
+- [x] Documentos por texto pegado o subida de PDF a almacenamiento, con URL firmada para el modelo.
+- [x] Extracción de evidencias con cita literal y localizador obligatorios, verificación de la cita contra el texto de origen y degradación de fiabilidad cuando no se puede verificar.
+- [x] Propuesta de puntuación por bloque del capítulo 6, con descarte de ítems ajenos, sin justificación o sin cita comprobable.
+- [x] Revisor crítico que devuelve objeciones sobre las puntuaciones ya introducidas.
+- [x] Libro de evidencias en la interfaz con aceptar, rechazar y eliminar; lo propuesto por IA se ve como propuesta.
+- [x] Aplicación de propuestas una a una desde el panel de evaluación, arrastrando la cita a la justificación del ítem.
+
+### Antes de desplegar
+
+Ejecute la migración: `pnpm drizzle-kit migrate`. Es aditiva y no altera datos existentes.
+El copiloto requiere `BUILT_IN_FORGE_API_KEY` y `BUILT_IN_FORGE_API_URL` en el entorno; sin
+ellas la pestaña de caso funciona para cargar documentos y registrar evidencias a mano, pero
+los botones de IA devuelven error.
+
 ## Fases siguientes del blueprint v2
 - [ ] Fase 3 — capítulo 5: ambición global, GRI/GCI, roles de país, posicionamiento, cadena de valor y Transfer-Adapt-Create.
 - [ ] Fase 4 — capítulos 7 y 8: fases de ventana, ritmo, opción real, build-borrow-buy, cuatro encajes, socio, integración y modelos económicos de adquisición y JV.
-- [ ] Fase 5 — copiloto de caso: ingesta de PDF, extracción con cita, libro de evidencias.
 - [ ] Fase 6 — motor de coherencia, índice de exhaustividad e informe ampliado.
 
 ## Consideraciones para la siguiente evolución

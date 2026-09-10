@@ -464,3 +464,21 @@ button:active:not(:disabled) { transform: scale(.98); }
 .country-lens > p { margin: 8px 0 10px; font-size: 13px; line-height: 1.5; }
 .country-lens-meta { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 12px; color: var(--muted-foreground); }
 .country-lens-meta b { color: var(--foreground); font-weight: 600; }
+
+/* Espacio de trabajo del caso y libro de evidencias. */
+.case-document { display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--card); font-size: 13px; cursor: pointer; }
+.case-document.is-active { border-color: var(--primary); background: color-mix(in srgb, var(--primary) 8%, transparent); }
+.evidence-row { padding: 12px 14px; border: 1px solid var(--border); border-radius: 8px; background: var(--card); }
+.evidence-row.status-suggested { border-style: dashed; }
+.evidence-row.status-rejected { opacity: .55; }
+.evidence-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.evidence-head strong { font-size: 14px; line-height: 1.45; }
+.evidence-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.evidence-quote { display: flex; gap: 8px; margin: 10px 0 8px; padding-left: 10px; border-left: 2px solid var(--border); font-size: 13px; font-style: italic; color: var(--muted-foreground); }
+.evidence-meta { display: flex; flex-wrap: wrap; gap: 4px 8px; font-size: 11.5px; color: var(--muted-foreground); }
+.evidence-warning { display: inline-flex; align-items: center; gap: 4px; color: #8a5510; font-style: normal; }
+
+/* Copiloto dentro de la evaluación detallada. */
+.assessment-copilot { margin-top: 18px; padding-top: 14px; border-top: 1px dashed var(--border); }
+.assessment-proposal { padding: 10px 12px; border: 1px dashed var(--border); border-radius: 8px; background: color-mix(in srgb, var(--muted) 30%, transparent); }
+.assessment-objection { display: flex; align-items: flex-start; gap: 8px; font-size: 12.5px; line-height: 1.5; }

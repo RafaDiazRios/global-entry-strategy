@@ -1,6 +1,6 @@
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertStrategyScenario, InsertUser, strategyApprovalMilestones, strategyApprovals, strategyScenarios, users } from "../drizzle/schema";
+import { InsertStrategyScenario, InsertUser, strategyApprovalMilestones, strategyApprovals, strategyCaseDocuments, strategyCases, strategyEvidence, strategyScenarios, users } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -158,4 +158,138 @@ export async function updateApprovalMilestone(userId: number, milestoneId: numbe
   const updated = await loadApprovalWorkflow(userId, approval.id);
   if (!updated) throw new Error("No se pudo actualizar el hito.");
   return updated;
+}
+
+// ---------------------------------------------------------------------------
+// Casos de estudio, documentos y libro de evidencias
+// ---------------------------------------------------------------------------
+
+export type EvidenceKind = "document" | "public_data" | "interview" | "assumption" | "ai_extraction";
+export type EvidenceStatus = "accepted" | "suggested" | "rejected";
+
+export type EvidenceInput = {
+  kind: EvidenceKind;
+  claim: string;
+  sourceLabel: string;
+  documentId?: number | null;
+  locator?: string | null;
+  quote?: string | null;
+  url?: string | null;
+  retrievedAt?: string | null;
+  reliability?: number;
+  targetPath?: string | null;
+  countryCode?: string | null;
+  createdBy?: "user" | "ai";
+  status?: EvidenceStatus;
+  quoteVerified?: boolean;
+};
+
+async function ensureCaseOwnership(userId: number, caseId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const found = await db.select({ id: strategyCases.id }).from(strategyCases).where(and(eq(strategyCases.id, caseId), eq(strategyCases.userId, userId))).limit(1);
+  if (!found[0]) throw new Error("Caso no encontrado o sin acceso.");
+  return db;
+}
+
+export async function createCase(input: { userId: number; title: string; decisionQuestion?: string | null; companyName?: string | null; homeCountry?: string | null; industry?: string | null; subIndustry?: string | null; caseYear?: number | null }) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const inserted = await db.insert(strategyCases).values({
+    userId: input.userId,
+    title: input.title,
+    decisionQuestion: input.decisionQuestion ?? null,
+    companyName: input.companyName ?? null,
+    homeCountry: input.homeCountry ?? null,
+    industry: input.industry ?? null,
+    subIndustry: input.subIndustry ?? null,
+    caseYear: input.caseYear ?? null,
+  });
+  return inserted[0].insertId;
+}
+
+export async function updateCase(userId: number, caseId: number, values: Partial<{ title: string; decisionQuestion: string | null; companyName: string | null; homeCountry: string | null; industry: string | null; subIndustry: string | null; caseYear: number | null }>) {
+  const db = await ensureCaseOwnership(userId, caseId);
+  await db.update(strategyCases).set(values).where(eq(strategyCases.id, caseId));
+}
+
+export async function listCases(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(strategyCases).where(eq(strategyCases.userId, userId)).orderBy(desc(strategyCases.updatedAt));
+}
+
+export async function getCase(userId: number, caseId: number) {
+  const db = await ensureCaseOwnership(userId, caseId);
+  const rows = await db.select().from(strategyCases).where(eq(strategyCases.id, caseId)).limit(1);
+  const documents = await db.select({ id: strategyCaseDocuments.id, filename: strategyCaseDocuments.filename, mimeType: strategyCaseDocuments.mimeType, storageKey: strategyCaseDocuments.storageKey, bytes: strategyCaseDocuments.bytes, createdAt: strategyCaseDocuments.createdAt }).from(strategyCaseDocuments).where(eq(strategyCaseDocuments.caseId, caseId)).orderBy(asc(strategyCaseDocuments.id));
+  return rows[0] ? { ...rows[0], documents } : null;
+}
+
+export async function addCaseDocument(input: { userId: number; caseId: number; filename: string; mimeType: string; storageKey?: string | null; textContent?: string | null; bytes?: number | null }) {
+  const db = await ensureCaseOwnership(input.userId, input.caseId);
+  const inserted = await db.insert(strategyCaseDocuments).values({
+    caseId: input.caseId,
+    userId: input.userId,
+    filename: input.filename,
+    mimeType: input.mimeType,
+    storageKey: input.storageKey ?? null,
+    textContent: input.textContent ?? null,
+    bytes: input.bytes ?? null,
+  });
+  return inserted[0].insertId;
+}
+
+export async function getCaseDocument(userId: number, documentId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const rows = await db.select().from(strategyCaseDocuments).where(and(eq(strategyCaseDocuments.id, documentId), eq(strategyCaseDocuments.userId, userId))).limit(1);
+  return rows[0] ?? null;
+}
+
+export async function addEvidence(userId: number, caseId: number, entries: EvidenceInput[]) {
+  const db = await ensureCaseOwnership(userId, caseId);
+  if (!entries.length) return [];
+  await db.insert(strategyEvidence).values(entries.map((entry) => ({
+    caseId,
+    userId,
+    kind: entry.kind,
+    claim: entry.claim,
+    sourceLabel: entry.sourceLabel,
+    documentId: entry.documentId ?? null,
+    locator: entry.locator ?? null,
+    quote: entry.quote ?? null,
+    url: entry.url ?? null,
+    retrievedAt: entry.retrievedAt ?? null,
+    reliability: entry.reliability ?? 3,
+    targetPath: entry.targetPath ?? null,
+    countryCode: entry.countryCode ?? null,
+    createdBy: entry.createdBy ?? "user",
+    status: entry.status ?? "accepted",
+    quoteVerified: entry.quoteVerified ?? false,
+  })));
+  return listEvidence(userId, caseId);
+}
+
+export async function listEvidence(userId: number, caseId: number) {
+  const db = await ensureCaseOwnership(userId, caseId);
+  return db.select().from(strategyEvidence).where(eq(strategyEvidence.caseId, caseId)).orderBy(desc(strategyEvidence.id));
+}
+
+export async function setEvidenceStatus(userId: number, evidenceId: number, status: EvidenceStatus) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  await db.update(strategyEvidence).set({ status }).where(and(eq(strategyEvidence.id, evidenceId), eq(strategyEvidence.userId, userId)));
+}
+
+export async function updateEvidence(userId: number, evidenceId: number, values: Partial<{ claim: string; sourceLabel: string; locator: string | null; targetPath: string | null; reliability: number; countryCode: string | null }>) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  await db.update(strategyEvidence).set(values).where(and(eq(strategyEvidence.id, evidenceId), eq(strategyEvidence.userId, userId)));
+}
+
+export async function deleteEvidence(userId: number, evidenceId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  await db.delete(strategyEvidence).where(and(eq(strategyEvidence.id, evidenceId), eq(strategyEvidence.userId, userId)));
 }

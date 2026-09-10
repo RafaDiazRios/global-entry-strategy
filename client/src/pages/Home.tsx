@@ -13,42 +13,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
-import {
-  AlertTriangle,
-  ArrowDownToLine,
-  ArrowUpRight,
-  BarChart3,
-  Building2,
-  ChartNoAxesCombined,
-  CheckCircle2,
-  ChevronRight,
-  ClipboardCheck,
-  CircleAlert,
-  CircleDollarSign,
-  Columns3,
-  Compass,
-  Database,
-  FileCheck2,
-  FileDown,
-  Globe2,
-  Loader2,
-  MapPinned,
-  Pencil,
-  Plus,
-  RefreshCw,
-  RotateCcw,
-  Save,
-  ShieldCheck,
-  SlidersHorizontal,
-  Sparkles,
-  Target,
-  Trash2,
-  X,
-} from "lucide-react";
+import { AlertTriangle, ArrowDownToLine, ArrowUpRight, BarChart3, Building2, ChartNoAxesCombined, CheckCircle2, ChevronRight, CircleAlert, CircleDollarSign, ClipboardCheck, Columns3, Compass, Database, FileCheck2, FileDown, FileText, Globe2, Loader2, MapPinned, Pencil, Plus, RefreshCw, RotateCcw, Save, ShieldCheck, SlidersHorizontal, Sparkles, Target, Trash2, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { countryCatalog } from "@shared/domain/countries";
 import { CountryAssessmentPanel, assessmentProgress, emptyAssessment, type CountryAssessmentState } from "@/components/CountryAssessmentPanel";
+import { CaseWorkspace } from "@/components/CaseWorkspace";
 
 type Objective = "market" | "resources" | "learning" | "coordination";
 type Status = "live" | "partial" | "unavailable";
@@ -183,6 +153,8 @@ function decisionStyle(action: CountryResult["investmentRecommendation"]["action
 export default function Home() {
   const { isAuthenticated } = useAuth();
   const [activeTab, setActiveTab] = useState("brief");
+  const [caseId, setCaseId] = useState<number | null>(null);
+  const [caseDocumentId, setCaseDocumentId] = useState<number | null>(null);
   const [scenarioName, setScenarioName] = useState("Nuevo análisis");
   const [companyName, setCompanyName] = useState("");
   const [homeCountry, setHomeCountry] = useState("");
@@ -230,6 +202,8 @@ export default function Home() {
   const fetchGovernanceData = trpc.strategy.fetchGovernanceData.useMutation();
   const evaluation = trpc.strategy.evaluate.useMutation();
   const saveScenario = trpc.strategy.saveScenario.useMutation();
+  const proposeBlock = trpc.ai.proposeBlock.useMutation();
+  const critiqueBlock = trpc.ai.critique.useMutation();
 
   const activeCandidate = candidates.find((candidate) => candidate.code === activeCountry) ?? candidates[0];
   const excluded = useMemo(() => new Set(excludedCodes.toUpperCase().split(",").map((code) => code.trim()).filter(Boolean)), [excludedCodes]);
@@ -589,6 +563,7 @@ export default function Home() {
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-7">
           <TabsList className="studio-tabs">
+            <TabsTrigger value="case"><FileText className="mr-2 h-4 w-4" /> 0. Caso</TabsTrigger>
             <TabsTrigger value="brief"><Building2 className="mr-2 h-4 w-4" /> 1. Mandato</TabsTrigger>
             <TabsTrigger value="screen"><Globe2 className="mr-2 h-4 w-4" /> 2. Mercados</TabsTrigger>
             <TabsTrigger value="calibrate"><SlidersHorizontal className="mr-2 h-4 w-4" /> 3. Calibración</TabsTrigger>
@@ -598,7 +573,8 @@ export default function Home() {
             <TabsTrigger value="approval"><ClipboardCheck className="mr-2 h-4 w-4" /> 7. Gates</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="brief" className="tab-enter">
+          <TabsContent value="case" className="mt-6"><CaseWorkspace caseId={caseId} onCaseSelected={setCaseId} decisionContext={[companyName, industry, valueProposition].filter(Boolean).join(" · ")} defaults={{ companyName, homeCountry, industry }} activeDocumentId={caseDocumentId} onActiveDocumentChange={setCaseDocumentId} /></TabsContent>
+              <TabsContent value="brief" className="tab-enter">
             <div className="grid gap-6 xl:grid-cols-[1.45fr_.8fr]">
               <Card className="strategic-card"><CardHeader><div className="step-tag">PARTE II · CAPÍTULO 5</div><CardTitle>Defina el mandato antes de puntuar países</CardTitle><CardDescription>El resultado depende de la ambición, la propuesta de valor y las capacidades de la empresa, no solo de la macroeconomía.</CardDescription></CardHeader><CardContent className="space-y-6">
                 <div className="grid gap-5 md:grid-cols-2"><Field label="Empresa o proyecto" required><Input value={companyName} onChange={(event) => setCompanyName(event.target.value)} placeholder="Nombre o identificador del caso" /></Field><Field label="País base" required><Input value={homeCountry} onChange={(event) => setHomeCountry(event.target.value)} placeholder="País desde el que se expande" /></Field><Field label="Industria / subindustria" required><Input value={industry} onChange={(event) => setIndustry(event.target.value)} placeholder="Ej. software B2B, equipamiento médico" /></Field><Field label="Modelo de negocio" required><Input value={businessModel} onChange={(event) => setBusinessModel(event.target.value)} placeholder="Ej. B2B, B2C, SaaS, franquicia" /></Field></div>
@@ -630,7 +606,28 @@ export default function Home() {
               <Card className="strategic-card"><CardHeader><div className="step-tag">CONTEXTUALICE LA EVIDENCIA</div><CardTitle>Calibre los factores no reducibles a macrodatos</CardTitle><CardDescription>Use una escala de 0 a 100. Los factores de riesgo y distancia se leen como exposición: 100 equivale a la exposición más alta.</CardDescription></CardHeader><CardContent>{candidates.length ? <div className="space-y-3">{candidates.map((candidate) => <button key={candidate.code} onClick={() => setActiveCountry(candidate.code)} className={`country-selector ${activeCandidate?.code === candidate.code ? "selected" : ""}`}><span className="country-code">{candidate.code}</span><span><strong>{candidate.name}</strong><small>{candidate.region}</small></span><ChevronRight className="ml-auto h-4 w-4" /></button>)}</div> : <EmptyState icon={Globe2} title="Primero defina los mercados" text="Añada candidatos en la fase 2 para poder calibrar su atractivo estratégico." />}
                 <div className="method-box"><FileCheck2 className="h-5 w-5" /><p><strong>Disciplina analítica:</strong> cada puntuación debe poder justificarse con una fuente, entrevista, prueba de mercado, asesor local o supuesto explícito.</p></div>
               </CardContent></Card>
-              <Card className="calibration-card"><CardHeader><div className="flex items-center justify-between"><div><div className="step-tag">PAÍS ACTIVO</div><CardTitle>{activeCandidate ? activeCandidate.name : "Seleccione un país"}</CardTitle></div>{activeCandidate && <div className="flex items-center gap-2"><Badge variant="outline">{documentedCount(activeCandidate)}/{calibrationFields.length} justificados · {assessmentProgress(activeCandidate.assessment).pct}% evaluado</Badge><Badge className="country-badge">{activeCandidate.code}</Badge></div>}</div></CardHeader><CardContent>{activeCandidate ? <div className="space-y-8">{["Oportunidad", "Distancia y riesgo", "Entrada"].map((group) => <section key={group}><h3 className="calibration-group">{group}</h3><div className="space-y-5">{calibrationFields.filter((field) => field.group === group).map((field) => <div key={field.key} className="slider-row"><div className="slider-meta"><div><strong>{field.label}</strong><span>{field.help}</span></div><output className={field.reverse ? "risk-output" : ""}>{activeCandidate.calibration[field.key]}</output></div><Slider min={0} max={100} step={5} value={[activeCandidate.calibration[field.key]]} onValueChange={([value]) => updateCalibration(field.key, value)} /><Input className="calibration-rationale" value={activeCandidate.notes[field.key]?.rationale ?? ""} onChange={(event) => updateCalibrationNote(field.key, event.target.value)} placeholder="Fuente u observación que sostiene este juicio" aria-label={`Justificación de ${field.label}`} /></div>)}</div></section>)}</div> : <EmptyState icon={SlidersHorizontal} title="Sin país activo" text="Seleccione un mercado candidato para asignar los supuestos específicos del caso." />}</CardContent></Card>{activeCandidate && <Card className="assessment-card"><CardContent className="pt-6"><CountryAssessmentPanel countryName={activeCandidate.name} assessment={activeCandidate.assessment} onChange={updateAssessment} /></CardContent></Card>}
+              <Card className="calibration-card"><CardHeader><div className="flex items-center justify-between"><div><div className="step-tag">PAÍS ACTIVO</div><CardTitle>{activeCandidate ? activeCandidate.name : "Seleccione un país"}</CardTitle></div>{activeCandidate && <div className="flex items-center gap-2"><Badge variant="outline">{documentedCount(activeCandidate)}/{calibrationFields.length} justificados · {assessmentProgress(activeCandidate.assessment).pct}% evaluado</Badge><Badge className="country-badge">{activeCandidate.code}</Badge></div>}</div></CardHeader><CardContent>{activeCandidate ? <div className="space-y-8">{["Oportunidad", "Distancia y riesgo", "Entrada"].map((group) => <section key={group}><h3 className="calibration-group">{group}</h3><div className="space-y-5">{calibrationFields.filter((field) => field.group === group).map((field) => <div key={field.key} className="slider-row"><div className="slider-meta"><div><strong>{field.label}</strong><span>{field.help}</span></div><output className={field.reverse ? "risk-output" : ""}>{activeCandidate.calibration[field.key]}</output></div><Slider min={0} max={100} step={5} value={[activeCandidate.calibration[field.key]]} onValueChange={([value]) => updateCalibration(field.key, value)} /><Input className="calibration-rationale" value={activeCandidate.notes[field.key]?.rationale ?? ""} onChange={(event) => updateCalibrationNote(field.key, event.target.value)} placeholder="Fuente u observación que sostiene este juicio" aria-label={`Justificación de ${field.label}`} /></div>)}</div></section>)}</div> : <EmptyState icon={SlidersHorizontal} title="Sin país activo" text="Seleccione un mercado candidato para asignar los supuestos específicos del caso." />}</CardContent></Card>{activeCandidate && <Card className="assessment-card"><CardContent className="pt-6"><CountryAssessmentPanel
+                countryName={activeCandidate.name}
+                assessment={activeCandidate.assessment}
+                onChange={updateAssessment}
+                onSuggestBlock={caseDocumentId ? async (blockKey) => {
+                  try {
+                    return await proposeBlock.mutateAsync({ documentId: caseDocumentId, blockKey, countryName: activeCandidate.name, context: [companyName, industry].filter(Boolean).join(" · ") || undefined });
+                  } catch (error) {
+                    toast.error(error instanceof Error ? error.message : "El copiloto no pudo proponer puntuaciones.");
+                    return null;
+                  }
+                } : undefined}
+                onCritiqueBlock={caseDocumentId ? async (blockKey, ratings) => {
+                  try {
+                    const result = await critiqueBlock.mutateAsync({ documentId: caseDocumentId, blockKey, countryName: activeCandidate.name, ratings });
+                    return result.objections;
+                  } catch (error) {
+                    toast.error(error instanceof Error ? error.message : "El revisor no pudo ejecutarse.");
+                    return null;
+                  }
+                } : undefined}
+              /></CardContent></Card>}
             </div>
             <Card className="weights-card mt-6"><CardHeader><div className="flex items-center justify-between"><div><div className="step-tag">LÓGICA DE PONDERACIÓN</div><CardTitle>Exprese las prioridades del mandato</CardTitle><CardDescription>Los pesos no son “verdad”; hacen visibles los trade-offs. El motor normaliza los pesos automáticamente.</CardDescription></div><Badge variant="outline">Total: {Object.values(weights).reduce((sum, value) => sum + value, 0)}</Badge></div></CardHeader><CardContent><div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">{([ ["market", "Mercado"], ["resources", "Recursos"], ["competition", "Competencia"], ["government", "Gobierno"], ["distance", "Encaje CAGE"], ["risk", "Seguridad / riesgo"] ] as [keyof typeof weights, string][]).map(([key, label]) => <div key={key} className="weight-control"><div><span>{label}</span><strong>{weights[key]}%</strong></div><Slider min={0} max={50} step={1} value={[weights[key]]} onValueChange={([value]) => { setWeights((current) => ({ ...current, [key]: value })); setResult(null); }} /></div>)}</div></CardContent></Card>
           </TabsContent>

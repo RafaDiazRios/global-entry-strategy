@@ -7,6 +7,8 @@ import * as db from "./db";
 import { evaluateStrategy, type EntryObjective, type EvaluationInput, type MarketData } from "./strategy/engine";
 import { getIndicatorPoints, getWorldBankMarketData, publicSources } from "./strategy/worldBank";
 import { fitPenetrationCurve, middleClassEffect } from "./strategy/marketCurves";
+import { critiqueAssessment, extractCaseEvidence, proposeAssessmentBlock, type CaseSource } from "./ai/caseCopilot";
+import { storageGetSignedUrl, storagePut } from "./storage";
 import { getWgiGovernanceData } from "./strategy/wgi";
 import { financialPublicSources, getCountryFinancialReference } from "./strategy/countryFinancialData";
 
@@ -263,6 +265,21 @@ function defaultApprovalMilestones(recommendation: "advance" | "test", responsib
   ];
 }
 
+/**
+ * Construye la fuente que se pasa al copiloto. El texto plano permite verificar las citas
+ * contra el original; un PDF solo permite exigir que la cita y el localizador existan.
+ */
+async function loadCaseSource(userId: number, documentId: number): Promise<CaseSource> {
+  const document = await db.getCaseDocument(userId, documentId);
+  if (!document) throw new Error("Documento no encontrado o sin acceso.");
+  if (document.textContent) {
+    return { text: document.textContent, label: document.filename };
+  }
+  if (!document.storageKey) throw new Error("El documento no tiene contenido utilizable.");
+  const signedUrl = await storageGetSignedUrl(document.storageKey);
+  return { documentUrl: signedUrl, mimeType: document.mimeType, label: document.filename };
+}
+
 export const appRouter = router({
   system: systemRouter,
   auth: router({
@@ -424,6 +441,201 @@ export const appRouter = router({
       .mutation(({ ctx, input }) => {
         const { milestoneId, dueAt, ...changes } = input;
         return db.updateApprovalMilestone(ctx.user.id, milestoneId, { ...changes, dueAt: dueAt === undefined ? undefined : dueAt === null ? null : new Date(dueAt) });
+      }),
+  }),
+
+  /** Casos de estudio: documentos y libro de evidencias. */
+  case: router({
+    create: protectedProcedure
+      .input(z.object({
+        title: z.string().min(2).max(200),
+        decisionQuestion: z.string().max(2000).nullable().optional(),
+        companyName: z.string().max(180).nullable().optional(),
+        homeCountry: z.string().max(120).nullable().optional(),
+        industry: z.string().max(180).nullable().optional(),
+        subIndustry: z.string().max(180).nullable().optional(),
+        caseYear: z.number().int().min(1900).max(2100).nullable().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => ({ id: await db.createCase({ userId: ctx.user.id, ...input }) })),
+
+    update: protectedProcedure
+      .input(z.object({
+        caseId: z.number().int().positive(),
+        title: z.string().min(2).max(200).optional(),
+        decisionQuestion: z.string().max(2000).nullable().optional(),
+        companyName: z.string().max(180).nullable().optional(),
+        homeCountry: z.string().max(120).nullable().optional(),
+        industry: z.string().max(180).nullable().optional(),
+        subIndustry: z.string().max(180).nullable().optional(),
+        caseYear: z.number().int().min(1900).max(2100).nullable().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const { caseId, ...values } = input;
+        await db.updateCase(ctx.user.id, caseId, values);
+        return db.getCase(ctx.user.id, caseId);
+      }),
+
+    list: protectedProcedure.query(({ ctx }) => db.listCases(ctx.user.id)),
+
+    get: protectedProcedure
+      .input(z.object({ caseId: z.number().int().positive() }))
+      .query(({ ctx, input }) => db.getCase(ctx.user.id, input.caseId)),
+
+    /** Texto pegado. Es la vía preferente: permite verificar las citas contra el original. */
+    addTextDocument: protectedProcedure
+      .input(z.object({
+        caseId: z.number().int().positive(),
+        filename: z.string().min(1).max(260),
+        text: z.string().min(50).max(400_000),
+      }))
+      .mutation(async ({ ctx, input }) => ({
+        id: await db.addCaseDocument({
+          userId: ctx.user.id,
+          caseId: input.caseId,
+          filename: input.filename,
+          mimeType: "text/plain",
+          textContent: input.text,
+          bytes: Buffer.byteLength(input.text, "utf8"),
+        }),
+      })),
+
+    /** PDF u otro binario. Sin texto no se pueden verificar las citas contra el original. */
+    uploadDocument: protectedProcedure
+      .input(z.object({
+        caseId: z.number().int().positive(),
+        filename: z.string().min(1).max(260),
+        mimeType: z.string().min(3).max(120),
+        contentBase64: z.string().min(16).max(28_000_000),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const buffer = Buffer.from(input.contentBase64, "base64");
+        if (!buffer.length) throw new Error("El contenido del fichero está vacío o mal codificado.");
+        const safeName = input.filename.replace(/[^A-Za-z0-9._-]+/g, "_").slice(0, 120);
+        const stored = await storagePut(`cases/${ctx.user.id}/${input.caseId}/${safeName}`, buffer, input.mimeType);
+        return {
+          id: await db.addCaseDocument({
+            userId: ctx.user.id,
+            caseId: input.caseId,
+            filename: input.filename,
+            mimeType: input.mimeType,
+            storageKey: stored.key,
+            bytes: buffer.length,
+          }),
+        };
+      }),
+
+    listEvidence: protectedProcedure
+      .input(z.object({ caseId: z.number().int().positive() }))
+      .query(({ ctx, input }) => db.listEvidence(ctx.user.id, input.caseId)),
+
+    addEvidence: protectedProcedure
+      .input(z.object({
+        caseId: z.number().int().positive(),
+        entries: z.array(z.object({
+          kind: z.enum(["document", "public_data", "interview", "assumption", "ai_extraction"]),
+          claim: z.string().min(3).max(2000),
+          sourceLabel: z.string().min(1).max(300),
+          documentId: z.number().int().positive().nullable().optional(),
+          locator: z.string().max(160).nullable().optional(),
+          quote: z.string().max(4000).nullable().optional(),
+          url: z.string().max(1000).nullable().optional(),
+          retrievedAt: z.string().max(80).nullable().optional(),
+          reliability: z.number().int().min(1).max(5).optional(),
+          targetPath: z.string().max(160).nullable().optional(),
+          countryCode: z.string().max(3).nullable().optional(),
+          status: z.enum(["accepted", "suggested", "rejected"]).optional(),
+        })).min(1).max(200),
+      }))
+      .mutation(({ ctx, input }) => db.addEvidence(ctx.user.id, input.caseId, input.entries)),
+
+    setEvidenceStatus: protectedProcedure
+      .input(z.object({ evidenceId: z.number().int().positive(), status: z.enum(["accepted", "suggested", "rejected"]) }))
+      .mutation(async ({ ctx, input }) => {
+        await db.setEvidenceStatus(ctx.user.id, input.evidenceId, input.status);
+        return { ok: true };
+      }),
+
+    updateEvidence: protectedProcedure
+      .input(z.object({
+        evidenceId: z.number().int().positive(),
+        claim: z.string().min(3).max(2000).optional(),
+        sourceLabel: z.string().min(1).max(300).optional(),
+        locator: z.string().max(160).nullable().optional(),
+        targetPath: z.string().max(160).nullable().optional(),
+        reliability: z.number().int().min(1).max(5).optional(),
+        countryCode: z.string().max(3).nullable().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const { evidenceId, ...values } = input;
+        await db.updateEvidence(ctx.user.id, evidenceId, values);
+        return { ok: true };
+      }),
+
+    deleteEvidence: protectedProcedure
+      .input(z.object({ evidenceId: z.number().int().positive() }))
+      .mutation(async ({ ctx, input }) => {
+        await db.deleteEvidence(ctx.user.id, input.evidenceId);
+        return { ok: true };
+      }),
+  }),
+
+  /**
+   * Copiloto de caso. Todo lo que devuelve es una propuesta: entra en el libro de
+   * evidencias con estado `suggested` y no alimenta ningún cálculo hasta que se acepta.
+   */
+  ai: router({
+    extractEvidence: protectedProcedure
+      .input(z.object({
+        caseId: z.number().int().positive(),
+        documentId: z.number().int().positive(),
+        context: z.string().max(2000).optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const source = await loadCaseSource(ctx.user.id, input.documentId);
+        const extraction = await extractCaseEvidence(source, { context: input.context });
+        const stored = await db.addEvidence(ctx.user.id, input.caseId, extraction.evidence.map((entry) => ({
+          kind: "ai_extraction" as const,
+          claim: entry.claim,
+          sourceLabel: source.label,
+          documentId: input.documentId,
+          locator: entry.locator,
+          quote: entry.quote,
+          reliability: entry.reliability,
+          targetPath: entry.targetPath,
+          countryCode: entry.countryCode,
+          createdBy: "ai" as const,
+          status: "suggested" as const,
+          quoteVerified: entry.quoteVerified,
+        })));
+        return { evidence: stored, discarded: extraction.discarded, model: extraction.model };
+      }),
+
+    proposeBlock: protectedProcedure
+      .input(z.object({
+        documentId: z.number().int().positive(),
+        blockKey: z.enum(["market", "resources", "industry", "cage", "risk"]),
+        countryName: z.string().min(1).max(120),
+        context: z.string().max(2000).optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const source = await loadCaseSource(ctx.user.id, input.documentId);
+        return proposeAssessmentBlock(input.blockKey, source, { countryName: input.countryName, context: input.context });
+      }),
+
+    critique: protectedProcedure
+      .input(z.object({
+        documentId: z.number().int().positive(),
+        blockKey: z.enum(["market", "resources", "industry", "cage", "risk"]),
+        countryName: z.string().max(120).optional(),
+        ratings: z.array(z.object({
+          itemPath: z.string().min(3).max(160),
+          value: z.number().min(0).max(4),
+          rationale: z.string().max(1200).nullable().optional(),
+        })).max(80),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const source = await loadCaseSource(ctx.user.id, input.documentId);
+        return critiqueAssessment(input.blockKey, input.ratings, source, { countryName: input.countryName });
       }),
   }),
 });

@@ -1,3 +1,5 @@
+import { useState } from "react";
+import { Loader2, Sparkles } from "lucide-react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -14,6 +16,7 @@ import {
   lifeCycleClusters,
   sustainabilityChecks,
   type AssessmentBlock,
+  type AssessmentBlockKey,
   type AssessmentValue,
   type LifeCycleCluster,
 } from "@shared/domain/countryAssessment";
@@ -57,14 +60,72 @@ function blockProgress(assessment: CountryAssessmentState, block: AssessmentBloc
 
 const scaleValues = Array.from({ length: assessmentScaleMax + 1 }, (_, index) => index);
 
+export type BlockProposal = {
+  ratings: { itemPath: string; value: number; rationale: string; evidenceQuotes: string[] }[];
+  discarded: { reason: string; itemPath: string }[];
+  unresolved: string[];
+};
+
+export type BlockObjection = { itemPath: string | null; objection: string; severity: string };
+
 type Props = {
   countryName: string;
   assessment: CountryAssessmentState;
   onChange: (next: CountryAssessmentState) => void;
+  /** Propuesta del copiloto para un bloque. Ausente cuando no hay documento de caso activo. */
+  onSuggestBlock?: (blockKey: AssessmentBlockKey) => Promise<BlockProposal | null>;
+  onCritiqueBlock?: (blockKey: AssessmentBlockKey, ratings: { itemPath: string; value: number; rationale?: string | null }[]) => Promise<BlockObjection[] | null>;
 };
 
-export function CountryAssessmentPanel({ countryName, assessment, onChange }: Props) {
+export function CountryAssessmentPanel({ countryName, assessment, onChange, onSuggestBlock, onCritiqueBlock }: Props) {
   const progress = assessmentProgress(assessment);
+  const [busyBlock, setBusyBlock] = useState<string | null>(null);
+  const [proposals, setProposals] = useState<Partial<Record<string, BlockProposal>>>({});
+  const [objections, setObjections] = useState<Partial<Record<string, BlockObjection[]>>>({});
+
+  async function requestSuggestion(blockKey: AssessmentBlockKey) {
+    if (!onSuggestBlock) return;
+    setBusyBlock(`suggest:${blockKey}`);
+    try {
+      const proposal = await onSuggestBlock(blockKey);
+      setProposals((current) => ({ ...current, [blockKey]: proposal ?? undefined }));
+    } finally {
+      setBusyBlock(null);
+    }
+  }
+
+  async function requestCritique(blockKey: AssessmentBlockKey) {
+    if (!onCritiqueBlock) return;
+    const block = assessmentBlocks.find((candidate) => candidate.key === blockKey);
+    if (!block) return;
+    const ratings = block.groups.flatMap((group) =>
+      group.items
+        .map((item) => ({ path: itemPath(blockKey, group.key, item.key), item }))
+        .filter(({ path }) => assessment.ratings[path] !== null && assessment.ratings[path] !== undefined)
+        .map(({ path }) => ({ itemPath: path, value: assessment.ratings[path] as number, rationale: assessment.notes[path] ?? null })),
+    );
+    setBusyBlock(`critique:${blockKey}`);
+    try {
+      const result = await onCritiqueBlock(blockKey, ratings);
+      setObjections((current) => ({ ...current, [blockKey]: result ?? undefined }));
+    } finally {
+      setBusyBlock(null);
+    }
+  }
+
+  /** Aplica una propuesta concreta. Nunca se aplican en bloque sin revisión. */
+  function applyProposedRating(blockKey: string, rating: BlockProposal["ratings"][number]) {
+    onChange({
+      ...assessment,
+      ratings: { ...assessment.ratings, [rating.itemPath]: rating.value },
+      notes: { ...assessment.notes, [rating.itemPath]: assessment.notes[rating.itemPath] || `${rating.rationale} · Cita: «${rating.evidenceQuotes[0] ?? ""}»` },
+    });
+    setProposals((current) => {
+      const proposal = current[blockKey];
+      if (!proposal) return current;
+      return { ...current, [blockKey]: { ...proposal, ratings: proposal.ratings.filter((entry) => entry.itemPath !== rating.itemPath) } };
+    });
+  }
 
   function setRating(path: string, value: number) {
     const current = assessment.ratings[path];
@@ -165,6 +226,63 @@ export function CountryAssessmentPanel({ countryName, assessment, onChange }: Pr
                     </section>
                   ))}
                 </div>
+                {(onSuggestBlock || onCritiqueBlock) && (
+                  <div className="assessment-copilot">
+                    <div className="flex flex-wrap items-center gap-2">
+                      {onSuggestBlock && (
+                        <Button size="sm" variant="outline" onClick={() => requestSuggestion(block.key)} disabled={busyBlock !== null}>
+                          {busyBlock === `suggest:${block.key}` ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <Sparkles className="mr-2 h-3.5 w-3.5" />}
+                          Proponer desde el caso
+                        </Button>
+                      )}
+                      {onCritiqueBlock && (
+                        <Button size="sm" variant="ghost" onClick={() => requestCritique(block.key)} disabled={busyBlock !== null}>
+                          {busyBlock === `critique:${block.key}` ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : null}
+                          Revisar mis puntuaciones
+                        </Button>
+                      )}
+                      <span className="text-xs text-muted-foreground">Las propuestas se revisan una a una; ninguna se aplica sola.</span>
+                    </div>
+
+                    {proposals[block.key]?.ratings.length ? (
+                      <div className="mt-3 space-y-2">
+                        {proposals[block.key]!.ratings.map((rating) => (
+                          <div key={rating.itemPath} className="assessment-proposal">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <strong className="text-sm">{rating.itemPath} = {rating.value}/{assessmentScaleMax}</strong>
+                                <p className="text-xs text-muted-foreground">{rating.rationale}</p>
+                                {rating.evidenceQuotes[0] && <p className="mt-1 text-xs italic text-muted-foreground">«{rating.evidenceQuotes[0]}»</p>}
+                              </div>
+                              <Button size="sm" onClick={() => applyProposedRating(block.key, rating)}>Aplicar</Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
+
+                    {proposals[block.key] && !proposals[block.key]!.ratings.length && (
+                      <p className="mt-2 text-xs text-muted-foreground">
+                        Sin propuestas aplicables. {proposals[block.key]!.discarded.length ? `${proposals[block.key]!.discarded.length} descartadas por falta de cita o justificación.` : "El material no sostiene ninguna puntuación de este bloque."}
+                      </p>
+                    )}
+
+                    {objections[block.key]?.length ? (
+                      <ul className="mt-3 space-y-1">
+                        {objections[block.key]!.map((objection, index) => (
+                          <li key={index} className="assessment-objection">
+                            <Badge variant="outline">{objection.severity}</Badge>
+                            <span>{objection.itemPath ? `${objection.itemPath}: ` : ""}{objection.objection}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
+
+                    {objections[block.key]?.length === 0 && (
+                      <p className="mt-2 text-xs text-muted-foreground">El revisor no encontró objeciones en este bloque.</p>
+                    )}
+                  </div>
+                )}
               </AccordionContent>
             </AccordionItem>
           );

@@ -78,6 +78,36 @@ La **variabilidad del crecimiento** se calcula sola desde la serie pública de c
 
 Cada mercado recibe además un **perfil estratégico** —hub, gigante emergente, industrialización rápida, en desarrollo, OCDE o rico en recursos— por comparación de sus rasgos observables con la Tabla 6.6 (p. 249), y una posición en la **matriz oportunidades × riesgos** de la Figura 6.2 (p. 227), cuyos umbrales son parámetros y no constantes.
 
+## Copiloto de caso
+
+Un caso de estudio se trabaja en tres pasos: se cargan sus documentos, se extraen las
+afirmaciones que sostienen el análisis, y esas afirmaciones alimentan los marcos.
+
+**El libro de evidencias.** Cada afirmación se guarda con su cita literal, su localizador
+—página, sección o párrafo—, su fuente y una fiabilidad de 1 a 5. Una evidencia sin cita
+no existe. El texto pegado es preferible al PDF, porque permite comprobar que la cita
+aparece de verdad en el original.
+
+**Tres controles, implementados y no solo pedidos en el prompt:**
+
+1. **Cita y localizador obligatorios.** Toda afirmación extraída que no los traiga se
+   descarta en el servidor antes de llegar a la interfaz, y se informa de cuántas y por qué.
+2. **Verificación de la cita.** Cuando hay texto de origen, la cita se busca en él tras
+   normalizar acentos, comillas y espacios. Si no aparece, la evidencia se descarta. Si no
+   hay texto contra el que comprobar —el caso del PDF—, la evidencia se marca como no
+   verificada y su fiabilidad se limita a 3: no puede presentarse como dato contrastado.
+3. **Nada se aplica solo.** Lo que propone el modelo entra con estado `suggested` y no
+   alimenta ningún cálculo. Las puntuaciones propuestas para un bloque se revisan y se
+   aplican una a una, con la cita que las sostiene a la vista.
+
+**El revisor.** Además de proponer, el copiloto puede criticar: recibe las puntuaciones ya
+introducidas y devuelve objeciones —contradicciones con el material, juicios sin base,
+omisiones—, sin proponer valores. Es la función más útil de las tres, porque no añade
+contenido: cuestiona el que ya hay.
+
+Los tres se apoyan en el cliente LLM del propio proyecto, con esquema JSON estricto. Ningún
+resultado se acepta como texto libre.
+
 ## Instrumentos cuantitativos de demanda
 
 - **Curva de penetración** (Figuras 6.4-6.5, p. 230): correlaciona un indicador de consumo de la industria con la renta per cápita sobre un conjunto de países y devuelve el ajuste con su R y el residuo de cada país. Se prueban tres formas —lineal, saturante y en campana— y se elige la de mejor ajuste, que es la distinción que el libro ilustra con suscripciones móviles frente a producción de cemento.
