@@ -44,9 +44,23 @@
 
 Los escenarios guardados antes de esta fase no llevan justificaciones por factor, de modo que su cobertura de evidencia cae y la política devolverá **Completar evidencia** hasta que se documenten los juicios. Es el resultado buscado: la cifra anterior de confianza no medía evidencia.
 
-## Fases siguientes del blueprint v2
+## Fase 2 del blueprint v2 — capítulo 6 completo (completada)
 
-- [ ] Fase 2 — capítulo 6 completo: indicadores ampliados, curvas de penetración, efecto clase media, seis fuerzas con determinantes, incentivos, CAGE de 22 dimensiones, riesgo de 14 componentes, clusters y matriz oportunidades × riesgos.
+- [x] Marcos del capítulo 6 como datos: 71 ítems con ancla baja y alta declaradas, más 29 instrumentos de incentivo y 5 cuestiones ambientales y sociales.
+- [x] 21 dimensiones CAGE y 23 componentes de riesgo, con la separación del libro entre exposición del accionista, del empleado y de la operación.
+- [x] Seis fuerzas con los determinantes propios de una entrada internacional, y diamante del país.
+- [x] Derivación de la calibración desde la evaluación, conservando los cuatro factores que describen a la empresa.
+- [x] Indicadores públicos ampliados a las cuatro familias de la Tabla 6.1 y serie de crecimiento para el coeficiente de variación.
+- [x] Curva de penetración con tres formas y residuo por país; efecto clase media sobre distribución lognormal calibrada por Gini.
+- [x] Perfil estratégico de país por comparación con la Tabla 6.6 y matriz oportunidades × riesgos con umbrales parametrizables.
+- [x] Panel de evaluación detallada generado desde los marcos, con justificación por ítem.
+- [x] Criterio de aceptación: el mini-caso 6.2 del libro (Izmir Industrial Electric) se resuelve dentro de la herramienta con las cifras de la Tabla 6.7.
+
+### Corrección de recuento
+
+El blueprint decía 22 dimensiones CAGE y 14 componentes de riesgo. Contados uno a uno sobre las figuras 6.11 y 6.12, son **21** y **23**. Corregido en el documento.
+
+## Fases siguientes del blueprint v2
 - [ ] Fase 3 — capítulo 5: ambición global, GRI/GCI, roles de país, posicionamiento, cadena de valor y Transfer-Adapt-Create.
 - [ ] Fase 4 — capítulos 7 y 8: fases de ventana, ritmo, opción real, build-borrow-buy, cuatro encajes, socio, integración y modelos económicos de adquisición y JV.
 - [ ] Fase 5 — copiloto de caso: ingesta de PDF, extracción con cita, libro de evidencias.

@@ -11,6 +11,9 @@ La herramienta no asigna un “mejor país” universal. Estructura una decisió
 | Mandato | Empresa, país base, industria, modelo de negocio, propuesta de valor, objetivo y horizonte |
 | Mercados | Catálogo de países, filtros de exclusión, PIB, crecimiento y población |
 | Datos externos | World Bank Open Data, IED de fuente UNCTAD y gobernanza WGI 2025 |
+| Evaluación de país | 71 ítems del capítulo 6: mercado, recursos, seis fuerzas y diamante, 21 dimensiones CAGE y 23 componentes de riesgo, más 29 instrumentos de incentivo y el filtro ambiental y social |
+| Demanda | Curva de penetración frente a renta per cápita con su R, y efecto clase media sobre distribución lognormal calibrada por Gini |
+| Síntesis de país | Perfil estratégico (hub, gigante emergente, industrialización rápida, en desarrollo, OCDE, rico en recursos) y posición en la matriz oportunidades x riesgos |
 | Estrategia | Atractividad, riesgo, distancia CAGE, pesos configurables y modos de entrada puntuados con la Tabla 7.4 del libro |
 | Finanzas | TAM, SAM, SOM, impuestos, capital de trabajo, tipo de cambio, ROI sobre flujo libre, NPV, valor terminal y recuperación por alternativa |
 | Sensibilidad | Casos base, optimista y conservador, más un tornado de ocho palancas ordenadas por amplitud de NPV |
@@ -106,6 +109,10 @@ client/src/components/OnboardingGuide.tsx  Guía de primera evaluación y estado
 client/src/components/ApprovalWorkspace.tsx Gates, responsables e hitos de revisión
 shared/domain/countries.ts           Catálogo único de países, regiones y monedas
 shared/domain/entryModes.ts          Modos de entrada y su perfil según la Tabla 7.4 del libro
+shared/domain/countryAssessment.ts   Marcos del capítulo 6 como datos: CAGE, riesgo, fuerzas, incentivos y perfiles
+server/strategy/countryAssessment.ts Derivación de la calibración, perfil de país y matriz oportunidades x riesgos
+server/strategy/marketCurves.ts      Curvas de penetración y efecto clase media
+client/src/components/CountryAssessmentPanel.tsx  Panel de evaluación detallada generado desde los marcos
 server/strategy/entryModeScoring.ts  Puntuación de modos con procedencia por criterio
 server/strategy/engine.ts            Motor de atractividad, riesgo, elegibilidad, modos y combinación financiera
 server/strategy/financialEngine.ts   TAM/SAM/SOM, escenarios, ROI, NPV y recuperación

@@ -54,12 +54,41 @@ La **atractividad** combina mercado, recursos, competencia, gobierno y encaje CA
 
 > La puntuación es una representación de preferencias y evidencia disponible, no una predicción de retorno ni una recomendación de inversión autónoma.
 
+## Evaluación detallada del país
+
+La calibración de trece factores sigue existiendo, pero deja de ser el punto de entrada. Los factores que describen al **país** se derivan de una evaluación estructurada con los marcos del capítulo 6; los cuatro que describen a la **empresa** —capacidad interna, presión temporal, necesidad de control y sensibilidad de IP— siguen siendo entrada directa, porque no salen de ese capítulo.
+
+| Bloque | Ítems | Marco |
+|---|---|---|
+| Oportunidades de mercado | 7 | Figura 6.3 (p. 229), Tabla 6.1 (p. 231), Figura 6.8 y Tabla 6.2 (pp. 233-234) |
+| Oportunidades de recursos | 10 | pp. 234-238, Figura 6.10 (p. 236), Tabla 6.3 (pp. 237-238) |
+| Contexto competitivo | 10 | Tabla 6.4 (pp. 238-239) y diamante del país (p. 239) |
+| Distancia CAGE | 21 | Figura 6.11 (p. 243) |
+| Riesgo país | 23 | Figura 6.12 (p. 244), con la variabilidad de la Figura 6.13 (p. 245) |
+
+Más 29 instrumentos de incentivo (Tabla 6.5, pp. 241-242) y las cinco cuestiones ambientales y sociales de la p. 242.
+
+Tres reglas de lectura:
+
+- **Escala 0-4 con anclas explícitas por ítem.** Cada ítem declara qué significa su 0 y su 4, porque no significa lo mismo un 4 en distancia cultural que un 4 en calidad de la demanda.
+- **Sin evaluar no es cero.** Un ítem que no se ha podido contrastar queda fuera de la media y baja la cobertura, en lugar de puntuar como el peor caso.
+- **La orientación se normaliza.** Los bloques adversos —distancia, riesgo, presión competitiva— se puntúan por su magnitud y el motor los invierte para combinarlos con los favorables.
+
+La **variabilidad del crecimiento** se calcula sola desde la serie pública de crecimiento real, como coeficiente de variación, y rellena ese ítem si el analista no lo ha puntuado a mano. Es la medida que el libro usa para distinguir dos países con el mismo crecimiento medio y distinto riesgo (p. 245).
+
+Cada mercado recibe además un **perfil estratégico** —hub, gigante emergente, industrialización rápida, en desarrollo, OCDE o rico en recursos— por comparación de sus rasgos observables con la Tabla 6.6 (p. 249), y una posición en la **matriz oportunidades × riesgos** de la Figura 6.2 (p. 227), cuyos umbrales son parámetros y no constantes.
+
+## Instrumentos cuantitativos de demanda
+
+- **Curva de penetración** (Figuras 6.4-6.5, p. 230): correlaciona un indicador de consumo de la industria con la renta per cápita sobre un conjunto de países y devuelve el ajuste con su R y el residuo de cada país. Se prueban tres formas —lineal, saturante y en campana— y se elige la de mejor ajuste, que es la distinción que el libro ilustra con suscripciones móviles frente a producción de cemento.
+- **Efecto clase media** (Figura 6.6, p. 232): modela la distribución de renta como lognormal calibrada por el Gini y mide qué proporción de población queda por encima de un umbral antes y después de un crecimiento de la renta media. Es el mecanismo que explica por qué un aumento del 20% de la renta amplía el segmento mucho más de un 20%.
+
 ### Cobertura de evidencia
 
 La confianza de evidencia no indica probabilidad de éxito y no se calcula contando deslizadores movidos. Se calcula sobre dos componentes:
 
 - **Cobertura pública (45%)**: proporción de los quince indicadores disponibles, corregida por antigüedad del dato (1,00 hasta dos años; 0,85 hasta cinco; 0,70 si es más antiguo o se desconoce el año).
-- **Cobertura de juicio (55%)**: proporción de los trece factores cualitativos que llevan una justificación o una fuente escrita. Un factor evaluado en 50 tras estudiar el caso, con su razón anotada, cuenta como documentado; uno movido sin justificación, no.
+- **Cobertura de juicio (55%)**: proporción de los trece factores cualitativos documentados. Un factor cuenta como documentado si lleva justificación escrita **o** si procede de una evaluación detallada con al menos la mitad de sus ítems cubiertos: veintiuna dimensiones CAGE puntuadas son mejor evidencia que una frase suelta. Un factor evaluado en 50 tras estudiar el caso, con su razón anotada, cuenta como documentado; uno movido sin justificación, no.
 
 Cuando la cobertura queda por debajo del mínimo de la política, la herramienta no emite veredicto de inversión: devuelve **Completar evidencia**. Antes degradaba a *Descartar*, lo que hacía indistinguible un mercado malo de un mercado sin documentar.
 

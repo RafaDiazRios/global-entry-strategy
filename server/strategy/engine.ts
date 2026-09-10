@@ -1,5 +1,20 @@
 import { evaluateFinancials, recommendInvestmentAction, type EntryModeKey, type FinancialAssumptions, type FinancialResult, type InvestmentRecommendation, type InvestmentThresholds } from "./financialEngine";
 import { buildSituation, scoreEntryModes, type EntryModeScore, type EntryModeWeights } from "./entryModeScoring";
+import {
+  classifyCountryProfile,
+  deriveCalibration,
+  growthVariability,
+  positionOnOpportunityRiskMatrix,
+  summarizeAssessment,
+  variabilityRating,
+  type AssessmentSummary,
+  type CountryAssessment,
+  type CountryProfileClassification,
+  type DerivedCalibrationField,
+  type GrowthVariability,
+  type OpportunityRiskPosition,
+} from "./countryAssessment";
+import { itemPath } from "@shared/domain/countryAssessment";
 import type { EntryDeliveryModel } from "@shared/domain/entryModes";
 import type { GovernanceData } from "./wgi";
 
@@ -74,6 +89,21 @@ export type MarketData = {
   investmentRate?: number | null;
   fdiInflowUsd?: number | null;
   fdiInflowPctGdp?: number | null;
+  // Indicadores añadidos para cubrir la Tabla 6.1 (p. 231).
+  gdpPpp?: number | null;
+  gdpPerCapitaPpp?: number | null;
+  incomeDistributionGini?: number | null;
+  householdConsumptionPctGdp?: number | null;
+  savingsRate?: number | null;
+  populationGrowth?: number | null;
+  workingAgeSharePct?: number | null;
+  governmentSpendingPctGdp?: number | null;
+  tertiaryEnrolmentPct?: number | null;
+  researchersPerMillion?: number | null;
+  researchSpendingPctGdp?: number | null;
+  electricityAccessPct?: number | null;
+  /** Serie de crecimiento real, para medir la variabilidad económica (Fig. 6.13, p. 245). */
+  gdpGrowthSeries?: { year: number; value: number }[] | null;
   governance?: GovernanceData;
   sourceYear?: number | null;
   /** Timestamp of the most recent public-data refresh for this country. */
@@ -89,6 +119,11 @@ export type CountryInput = {
   calibration?: Partial<QualitativeCalibration>;
   /** Justificación por factor. Alimenta la cobertura de evidencia. */
   calibrationNotes?: CalibrationNotes;
+  /**
+   * Evaluación detallada del capítulo 6. Cuando existe, los factores de país de la
+   * calibración se derivan de ella; los que no estén evaluados conservan el valor manual.
+   */
+  assessment?: CountryAssessment;
   /** Criterios eliminatorios específicos de este país; si falta, se aplica la política general. */
   knockOuts?: KnockOutPolicy;
 };
@@ -151,6 +186,17 @@ export type CountryResult = {
     documentedJudgements: number;
     totalJudgements: number;
     recencyFactor: number;
+    /** Proporción de ítems del capítulo 6 evaluados, 0-1. */
+    assessmentCoverage: number;
+  };
+  /** Resultado de la evaluación detallada del capítulo 6. */
+  assessment: {
+    summary: AssessmentSummary;
+    /** Factores de la calibración que provienen de la evaluación en lugar del deslizador. */
+    derivedFields: DerivedCalibrationField[];
+    profile: CountryProfileClassification;
+    opportunityRisk: OpportunityRiskPosition;
+    growthVariability: GrowthVariability;
   };
   eligibility: CountryEligibility;
   entryModes: EntryModeRecommendation[];
@@ -243,7 +289,12 @@ const calibrationKeys = Object.keys(defaults) as (keyof QualitativeCalibration)[
  * juicio: cuántos indicadores públicos hay, con qué antigüedad, y cuántos juicios
  * cualitativos llevan una justificación o una fuente escrita.
  */
-function calculateEvidence(data: MarketData, notes: CalibrationNotes | undefined) {
+function calculateEvidence(
+  data: MarketData,
+  notes: CalibrationNotes | undefined,
+  derived: DerivedCalibrationField[],
+  assessmentCoverage: number,
+) {
   const dataPoints = [
     data.gdpUsd,
     data.gdpPerCapita,
@@ -269,9 +320,15 @@ function calculateEvidence(data: MarketData, notes: CalibrationNotes | undefined
   const age = sourceYear === null ? null : currentYear - sourceYear;
   const recencyFactor = age === null ? 0.7 : age <= 2 ? 1 : age <= 5 ? 0.85 : 0.7;
 
+  /**
+   * Un factor cuenta como documentado si lleva justificación escrita **o** si procede de
+   * una evaluación detallada suficientemente cubierta: trece dimensiones CAGE puntuadas
+   * son mejor evidencia que una frase suelta.
+   */
+  const derivedEnough = new Set(derived.filter((field) => field.coverage >= 0.5).map((field) => field.key));
   const documentedJudgements = calibrationKeys.filter((key) => {
     const note = notes?.[key];
-    return Boolean(note?.rationale?.trim() || note?.sourceLabel?.trim());
+    return Boolean(note?.rationale?.trim() || note?.sourceLabel?.trim()) || derivedEnough.has(key);
   }).length;
 
   return {
@@ -280,6 +337,7 @@ function calculateEvidence(data: MarketData, notes: CalibrationNotes | undefined
     documentedJudgements,
     totalJudgements: calibrationKeys.length,
     recencyFactor,
+    assessmentCoverage: Math.round(assessmentCoverage * 100) / 100,
   };
 }
 
@@ -352,7 +410,22 @@ export function evaluateStrategy(input: EvaluationInput): EvaluationResult {
   const totalWeight = Object.values(weights).reduce((sum, value) => sum + value, 0) || 1;
   const countries = input.countryInputs.map((country) => {
     const data = input.marketData[country.code] ?? { sourceStatus: "unavailable" as const };
-    const calibration = { ...defaults, ...country.calibration };
+    const manualCalibration = { ...defaults, ...country.calibration };
+
+    /**
+     * Variabilidad económica a partir de la serie pública de crecimiento. Si el analista
+     * no ha puntuado ese ítem a mano, se rellena con el dato; si lo ha puntuado, manda él.
+     */
+    const variability = growthVariability(data.gdpGrowthSeries?.map((point) => point.value));
+    const variabilityPath = itemPath("risk", "economic", "variability");
+    const derivedVariability = variabilityRating(variability.coefficientOfVariation);
+    const assessmentInput: CountryAssessment | undefined =
+      country.assessment && derivedVariability !== null && country.assessment.ratings?.[variabilityPath] == null
+        ? { ...country.assessment, ratings: { ...country.assessment.ratings, [variabilityPath]: derivedVariability } }
+        : country.assessment;
+
+    const { calibration, derived: derivedFields } = deriveCalibration(assessmentInput, manualCalibration);
+    const assessmentSummary = summarizeAssessment(assessmentInput);
 
     const macroMarket = mean([
       logNormalize(data.gdpUsd, 20_000_000_000, 25_000_000_000_000),
@@ -414,10 +487,16 @@ export function evaluateStrategy(input: EvaluationInput): EvaluationResult {
     if (data.sourceStatus !== "live") flags.push("Datos macroeconómicos incompletos o no disponibles: la puntuación se apoya más en calibración cualitativa.");
     if (governance?.sourceStatus === "unavailable") flags.push("Gobernanza WGI no disponible: el componente de gobierno y riesgo se apoya solo en la calibración cualitativa.");
 
-    const evidence = calculateEvidence(data, country.calibrationNotes);
+    const evidence = calculateEvidence(data, country.calibrationNotes, derivedFields, assessmentSummary.coverage);
     const confidence = confidenceFromEvidence(evidence);
     if (evidence.documentedJudgements < evidence.totalJudgements) {
-      flags.push(`Juicios cualitativos sin justificación documentada: ${evidence.totalJudgements - evidence.documentedJudgements} de ${evidence.totalJudgements}. Registre la fuente u observación que sostiene cada factor.`);
+      flags.push(`Juicios cualitativos sin justificación documentada: ${evidence.totalJudgements - evidence.documentedJudgements} de ${evidence.totalJudgements}. Complete la evaluación detallada del país o registre la fuente que sostiene cada factor.`);
+    }
+    if (assessmentSummary.sustainabilityConcerns.length) {
+      flags.push(`Cuestiones ambientales o sociales señaladas: ${assessmentSummary.sustainabilityConcerns.length}. El libro las plantea como filtro previo a la inversión, no como matiz (p. 242).`);
+    }
+    if (variability.coefficientOfVariation !== null && variability.coefficientOfVariation >= 1.1) {
+      flags.push(`Crecimiento muy volátil: coeficiente de variación ${variability.coefficientOfVariation} sobre ${variability.observations} años. Dos países con el mismo crecimiento medio y distinta dispersión no tienen el mismo riesgo económico (p. 245).`);
     }
 
     const eligibility = evaluateEligibility(calibration, safety, governance, country.knockOuts ?? input.knockOuts);
@@ -478,6 +557,14 @@ export function evaluateStrategy(input: EvaluationInput): EvaluationResult {
         confidence,
       },
       evidence,
+      assessment: {
+        summary: assessmentSummary,
+        derivedFields,
+        profile: classifyCountryProfile(data, assessmentInput),
+        // La matriz de síntesis del libro cruza oportunidad de mercado y competitiva con riesgo.
+        opportunityRisk: positionOnOpportunityRiskMatrix(attractiveness, 100 - safety),
+        growthVariability: variability,
+      },
       eligibility,
       entryModes,
       financial,

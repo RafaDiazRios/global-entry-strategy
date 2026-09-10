@@ -5,7 +5,8 @@ import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import * as db from "./db";
 import { evaluateStrategy, type EntryObjective, type EvaluationInput, type MarketData } from "./strategy/engine";
-import { getWorldBankMarketData, publicSources } from "./strategy/worldBank";
+import { getIndicatorPoints, getWorldBankMarketData, publicSources } from "./strategy/worldBank";
+import { fitPenetrationCurve, middleClassEffect } from "./strategy/marketCurves";
 import { getWgiGovernanceData } from "./strategy/wgi";
 import { financialPublicSources, getCountryFinancialReference } from "./strategy/countryFinancialData";
 
@@ -57,11 +58,23 @@ const knockOutPolicySchema = z.object({
   requireGovernanceEvidence: z.boolean().nullable().optional(),
 });
 
+const countryAssessmentSchema = z.object({
+  // Clave `bloque.grupo.item`; el valor 0-4 o null cuando el ítem no se ha evaluado.
+  ratings: z.record(z.string().max(120), z.number().min(0).max(4).nullable()).optional(),
+  notes: z.record(z.string().max(120), z.string().max(1200)).optional(),
+  incentives: z.array(z.string().max(80)).max(40).optional(),
+  sustainabilityConcerns: z.array(z.string().max(80)).max(20).optional(),
+  lifeCycleCluster: z.enum(["developing", "emerging", "fastIndustrializing", "industrialized"]).nullable().optional(),
+  easeOfDoingBusinessScore: z.number().min(0).max(100).nullable().optional(),
+  profileOverride: z.enum(["hub", "emergingGiant", "fastIndustrializing", "developing", "oecd", "resourceRich"]).nullable().optional(),
+});
+
 const countrySchema = z.object({
   code: z.string().min(2).max(3),
   name: z.string().min(2).max(100).optional(),
   calibration: calibrationSchema.optional(),
   calibrationNotes: calibrationNotesSchema.optional(),
+  assessment: countryAssessmentSchema.optional(),
   knockOuts: knockOutPolicySchema.optional(),
 });
 
@@ -86,6 +99,19 @@ const marketDataSchema = z.object({
   investmentRate: z.number().nullable().optional(),
   fdiInflowUsd: z.number().nullable().optional(),
   fdiInflowPctGdp: z.number().nullable().optional(),
+  gdpPpp: z.number().nullable().optional(),
+  gdpPerCapitaPpp: z.number().nullable().optional(),
+  incomeDistributionGini: z.number().nullable().optional(),
+  householdConsumptionPctGdp: z.number().nullable().optional(),
+  savingsRate: z.number().nullable().optional(),
+  populationGrowth: z.number().nullable().optional(),
+  workingAgeSharePct: z.number().nullable().optional(),
+  governmentSpendingPctGdp: z.number().nullable().optional(),
+  tertiaryEnrolmentPct: z.number().nullable().optional(),
+  researchersPerMillion: z.number().nullable().optional(),
+  researchSpendingPctGdp: z.number().nullable().optional(),
+  electricityAccessPct: z.number().nullable().optional(),
+  gdpGrowthSeries: z.array(z.object({ year: z.number().int(), value: z.number() })).max(60).nullable().optional(),
   governance: governanceSchema.optional(),
   sourceYear: z.number().nullable().optional(),
   lastUpdatedAt: z.string().nullable().optional(),
@@ -281,6 +307,48 @@ export const appRouter = router({
     evaluate: protectedProcedure.input(evaluationSchema).mutation(({ input }) => {
       return evaluateStrategy(input as EvaluationInput);
     }),
+
+    /**
+     * Curva de penetración: correlaciona un indicador de consumo con la renta per cápita
+     * sobre los países indicados y devuelve el ajuste con su R (Figuras 6.4-6.5, p. 230).
+     * Los puntos pueden venir del World Bank por código de indicador o entrarse a mano.
+     */
+    fitPenetrationCurve: protectedProcedure
+      .input(z.object({
+        model: z.enum(["linear", "logarithmic", "invertedU"]).optional(),
+        points: z.array(z.object({ label: z.string().min(1).max(80), gdpPerCapita: z.number().positive(), value: z.number() })).min(3).max(120).optional(),
+        indicator: z.string().min(3).max(40).optional(),
+        countryCodes: z.array(z.string().min(2).max(3)).min(3).max(60).optional(),
+      }))
+      .mutation(async ({ input }) => {
+        if (input.points?.length) {
+          return { ...fitPenetrationCurve(input.points, input.model), points: input.points };
+        }
+        if (!input.indicator || !input.countryCodes?.length) {
+          throw new Error("Indique puntos explícitos o un indicador con su lista de países.");
+        }
+        const points = await getIndicatorPoints(input.indicator, input.countryCodes);
+        if (points.length < 3) throw new Error("La fuente pública no devolvió suficientes observaciones para ajustar una curva.");
+        return { ...fitPenetrationCurve(points, input.model), points };
+      }),
+
+    /**
+     * Efecto clase media: cuánto crece el segmento por encima de un umbral de renta
+     * cuando la renta media sube (Figura 6.6, p. 232).
+     */
+    middleClassEffect: protectedProcedure
+      .input(z.object({
+        gdpPerCapita: z.number().positive(),
+        gini: z.number().min(1).max(99),
+        threshold: z.number().positive(),
+        incomeGrowthPct: z.number().min(-90).max(500),
+        upperThreshold: z.number().positive().nullable().optional(),
+      }))
+      .mutation(({ input }) => {
+        const result = middleClassEffect(input);
+        if (!result) throw new Error("Los parámetros no permiten calcular la distribución de renta.");
+        return result;
+      }),
 
     saveScenario: protectedProcedure
       .input(z.object({ name: z.string().min(2).max(180), evaluation: evaluationSchema }))

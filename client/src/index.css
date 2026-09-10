@@ -452,3 +452,15 @@ button:active:not(:disabled) { transform: scale(.98); }
   font-size: 0.8125rem;
   background: color-mix(in srgb, var(--muted) 40%, transparent);
 }
+
+/* Panel de evaluación detallada del capítulo 6. */
+.assessment-card { margin-top: 16px; }
+.assessment-panel .assessment-item { padding-bottom: 14px; border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, transparent); }
+.assessment-panel .assessment-item:last-child { padding-bottom: 0; border-bottom: 0; }
+
+/* Lectura de país: cuadrante de la Figura 6.2, perfil y volatilidad. */
+.country-lens { margin: 12px 0; padding: 12px 14px; border: 1px solid var(--border); border-radius: 8px; background: color-mix(in srgb, var(--muted) 35%, transparent); }
+.country-lens-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted-foreground); }
+.country-lens > p { margin: 8px 0 10px; font-size: 13px; line-height: 1.5; }
+.country-lens-meta { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 12px; color: var(--muted-foreground); }
+.country-lens-meta b { color: var(--foreground); font-weight: 600; }

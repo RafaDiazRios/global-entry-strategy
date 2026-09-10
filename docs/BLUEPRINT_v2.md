@@ -17,7 +17,7 @@ Los cinco hallazgos:
 
 2. **Falta el capítulo 8 entero.** No hay análisis de encajes (estratégico, de capacidades, cultural, organizativo), ni análisis de socio, ni valoración de adquisición con sinergias, ni modo de integración. La app *recomienda* "adquisición" o "joint venture" como salida de una fórmula ponderada y ahí se detiene — justo donde el libro dedica 66 páginas y donde se pierde el 45–75% del valor de las operaciones (p. 289).
 
-3. **Lo cualitativo se ha comprimido a 13 deslizadores sin evidencia.** Toda la riqueza de los caps. 6 y 7 — las 22 dimensiones CAGE (Fig. 6.11, p. 243), las 6 fuerzas con sus determinantes (Tabla 6.4, pp. 238–239), los 4 riesgos con sus 14 componentes (Fig. 6.12, p. 244), los 5 tipos de incentivo (Tabla 6.5, pp. 241–242) — se han colapsado en `calibration`, un vector de 13 escalares 0–100 sin fuente, sin cita y sin justificación. Para un caso de estudio esto es inservible: un caso son hechos, y la herramienta no tiene dónde ponerlos.
+3. **Lo cualitativo se ha comprimido a 13 deslizadores sin evidencia.** Toda la riqueza de los caps. 6 y 7 — las 21 dimensiones CAGE (Fig. 6.11, p. 243), las 6 fuerzas con sus determinantes (Tabla 6.4, pp. 238–239), los 4 riesgos con sus 23 componentes (Fig. 6.12, p. 244), los 5 tipos de incentivo (Tabla 6.5, pp. 241–242) — se han colapsado en `calibration`, un vector de 13 escalares 0–100 sin fuente, sin cita y sin justificación. Para un caso de estudio esto es inservible: un caso son hechos, y la herramienta no tiene dónde ponerlos.
 
 4. **No hay caso.** No existe entidad "caso", ni ingesta de documento, ni campo narrativo, ni libro de evidencias. Existe `valueProposition` (hasta 1.200 caracteres) y se ignora en todos los cálculos. La buena noticia: `server/_core/llm.ts` ya expone un cliente LLM con soporte de `file_url` con `mime_type: application/pdf` y `response_format: json_schema` estricto — la pieza más cara del "modo caso" ya está en el repositorio, sin usar.
 
@@ -89,8 +89,8 @@ Para un caso de estudio esto es fatal: un caso te da una empresa con una histori
 | 6 | Cinco fuerzas + políticas gubernamentales, con determinantes específicos de entrada internacional | Tabla 6.4, pp. 238–239 | **Reducido a 1 deslizador** (`competitionAttractiveness`) |
 | 6 | Country diamond (dotación, calidad de demanda, rivalidad, industrias de soporte) | p. 239 | **Ausente** |
 | 6 | Incentivos gubernamentales: 5 familias, ~25 instrumentos | Tabla 6.5, pp. 241–242 | **Ausente** |
-| 6 | CAGE con 22 dimensiones nombradas | Fig. 6.11, p. 243 | **Reducido a 1 deslizador** (`cageDistance`) |
-| 6 | Riesgo país: 4 categorías, 14 componentes, con exposición separada de accionista / empleado / operación | Fig. 6.12, p. 244 | **Reducido a 4 deslizadores** |
+| 6 | CAGE con 21 dimensiones nombradas | Fig. 6.11, p. 243 | **Reducido a 1 deslizador** (`cageDistance`) |
+| 6 | Riesgo país: 4 categorías, 23 componentes, con exposición separada de accionista / empleado / operación | Fig. 6.12, p. 244 | **Reducido a 4 deslizadores** |
 | 6 | Variabilidad económica como coeficiente de variación del crecimiento | Fig. 6.13, p. 245 | **Ausente** (calculable con los datos que ya se descargan) |
 | 6 | Clustering en 6 dimensiones y perfiles estratégicos (hubs, gigantes emergentes, etc.) | Tabla 6.6, p. 249 | **Ausente** |
 | 6 | Matriz de síntesis oportunidades × riesgos | Fig. 6.2, p. 227 | **Ausente** (hay un escalar `riskAdjusted`, que no es lo mismo) |
@@ -184,7 +184,7 @@ M2  POSICIÓN        Propuesta de valor · 8 posicionamientos · value curve
     Y SISTEMA       Cadena de valor global/regional/local · T-A-C · ventajas      (cap. 5, pp. 188-199)
      │
 M3  PAÍSES          Mercado · recursos · industria (6 fuerzas) · incentivos
-                    CAGE (22 dim.) · riesgo (14 comp.) · clusters · matriz O×R    (cap. 6)
+                    CAGE (21 dim.) · riesgo (23 comp.) · clusters · matriz O×R    (cap. 6)
      │
 M4  ENTRADA         Por qué · cuándo (4 fases) · ritmo · modo (Tabla 7.4)
                     · opción real · modelo digital                                (cap. 7)
@@ -323,10 +323,10 @@ Reemplaza la pestaña actual de Calibración. La estructura sigue la Fig. 6.3 (p
 - **ESG** (p. 242): el checklist de cuestiones medioambientales y sociales como filtro explícito.
 
 **3d. Distancia CAGE**
-Las 22 dimensiones nombradas de la Fig. 6.11 (p. 243), agrupadas en cultural (5), administrativa (5), geográfica (4) y económica (7), cada una con escala 0–4 y campo de justificación. Comparación bilateral desde el país de origen. Se puede precargar con datos objetivos donde existan (idioma común, bloque regional compartido, colonia común, distancia física, diferencia de PIB per cápita) y dejar el resto a juicio. El módulo debe mostrar el perfil, no solo la media — dos países con la misma media CAGE y perfiles opuestos exigen respuestas distintas.
+Las 21 dimensiones nombradas de la Fig. 6.11 (p. 243), agrupadas en cultural (5), administrativa (5), geográfica (4) y económica (7), cada una con escala 0–4 y campo de justificación. Comparación bilateral desde el país de origen. Se puede precargar con datos objetivos donde existan (idioma común, bloque regional compartido, colonia común, distancia física, diferencia de PIB per cápita) y dejar el resto a juicio. El módulo debe mostrar el perfil, no solo la media — dos países con la misma media CAGE y perfiles opuestos exigen respuestas distintas.
 
 **3e. Riesgo país**
-Los 14 componentes de la Fig. 6.12 (p. 244), con la distinción del libro entre exposición de accionista (destrucción, expropiación, inflexibilidad de transferencia), de empleado (secuestro, gangsterismo, acoso) y operativa (disrupción de mercado, conflictividad, extorsión, escasez de suministros), más riesgo económico, competitivo y operativo. Dos añadidos calculables con datos que la app ya descarga:
+Los 23 componentes de la Fig. 6.12 (p. 244), con la distinción del libro entre exposición de accionista (destrucción, expropiación, inflexibilidad de transferencia), de empleado (secuestro, gangsterismo, acoso) y operativa (disrupción de mercado, conflictividad, extorsión, escasez de suministros), más riesgo económico, competitivo y operativo. Dos añadidos calculables con datos que la app ya descarga:
 - **Coeficiente de variación del crecimiento** (Fig. 6.13, p. 245): σ/μ de la serie de `NY.GDP.MKTP.KD.ZG` de los últimos 20 años. Es una medida objetiva de riesgo económico y hoy la app descarga la serie y se queda solo con el último valor.
 - **Knock-outs**: umbrales por componente que declaran el país no elegible con motivo, en lugar de compensarse.
 
@@ -478,7 +478,7 @@ Los 11 defectos de §3: escudo fiscal, coherencia ROI/NPV, payback interpolado, 
 *Criterio:* cada número del informe puede rastrearse a una fórmula documentada o a una fuente. Ningún coeficiente sin procedencia.
 
 ### Fase 2 — Capítulo 6 completo (L)
-M3 entero: taxonomía de indicadores ampliada, curva de penetración, efecto clase media, 6 fuerzas con determinantes, country diamond, incentivos, CAGE de 22 dimensiones, riesgo de 14 componentes con coeficiente de variación, clustering y matriz oportunidades × riesgos.
+M3 entero: taxonomía de indicadores ampliada, curva de penetración, efecto clase media, 6 fuerzas con determinantes, country diamond, incentivos, CAGE de 21 dimensiones, riesgo de 23 componentes con coeficiente de variación, clustering y matriz oportunidades × riesgos.
 *Criterio:* el mini-caso 6.2 (Izmir Industrial Electric, pp. 249–251, con sus cinco países africanos) se puede resolver de principio a fin dentro de la herramienta.
 
 ### Fase 3 — Capítulo 5 (L)
@@ -550,8 +550,8 @@ Cinco decisiones que no puedo tomar por ti y que condicionan el diseño:
 | Cinco fuerzas + gobierno | M3c | Tabla 6.4, pp. 238–239 |
 | Country diamond | M3c | p. 239 |
 | Incentivos a la inversión | M3c | Tabla 6.5, pp. 241–242 |
-| CAGE (22 dimensiones) | M3d | Fig. 6.11, p. 243 |
-| Riesgo país (14 componentes) | M3e | Fig. 6.12, p. 244 |
+| CAGE (21 dimensiones) | M3d | Fig. 6.11, p. 243 |
+| Riesgo país (23 componentes) | M3e | Fig. 6.12, p. 244 |
 | Variabilidad económica | M3e | Fig. 6.13, p. 245 |
 | Clustering y perfiles | M3f | Tabla 6.6, p. 249 |
 | Objetivos de entrada | M4a | Tabla 7.1, pp. 260–261 |
@@ -596,5 +596,7 @@ Cinco decisiones que no puedo tomar por ti y que condicionan el diseño:
 | Preguntas de análisis estratégico | Transversal | Módulo 16 INSEAD |
 
 ---
+
+> **Corrección posterior a la implementación.** Al codificar los marcos se contaron los ítems uno a uno: la Fig. 6.11 tiene **21** dimensiones CAGE (5 culturales, 5 administrativas, 4 geográficas, 7 económicas) y la Fig. 6.12 tiene **23** componentes de riesgo, no las 22 y 14 que decía el primer borrador. El total del capítulo 6 implementado es de **71 ítems** más 29 instrumentos de incentivo.
 
 *Documento preparado para revisión previa a la implementación. Todas las referencias de página corresponden a la 5ª edición (Bloomsbury Academic, 2023). Las referencias de código corresponden al estado del repositorio el 10 de septiembre de 2026.*
