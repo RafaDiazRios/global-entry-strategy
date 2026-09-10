@@ -212,15 +212,28 @@ const normalizeToolChoice = (
   return toolChoice;
 };
 
-const resolveApiUrl = () =>
-  ENV.forgeApiUrl && ENV.forgeApiUrl.trim().length > 0
-    ? `${ENV.forgeApiUrl.replace(/\/$/, "")}/v1/chat/completions`
-    : "https://forge.manus.im/v1/chat/completions";
+/**
+ * Proveedor de modelo, configurable por entorno.
+ *
+ * La API es la de chat completions compatible con OpenAI, así que sirve tal cual para
+ * OpenAI, para pasarelas compatibles y para cualquier despliegue propio. `LLM_BASE_URL`
+ * apunta al proveedor y `LLM_MODEL` fija el modelo por defecto.
+ */
+const resolveBaseUrl = () => (ENV.llmBaseUrl || "https://api.openai.com/v1").replace(/\/+$/, "");
+const resolveApiUrl = () => `${resolveBaseUrl()}/chat/completions`;
 
 const assertApiKey = () => {
-  if (!ENV.forgeApiKey) {
-    throw new Error("OPENAI_API_KEY is not configured");
+  if (!ENV.llmApiKey) {
+    throw new Error("LLM_API_KEY no está configurada.");
   }
+};
+
+const resolveModel = (requested?: string) => {
+  const model = requested || ENV.llmModel;
+  if (!model) {
+    throw new Error("Indique un modelo en la llamada o configure LLM_MODEL.");
+  }
+  return model;
 };
 
 const normalizeResponseFormat = ({
@@ -362,9 +375,8 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     messages: messages.map(normalizeMessage),
   };
 
-  if (model) {
-    payload.model = model;
-  }
+  // OpenAI exige el modelo en cada llamada; la pasarela anterior lo elegía por su cuenta.
+  payload.model = resolveModel(model);
 
   if (tools && tools.length > 0) {
     payload.tools = tools;
@@ -405,7 +417,7 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     method: "POST",
     headers: {
       "content-type": "application/json",
-      authorization: `Bearer ${ENV.forgeApiKey}`,
+      authorization: `Bearer ${ENV.llmApiKey}`,
     },
     body: JSON.stringify(payload),
   });
@@ -435,12 +447,10 @@ export type ModelsResponse = {
 export async function listLLMModels(): Promise<ModelsResponse> {
   assertApiKey();
 
-  const url = ENV.forgeApiUrl && ENV.forgeApiUrl.trim().length > 0
-    ? `${ENV.forgeApiUrl.replace(/\/$/, "")}/v1/models`
-    : "https://forge.manus.im/v1/models";
+  const url = `${resolveBaseUrl()}/models`;
 
   const response = await fetchWithBackoff(url, {
-    headers: { authorization: `Bearer ${ENV.forgeApiKey}` },
+    headers: { authorization: `Bearer ${ENV.llmApiKey}` },
   });
 
   if (!response.ok) {

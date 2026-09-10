@@ -1,48 +1,28 @@
-import type { Express } from "express";
-import { ENV } from "./env";
+import type { Express, Request, Response } from "express";
+import { storageGetSignedUrl } from "../storage";
+import { authenticateRequest } from "./auth";
 
+/**
+ * Sirve los ficheros almacenados mediante una redirección a una URL firmada de corta
+ * duración. Exige sesión: los documentos de un caso no son públicos.
+ */
 export function registerStorageProxy(app: Express) {
-  app.get("/manus-storage/*", async (req, res) => {
-    const key = (req.params as Record<string, string>)[0];
-    if (!key) {
-      res.status(400).send("Missing storage key");
+  app.get("/files/*", async (req: Request, res: Response) => {
+    const key = decodeURIComponent(String(req.params[0] ?? "")).replace(/^\/+/, "");
+    if (!key || key.includes("..")) {
+      res.status(400).json({ error: "clave no válida" });
       return;
     }
-
-    if (!ENV.forgeApiUrl || !ENV.forgeApiKey) {
-      res.status(500).send("Storage proxy not configured");
-      return;
-    }
-
     try {
-      const forgeUrl = new URL(
-        "v1/storage/presign/get",
-        ENV.forgeApiUrl.replace(/\/+$/, "") + "/",
-      );
-      forgeUrl.searchParams.set("path", key);
-
-      const forgeResp = await fetch(forgeUrl, {
-        headers: { Authorization: `Bearer ${ENV.forgeApiKey}` },
-      });
-
-      if (!forgeResp.ok) {
-        const body = await forgeResp.text().catch(() => "");
-        console.error(`[StorageProxy] forge error: ${forgeResp.status} ${body}`);
-        res.status(502).send("Storage backend error");
+      const user = await authenticateRequest(req);
+      if (!user) {
+        res.status(401).json({ error: "sesión requerida" });
         return;
       }
-
-      const { url } = (await forgeResp.json()) as { url: string };
-      if (!url) {
-        res.status(502).send("Empty signed URL from backend");
-        return;
-      }
-
-      res.set("Cache-Control", "no-store");
-      res.redirect(307, url);
-    } catch (err) {
-      console.error("[StorageProxy] failed:", err);
-      res.status(502).send("Storage proxy error");
+      res.redirect(307, await storageGetSignedUrl(key));
+    } catch (error) {
+      console.error("[Storage] No se pudo firmar la descarga", error);
+      res.status(500).json({ error: "no se pudo servir el fichero" });
     }
   });
 }

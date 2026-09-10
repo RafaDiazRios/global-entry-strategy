@@ -1,6 +1,6 @@
 import type { Request, Response } from "express";
 import * as db from "./db";
-import { sdk } from "./_core/sdk";
+import { ENV } from "./_core/env";
 import { evaluateStrategy, type EvaluationInput, type MarketData } from "./strategy/engine";
 import { getWorldBankMarketData } from "./strategy/worldBank";
 import { getCountryFinancialReference } from "./strategy/countryFinancialData";
@@ -8,8 +8,14 @@ import { getCountryFinancialReference } from "./strategy/countryFinancialData";
 /** Refreshes the public macro data in all saved scenarios. It is deliberately idempotent. */
 export async function refreshScenarioDataHandler(req: Request, res: Response) {
   try {
-    const user = await sdk.authenticateRequest(req);
-    if (!user.isCron || !user.taskUid) return res.status(403).json({ error: "cron-only" });
+    /**
+     * El refresco programado no lo dispara una persona, así que no usa sesión: se protege
+     * con un secreto compartido que el programador de tareas envía en la cabecera.
+     * Sin CRON_SECRET configurado el endpoint queda cerrado.
+     */
+    const provided = req.headers["x-cron-secret"];
+    const token = Array.isArray(provided) ? provided[0] : provided;
+    if (!ENV.cronSecret || token !== ENV.cronSecret) return res.status(403).json({ error: "cron-only" });
 
     const scenarios = await db.listStrategyScenariosForRefresh();
     let refreshed = 0;

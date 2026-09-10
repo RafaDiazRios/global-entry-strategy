@@ -8,6 +8,7 @@ import { evaluateStrategy, type EntryObjective, type EvaluationInput, type Marke
 import { getIndicatorPoints, getWorldBankMarketData, publicSources } from "./strategy/worldBank";
 import { fitPenetrationCurve, middleClassEffect } from "./strategy/marketCurves";
 import { critiqueAssessment, extractCaseEvidence, proposeAssessmentBlock, type CaseSource } from "./ai/caseCopilot";
+import { extractPdfText } from "./ai/pdfText";
 import { storageGetSignedUrl, storagePut } from "./storage";
 import { getWgiGovernanceData } from "./strategy/wgi";
 import { financialPublicSources, getCountryFinancialReference } from "./strategy/countryFinancialData";
@@ -512,6 +513,12 @@ export const appRouter = router({
         if (!buffer.length) throw new Error("El contenido del fichero está vacío o mal codificado.");
         const safeName = input.filename.replace(/[^A-Za-z0-9._-]+/g, "_").slice(0, 120);
         const stored = await storagePut(`cases/${ctx.user.id}/${input.caseId}/${safeName}`, buffer, input.mimeType);
+        /**
+         * Se extrae el texto en el momento de subir. Con texto se puede comprobar que las
+         * citas del copiloto están de verdad en el documento; sin él, solo se puede exigir
+         * que existan.
+         */
+        const extraction = input.mimeType.includes("pdf") ? await extractPdfText(buffer) : { text: null, pages: null, note: "Formato sin extracción de texto." };
         return {
           id: await db.addCaseDocument({
             userId: ctx.user.id,
@@ -519,8 +526,12 @@ export const appRouter = router({
             filename: input.filename,
             mimeType: input.mimeType,
             storageKey: stored.key,
+            textContent: extraction.text,
             bytes: buffer.length,
           }),
+          textExtracted: Boolean(extraction.text),
+          pages: extraction.pages,
+          note: extraction.note,
         };
       }),
 

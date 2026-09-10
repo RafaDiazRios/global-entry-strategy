@@ -46,7 +46,7 @@ export async function upsertUser(user: InsertUser): Promise<void> {
   values.lastSignedIn = user.lastSignedIn ?? new Date();
   updateSet.lastSignedIn = values.lastSignedIn;
   if (user.role !== undefined) { values.role = user.role; updateSet.role = user.role; }
-  else if (user.openId === ENV.ownerOpenId) { values.role = "admin"; updateSet.role = "admin"; }
+
   await db.insert(users).values(values).onDuplicateKeyUpdate({ set: updateSet });
 }
 

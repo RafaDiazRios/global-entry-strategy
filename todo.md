@@ -77,6 +77,23 @@ El copiloto requiere `BUILT_IN_FORGE_API_KEY` y `BUILT_IN_FORGE_API_URL` en el e
 ellas la pestaña de caso funciona para cargar documentos y registrar evidencias a mano, pero
 los botones de IA devuelven error.
 
+## Migración fuera de la plataforma (completada)
+
+- [x] Retirados seis servicios de plataforma sin ningún importador, más el showcase de componentes y el diálogo de plataforma: unas 1.400 líneas.
+- [x] Autenticación propia con Google OAuth, lista blanca de correos y sesión firmada con `JWT_SECRET`. Sin lista blanca no entra nadie.
+- [x] Almacenamiento en S3 o compatible con el SDK de AWS, que ya era dependencia del proyecto. Los ficheros exigen sesión y se sirven por URL firmada de quince minutos.
+- [x] Cliente de modelo apuntando a cualquier API compatible con OpenAI mediante `LLM_BASE_URL`, `LLM_API_KEY` y `LLM_MODEL`.
+- [x] Endpoint de refresco programado protegido por secreto compartido en cabecera.
+- [x] Retirados el plugin de compilación, el recolector de logs y el script de analítica de la plataforma.
+- [x] `Dockerfile`, `.env.example` y guía de despliegue en `docs/DESPLIEGUE.md`.
+- [x] Extracción de texto de PDF en el servidor, que hace verificables las citas también en documentos subidos.
+
+### Antes de desplegar
+
+Credenciales de Google con el URI de redirección exacto, `DATABASE_URL`, `JWT_SECRET` de al
+menos 32 caracteres y `ALLOWED_EMAILS`. El copiloto necesita además `LLM_API_KEY` y
+`LLM_MODEL`, y los PDF de casos un bucket S3 o compatible.
+
 ## Fases siguientes del blueprint v2
 - [ ] Fase 3 — capítulo 5: ambición global, GRI/GCI, roles de país, posicionamiento, cadena de valor y Transfer-Adapt-Create.
 - [ ] Fase 4 — capítulos 7 y 8: fases de ventana, ritmo, opción real, build-borrow-buy, cuatro encajes, socio, integración y modelos económicos de adquisición y JV.

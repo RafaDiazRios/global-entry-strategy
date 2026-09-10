@@ -80,7 +80,11 @@ El botón **PDF** genera localmente un informe detallado que incluye mandato, ta
 
 - Node.js 22+
 - pnpm 10+
-- Una base de datos MySQL/TiDB y las variables de entorno de Manus para autenticación si se requiere historial de escenarios.
+- Una base de datos MySQL 8 o TiDB
+- Credenciales de OAuth de Google para el acceso
+- Opcional: una API compatible con OpenAI para el copiloto, y un bucket S3 o compatible para los PDF de casos
+
+Copie `.env.example` a `.env` y rellénelo. La guía completa está en [docs/DESPLIEGUE.md](docs/DESPLIEGUE.md).
 
 ### Comandos
 
@@ -118,7 +122,10 @@ shared/domain/entryModes.ts          Modos de entrada y su perfil según la Tabl
 shared/domain/countryAssessment.ts   Marcos del capítulo 6 como datos: CAGE, riesgo, fuerzas, incentivos y perfiles
 server/strategy/countryAssessment.ts Derivación de la calibración, perfil de país y matriz oportunidades x riesgos
 server/strategy/marketCurves.ts      Curvas de penetración y efecto clase media
+server/_core/auth.ts                 Google OAuth, lista blanca y sesión firmada propia
+server/storage.ts                    Almacenamiento en S3 o compatible
 server/ai/caseCopilot.ts             Extracción con cita verificada, propuesta de puntuación y revisión crítica
+server/ai/pdfText.ts                 Extracción de texto de PDF, que hace verificable la cita
 client/src/components/CaseWorkspace.tsx           Casos, documentos y libro de evidencias
 client/src/components/CountryAssessmentPanel.tsx  Panel de evaluación detallada generado desde los marcos
 server/strategy/entryModeScoring.ts  Puntuación de modos con procedencia por criterio
@@ -134,7 +141,11 @@ drizzle/schema.ts                    Definición de persistencia
 
 ## Actualización de datos
 
-La aplicación permite actualización manual en el panel de mercados. También expone una ruta `POST /api/scheduled/refresh-scenarios`, protegida exclusivamente para tareas cron autenticadas de Manus, que actualiza los datos públicos y reevalúa todos los escenarios guardados. Configure la tarea solo después de publicar la aplicación. Para los datos macroeconómicos y de gobernanza, una frecuencia mensual es normalmente suficiente.
+La aplicación permite actualización manual en el panel de mercados. También expone una ruta `POST /api/scheduled/refresh-scenarios`, protegida por el secreto compartido `CRON_SECRET` que el programador envía en la cabecera `X-Cron-Secret`, que actualiza los datos públicos y reevalúa todos los escenarios guardados. Para los datos macroeconómicos y de gobernanza, una frecuencia mensual es normalmente suficiente. Ver [docs/DESPLIEGUE.md](docs/DESPLIEGUE.md).
+
+## Despliegue
+
+Servidor Express con MySQL, empaquetado con `Dockerfile`. Se despliega en Railway, Render, Fly.io o un VPS. El acceso es Google OAuth con lista blanca de correos: **si `ALLOWED_EMAILS` está vacío no entra nadie**, para que una instalación a medio configurar quede cerrada y no abierta. Instrucciones paso a paso en [docs/DESPLIEGUE.md](docs/DESPLIEGUE.md).
 
 ## Límites y principios de gobierno
 

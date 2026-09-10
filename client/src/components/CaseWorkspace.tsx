@@ -124,7 +124,11 @@ export function CaseWorkspace({ caseId, onCaseSelected, decisionContext, default
       });
       setActiveDocumentId(created.id);
       refresh();
-      toast.success("Documento subido.");
+      if (created.textExtracted) {
+        toast.success(`Documento subido y texto extraído${created.pages ? ` (${created.pages} páginas)` : ""}. Las citas se podrán verificar.`);
+      } else {
+        toast.warning(created.note ?? "Documento subido, pero sin texto extraíble: las citas no se podrán verificar contra el original.");
+      }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "No se pudo subir el documento.");
     }
