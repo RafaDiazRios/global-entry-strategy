@@ -13,40 +13,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
-import {
-  AlertTriangle,
-  ArrowDownToLine,
-  ArrowUpRight,
-  BarChart3,
-  Building2,
-  ChartNoAxesCombined,
-  CheckCircle2,
-  ChevronRight,
-  ClipboardCheck,
-  CircleAlert,
-  CircleDollarSign,
-  Columns3,
-  Compass,
-  Database,
-  FileCheck2,
-  FileDown,
-  Globe2,
-  Loader2,
-  MapPinned,
-  Pencil,
-  Plus,
-  RefreshCw,
-  RotateCcw,
-  Save,
-  ShieldCheck,
-  SlidersHorizontal,
-  Sparkles,
-  Target,
-  Trash2,
-  X,
-} from "lucide-react";
+import { AlertTriangle, ArrowDownToLine, ArrowUpRight, BarChart3, Building2, ChartNoAxesCombined, CheckCircle2, ChevronRight, CircleAlert, CircleDollarSign, ClipboardCheck, Columns3, Compass, Database, FileCheck2, FileDown, FileText, Globe2, Loader2, MapPinned, Pencil, Plus, RefreshCw, RotateCcw, Save, ShieldCheck, SlidersHorizontal, Sparkles, Target, Trash2, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
+import { countryCatalog } from "@shared/domain/countries";
+import { CountryAssessmentPanel, assessmentProgress, emptyAssessment, type CountryAssessmentState } from "@/components/CountryAssessmentPanel";
+import { CaseWorkspace } from "@/components/CaseWorkspace";
 
 type Objective = "market" | "resources" | "learning" | "coordination";
 type Status = "live" | "partial" | "unavailable";
@@ -93,7 +65,8 @@ type Calibration = {
   ipSensitivity: number;
 };
 
-type Candidate = { code: string; name: string; region: string; calibration: Calibration };
+type CalibrationNotes = Partial<Record<keyof Calibration, { rationale?: string }>>;
+type Candidate = { code: string; name: string; region: string; calibration: Calibration; notes: CalibrationNotes; assessment: CountryAssessmentState };
 type ModeKey = "greenfield" | "acquisition" | "alliance" | "licensing" | "distributor" | "office" | "digital";
 type FinancialProfile = { initialInvestment?: number | null; annualOperatingCost?: number | null; revenueCapturePct?: number | null };
 type Provenance = { sourceStatus: Status; sourceName: string; sourceUrl: string; sourceYear?: number | null; observedAt?: string | null; retrievedAt: string; note: string };
@@ -110,6 +83,12 @@ type CountryResult = {
   name: string;
   data: MarketData;
   scores: { market: number; resources: number; competition: number; government: number; distanceFit: number; safety: number; attractiveness: number; riskAdjusted: number; confidence: number };
+  assessment: {
+    summary: { assessedItems: number; totalItems: number; coverage: number; sustainabilityConcerns: string[] };
+    profile: { best: { key: string; label: string; description: string; match: number } | null };
+    opportunityRisk: { opportunity: number; risk: number; label: string; reading: string; source: string };
+    growthVariability: { mean: number | null; coefficientOfVariation: number | null; observations: number };
+  };
   entryModes: { mode: string; score: number; rationale: string; commitment: string }[];
   financial: FinancialCase & { scenarios: FinancialScenario[] };
   investmentRecommendation: { action: "advance" | "test" | "discard" | "insufficient_data"; label: string; summary: string; selectedMode: string | null; selectedModeKey: ModeKey | null; reasons: string[] };
@@ -119,12 +98,7 @@ type CountryResult = {
 
 type Evaluation = { generatedAt: string; methodology: string; countries: CountryResult[]; portfolio: { leadingCountry?: string; recommendation: string; caveats: string[] } };
 
-const catalog = [
-  ["DE", "Alemania", "Europa"], ["FR", "Francia", "Europa"], ["GB", "Reino Unido", "Europa"], ["ES", "España", "Europa"], ["PL", "Polonia", "Europa"], ["IT", "Italia", "Europa"],
-  ["US", "Estados Unidos", "Américas"], ["CA", "Canadá", "Américas"], ["MX", "México", "Américas"], ["BR", "Brasil", "Américas"], ["CL", "Chile", "Américas"], ["CO", "Colombia", "Américas"],
-  ["CN", "China", "Asia-Pacífico"], ["JP", "Japón", "Asia-Pacífico"], ["KR", "Corea del Sur", "Asia-Pacífico"], ["IN", "India", "Asia-Pacífico"], ["ID", "Indonesia", "Asia-Pacífico"], ["SG", "Singapur", "Asia-Pacífico"], ["AU", "Australia", "Asia-Pacífico"],
-  ["AE", "Emiratos Árabes Unidos", "Oriente Medio y África"], ["SA", "Arabia Saudí", "Oriente Medio y África"], ["ZA", "Sudáfrica", "Oriente Medio y África"], ["NG", "Nigeria", "Oriente Medio y África"], ["EG", "Egipto", "Oriente Medio y África"],
-] as const;
+const catalog = countryCatalog.map((entry) => [entry.code, entry.name, entry.region] as const);
 
 const neutralCalibration: Calibration = {
   demandQuality: 50, resourceFit: 50, competitionAttractiveness: 50, governmentOpenness: 50, cageDistance: 50, politicalRisk: 50, economicRisk: 50, competitiveRisk: 50, operationalRisk: 50, internalReadiness: 50, timePressure: 50, controlNeed: 50, ipSensitivity: 50,
@@ -166,6 +140,7 @@ const calibrationFields: { key: keyof Calibration; label: string; group: string;
 type MarketMetricKey = "gdpUsd" | "gdpPerCapita" | "gdpGrowth" | "fdiInflowUsd" | "fdiInflowPctGdp";
 type MarketManualKey = MarketMetricKey | "governance";
 type FinancialReferenceKey = "taxRatePct" | "fxRateToReportingCurrency";
+function documentedCount(candidate: Candidate) { return calibrationFields.filter((field) => (candidate.notes[field.key]?.rationale ?? "").trim().length > 0).length; }
 function blankData(): MarketData { return { sourceStatus: "unavailable", manualFields: [] }; }
 function formatNumber(value: number | null | undefined, options: Intl.NumberFormatOptions = {}) { return value === null || value === undefined ? "—" : new Intl.NumberFormat("es-ES", options).format(value); }
 function formatBillions(value: number | null | undefined) { return value === null || value === undefined ? "—" : `US$ ${new Intl.NumberFormat("es-ES", { notation: "compact", maximumFractionDigits: 1 }).format(value)}`; }
@@ -178,6 +153,8 @@ function decisionStyle(action: CountryResult["investmentRecommendation"]["action
 export default function Home() {
   const { isAuthenticated } = useAuth();
   const [activeTab, setActiveTab] = useState("brief");
+  const [caseId, setCaseId] = useState<number | null>(null);
+  const [caseDocumentId, setCaseDocumentId] = useState<number | null>(null);
   const [scenarioName, setScenarioName] = useState("Nuevo análisis");
   const [companyName, setCompanyName] = useState("");
   const [homeCountry, setHomeCountry] = useState("");
@@ -225,6 +202,8 @@ export default function Home() {
   const fetchGovernanceData = trpc.strategy.fetchGovernanceData.useMutation();
   const evaluation = trpc.strategy.evaluate.useMutation();
   const saveScenario = trpc.strategy.saveScenario.useMutation();
+  const proposeBlock = trpc.ai.proposeBlock.useMutation();
+  const critiqueBlock = trpc.ai.critique.useMutation();
 
   const activeCandidate = candidates.find((candidate) => candidate.code === activeCountry) ?? candidates[0];
   const excluded = useMemo(() => new Set(excludedCodes.toUpperCase().split(",").map((code) => code.trim()).filter(Boolean)), [excludedCodes]);
@@ -252,7 +231,7 @@ export default function Home() {
     if (!found) return;
     if (candidates.some((candidate) => candidate.code === found[0])) { toast.info("El país ya está en la comparación."); return; }
     if (candidates.length >= 12) { toast.error("El análisis admite hasta 12 países por escenario."); return; }
-    const candidate = { code: found[0], name: found[1], region: found[2], calibration: { ...neutralCalibration } };
+    const candidate = { code: found[0], name: found[1], region: found[2], calibration: { ...neutralCalibration }, notes: {} as CalibrationNotes, assessment: { ...emptyAssessment } };
     setCandidates((current) => [...current, candidate]);
     setActiveCountry(candidate.code);
     setSelectedCode("");
@@ -264,6 +243,18 @@ export default function Home() {
     setCandidates((current) => current.filter((candidate) => candidate.code !== code));
     if (activeCountry === code) setActiveCountry(undefined);
     setResult(null);
+  }
+
+  function updateAssessment(next: CountryAssessmentState) {
+    if (!activeCandidate) return;
+    setResult(null);
+    setCandidates((current) => current.map((candidate) => candidate.code === activeCandidate.code ? { ...candidate, assessment: next } : candidate));
+  }
+
+  function updateCalibrationNote(key: keyof Calibration, rationale: string) {
+    if (!activeCandidate) return;
+    setResult(null);
+    setCandidates((current) => current.map((candidate) => candidate.code === activeCandidate.code ? { ...candidate, notes: { ...candidate.notes, [key]: { rationale } } } : candidate));
   }
 
   function updateCalibration(key: keyof Calibration, value: number) {
@@ -497,7 +488,7 @@ export default function Home() {
   function buildInput() {
     return {
       companyName: companyName.trim(), homeCountry: homeCountry.trim(), industry: industry.trim(), businessModel: businessModel.trim(), valueProposition: valueProposition.trim(), objective, horizonYears: Number(horizonYears) || 3,
-      countryInputs: screenedCandidates.map(({ code, name, calibration }) => ({ code, name, calibration })),
+      countryInputs: screenedCandidates.map(({ code, name, calibration, notes, assessment }) => ({ code, name, calibration, calibrationNotes: notes, assessment })),
       marketData: Object.fromEntries(screenedCandidates.map((candidate) => [candidate.code, marketData[candidate.code] ?? blankData()])),
       financialByCountry: Object.fromEntries(screenedCandidates.map((candidate) => [candidate.code, financialByCountry[candidate.code] ?? {}])),
       investmentThresholds,
@@ -572,6 +563,7 @@ export default function Home() {
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-7">
           <TabsList className="studio-tabs">
+            <TabsTrigger value="case"><FileText className="mr-2 h-4 w-4" /> 0. Caso</TabsTrigger>
             <TabsTrigger value="brief"><Building2 className="mr-2 h-4 w-4" /> 1. Mandato</TabsTrigger>
             <TabsTrigger value="screen"><Globe2 className="mr-2 h-4 w-4" /> 2. Mercados</TabsTrigger>
             <TabsTrigger value="calibrate"><SlidersHorizontal className="mr-2 h-4 w-4" /> 3. Calibración</TabsTrigger>
@@ -581,7 +573,8 @@ export default function Home() {
             <TabsTrigger value="approval"><ClipboardCheck className="mr-2 h-4 w-4" /> 7. Gates</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="brief" className="tab-enter">
+          <TabsContent value="case" className="mt-6"><CaseWorkspace caseId={caseId} onCaseSelected={setCaseId} decisionContext={[companyName, industry, valueProposition].filter(Boolean).join(" · ")} defaults={{ companyName, homeCountry, industry }} activeDocumentId={caseDocumentId} onActiveDocumentChange={setCaseDocumentId} /></TabsContent>
+              <TabsContent value="brief" className="tab-enter">
             <div className="grid gap-6 xl:grid-cols-[1.45fr_.8fr]">
               <Card className="strategic-card"><CardHeader><div className="step-tag">PARTE II · CAPÍTULO 5</div><CardTitle>Defina el mandato antes de puntuar países</CardTitle><CardDescription>El resultado depende de la ambición, la propuesta de valor y las capacidades de la empresa, no solo de la macroeconomía.</CardDescription></CardHeader><CardContent className="space-y-6">
                 <div className="grid gap-5 md:grid-cols-2"><Field label="Empresa o proyecto" required><Input value={companyName} onChange={(event) => setCompanyName(event.target.value)} placeholder="Nombre o identificador del caso" /></Field><Field label="País base" required><Input value={homeCountry} onChange={(event) => setHomeCountry(event.target.value)} placeholder="País desde el que se expande" /></Field><Field label="Industria / subindustria" required><Input value={industry} onChange={(event) => setIndustry(event.target.value)} placeholder="Ej. software B2B, equipamiento médico" /></Field><Field label="Modelo de negocio" required><Input value={businessModel} onChange={(event) => setBusinessModel(event.target.value)} placeholder="Ej. B2B, B2C, SaaS, franquicia" /></Field></div>
@@ -613,7 +606,28 @@ export default function Home() {
               <Card className="strategic-card"><CardHeader><div className="step-tag">CONTEXTUALICE LA EVIDENCIA</div><CardTitle>Calibre los factores no reducibles a macrodatos</CardTitle><CardDescription>Use una escala de 0 a 100. Los factores de riesgo y distancia se leen como exposición: 100 equivale a la exposición más alta.</CardDescription></CardHeader><CardContent>{candidates.length ? <div className="space-y-3">{candidates.map((candidate) => <button key={candidate.code} onClick={() => setActiveCountry(candidate.code)} className={`country-selector ${activeCandidate?.code === candidate.code ? "selected" : ""}`}><span className="country-code">{candidate.code}</span><span><strong>{candidate.name}</strong><small>{candidate.region}</small></span><ChevronRight className="ml-auto h-4 w-4" /></button>)}</div> : <EmptyState icon={Globe2} title="Primero defina los mercados" text="Añada candidatos en la fase 2 para poder calibrar su atractivo estratégico." />}
                 <div className="method-box"><FileCheck2 className="h-5 w-5" /><p><strong>Disciplina analítica:</strong> cada puntuación debe poder justificarse con una fuente, entrevista, prueba de mercado, asesor local o supuesto explícito.</p></div>
               </CardContent></Card>
-              <Card className="calibration-card"><CardHeader><div className="flex items-center justify-between"><div><div className="step-tag">PAÍS ACTIVO</div><CardTitle>{activeCandidate ? activeCandidate.name : "Seleccione un país"}</CardTitle></div>{activeCandidate && <Badge className="country-badge">{activeCandidate.code}</Badge>}</div></CardHeader><CardContent>{activeCandidate ? <div className="space-y-8">{["Oportunidad", "Distancia y riesgo", "Entrada"].map((group) => <section key={group}><h3 className="calibration-group">{group}</h3><div className="space-y-5">{calibrationFields.filter((field) => field.group === group).map((field) => <div key={field.key} className="slider-row"><div className="slider-meta"><div><strong>{field.label}</strong><span>{field.help}</span></div><output className={field.reverse ? "risk-output" : ""}>{activeCandidate.calibration[field.key]}</output></div><Slider min={0} max={100} step={5} value={[activeCandidate.calibration[field.key]]} onValueChange={([value]) => updateCalibration(field.key, value)} /></div>)}</div></section>)}</div> : <EmptyState icon={SlidersHorizontal} title="Sin país activo" text="Seleccione un mercado candidato para asignar los supuestos específicos del caso." />}</CardContent></Card>
+              <Card className="calibration-card"><CardHeader><div className="flex items-center justify-between"><div><div className="step-tag">PAÍS ACTIVO</div><CardTitle>{activeCandidate ? activeCandidate.name : "Seleccione un país"}</CardTitle></div>{activeCandidate && <div className="flex items-center gap-2"><Badge variant="outline">{documentedCount(activeCandidate)}/{calibrationFields.length} justificados · {assessmentProgress(activeCandidate.assessment).pct}% evaluado</Badge><Badge className="country-badge">{activeCandidate.code}</Badge></div>}</div></CardHeader><CardContent>{activeCandidate ? <div className="space-y-8">{["Oportunidad", "Distancia y riesgo", "Entrada"].map((group) => <section key={group}><h3 className="calibration-group">{group}</h3><div className="space-y-5">{calibrationFields.filter((field) => field.group === group).map((field) => <div key={field.key} className="slider-row"><div className="slider-meta"><div><strong>{field.label}</strong><span>{field.help}</span></div><output className={field.reverse ? "risk-output" : ""}>{activeCandidate.calibration[field.key]}</output></div><Slider min={0} max={100} step={5} value={[activeCandidate.calibration[field.key]]} onValueChange={([value]) => updateCalibration(field.key, value)} /><Input className="calibration-rationale" value={activeCandidate.notes[field.key]?.rationale ?? ""} onChange={(event) => updateCalibrationNote(field.key, event.target.value)} placeholder="Fuente u observación que sostiene este juicio" aria-label={`Justificación de ${field.label}`} /></div>)}</div></section>)}</div> : <EmptyState icon={SlidersHorizontal} title="Sin país activo" text="Seleccione un mercado candidato para asignar los supuestos específicos del caso." />}</CardContent></Card>{activeCandidate && <Card className="assessment-card"><CardContent className="pt-6"><CountryAssessmentPanel
+                countryName={activeCandidate.name}
+                assessment={activeCandidate.assessment}
+                onChange={updateAssessment}
+                onSuggestBlock={caseDocumentId ? async (blockKey) => {
+                  try {
+                    return await proposeBlock.mutateAsync({ documentId: caseDocumentId, blockKey, countryName: activeCandidate.name, context: [companyName, industry].filter(Boolean).join(" · ") || undefined });
+                  } catch (error) {
+                    toast.error(error instanceof Error ? error.message : "El copiloto no pudo proponer puntuaciones.");
+                    return null;
+                  }
+                } : undefined}
+                onCritiqueBlock={caseDocumentId ? async (blockKey, ratings) => {
+                  try {
+                    const result = await critiqueBlock.mutateAsync({ documentId: caseDocumentId, blockKey, countryName: activeCandidate.name, ratings });
+                    return result.objections;
+                  } catch (error) {
+                    toast.error(error instanceof Error ? error.message : "El revisor no pudo ejecutarse.");
+                    return null;
+                  }
+                } : undefined}
+              /></CardContent></Card>}
             </div>
             <Card className="weights-card mt-6"><CardHeader><div className="flex items-center justify-between"><div><div className="step-tag">LÓGICA DE PONDERACIÓN</div><CardTitle>Exprese las prioridades del mandato</CardTitle><CardDescription>Los pesos no son “verdad”; hacen visibles los trade-offs. El motor normaliza los pesos automáticamente.</CardDescription></div><Badge variant="outline">Total: {Object.values(weights).reduce((sum, value) => sum + value, 0)}</Badge></div></CardHeader><CardContent><div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">{([ ["market", "Mercado"], ["resources", "Recursos"], ["competition", "Competencia"], ["government", "Gobierno"], ["distance", "Encaje CAGE"], ["risk", "Seguridad / riesgo"] ] as [keyof typeof weights, string][]).map(([key, label]) => <div key={key} className="weight-control"><div><span>{label}</span><strong>{weights[key]}%</strong></div><Slider min={0} max={50} step={1} value={[weights[key]]} onValueChange={([value]) => { setWeights((current) => ({ ...current, [key]: value })); setResult(null); }} /></div>)}</div></CardContent></Card>
           </TabsContent>
@@ -643,7 +657,7 @@ export default function Home() {
           <TabsContent value="decision" className="tab-enter">
             {!result ? <div className="decision-empty"><div className="decision-empty-icon"><Target className="h-8 w-8" /></div><h2>La decisión debe seguir a la evidencia.</h2><p>Cuando haya completado el mandato, los mercados y la calibración, genere una lectura comparativa de atractivo, riesgo, timing y modos de entrada.</p><Button size="lg" onClick={runEvaluation} disabled={evaluation.isPending || !formValid}>{evaluation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <BarChart3 className="mr-2 h-4 w-4" />} Generar evaluación</Button><span className="validity-note">{formValid ? `${screenedCandidates.length} mercados listos para analizar` : "Faltan datos del mandato o mercados que pasen el filtro"}</span></div> : <div className="space-y-6"><section className="decision-hero"><div><div className="eyebrow"><CheckCircle2 className="h-3.5 w-3.5" /> lectura ajustada por riesgo</div><h2>{result.portfolio.leadingCountry ?? "Comparación completada"}</h2><p>{result.portfolio.recommendation}</p></div><div className="hero-score"><span>Puntuación líder</span><strong>{result.countries[0]?.scores.riskAdjusted ?? "—"}<small>/100</small></strong><Button variant="outline" onClick={runEvaluation} disabled={evaluation.isPending}><RefreshCw className="mr-2 h-4 w-4" /> Recalcular</Button></div></section>
               <div className="grid gap-6 xl:grid-cols-[1.32fr_.68fr]"><Card className="ranking-card"><CardHeader><CardTitle>Prioridad de mercado</CardTitle><CardDescription>Orden basada en la combinación explícita de atractividad y seguridad. La confianza muestra cuánta información está disponible, no la probabilidad de éxito.</CardDescription></CardHeader><CardContent className="space-y-4">{result.countries.map((country, index) => <div className="ranking-row" key={country.code}><div className="rank-index">{index + 1}</div><div className="rank-country"><strong>{country.name}</strong><span>{country.timing.label}</span></div><div className="score-bar"><div><span>Atractividad {country.scores.attractiveness}</span><span>Seguridad {country.scores.safety}</span></div><div className="bar-track"><div className="bar-fill attractiveness" style={{ width: `${country.scores.attractiveness}%` }} /><div className="bar-marker" style={{ left: `${country.scores.safety}%` }} /></div></div><div className={`score-pill ${scoreStyle(country.scores.riskAdjusted)}`}>{country.scores.riskAdjusted}</div></div>)}</CardContent></Card><Card className="readout-card"><CardHeader><CardTitle>Cómo leer el resultado</CardTitle></CardHeader><CardContent><Readout icon={Target} title="Atractividad" text="Mercado, recursos, competencia, gobierno y encaje CAGE." /><Readout icon={ShieldCheck} title="Seguridad" text="Inverso de la exposición política, económica, competitiva y operativa." /><Readout icon={FileCheck2} title="Confianza" text="Cobertura de datos públicos y explicitud de los supuestos introducidos." /></CardContent></Card></div>
-              <Card className="recommendations-card"><CardHeader><div><CardTitle>Ruta recomendada por mercado</CardTitle><CardDescription>El modo no se determina solo por puntuación. Cruza atractivo, riesgo, capacidades internas, urgencia, control, IP y apertura regulatoria.</CardDescription></div><Button variant="outline" onClick={exportPdfReport}><FileDown className="mr-2 h-4 w-4" /> PDF detallado</Button></CardHeader><CardContent><div className="recommendation-grid">{result.countries.map((country) => <article className="country-recommendation" key={country.code}><div className="recommendation-top"><div><span className="country-code">{country.code}</span><h3>{country.name}</h3></div><div className={`score-pill ${scoreStyle(country.scores.riskAdjusted)}`}>{country.scores.riskAdjusted}</div></div><div className="timing-box"><ArrowUpRight className="h-4 w-4" /><div><strong>{country.timing.label}</strong><p>{country.timing.description}</p></div></div><div className="mode-list">{country.entryModes.map((mode, idx) => <div className="mode-row" key={mode.mode}><span>{idx + 1}</span><div><strong>{mode.mode}</strong><p>{mode.rationale}</p></div><Badge variant="outline">{mode.commitment}</Badge></div>)}</div><div className={`investment-decision ${decisionStyle(country.investmentRecommendation.action)}`}><div><span>Decisión por umbrales</span><strong>{country.investmentRecommendation.label}</strong></div><p>{country.investmentRecommendation.summary}</p></div><div className="financial-readout"><div className="financial-readout-head"><span>Viabilidad económica</span>{country.financial.status === "ok" ? <Badge className="source-live">Flujo de caja completo</Badge> : <Badge variant="outline">Supuestos pendientes</Badge>}</div>{country.financial.status === "ok" && <div className="financial-market-summary"><span>TAM horizonte <b>{formatMoney(country.financial.market.tamAtHorizon, country.financial.currency)}</b></span><span>SOM ingresos <b>{formatMoney(country.financial.market.somRevenueAtHorizon, country.financial.currency)}</b></span></div>}{country.financial.alternatives.map((alternative) => <div className="financial-alternative" key={alternative.key}><strong>{alternative.mode}</strong>{alternative.status === "ok" ? <div><span>ROI <b>{formatNumber(alternative.roiPct, { maximumFractionDigits: 1 })}%</b></span><span>NPV <b>{formatMoney(alternative.npv, country.financial.currency)}</b></span><span>TV <b>{formatMoney(alternative.presentValueTerminal, country.financial.currency)}</b></span>{alternative.paybackYear && <span>Recup. <b>Año {alternative.paybackYear}</b></span>}</div> : <p>Faltan: {alternative.missingInputs.slice(0, 2).join(", ")}.</p>}</div>)}</div><ScenarioOutcome country={country} />{country.flags.length > 0 && <div className="flag-list">{country.flags.map((flag) => <p key={flag}><AlertTriangle className="h-3.5 w-3.5" /> {flag}</p>)}</div>}<div className="confidence-row"><span>Confianza de evidencia</span><Progress value={country.scores.confidence} /><strong>{country.scores.confidence}%</strong></div></article>)}</div></CardContent></Card>
+              <Card className="recommendations-card"><CardHeader><div><CardTitle>Ruta recomendada por mercado</CardTitle><CardDescription>El modo no se determina solo por puntuación. Cruza atractivo, riesgo, capacidades internas, urgencia, control, IP y apertura regulatoria.</CardDescription></div><Button variant="outline" onClick={exportPdfReport}><FileDown className="mr-2 h-4 w-4" /> PDF detallado</Button></CardHeader><CardContent><div className="recommendation-grid">{result.countries.map((country) => <article className="country-recommendation" key={country.code}><div className="recommendation-top"><div><span className="country-code">{country.code}</span><h3>{country.name}</h3></div><div className={`score-pill ${scoreStyle(country.scores.riskAdjusted)}`}>{country.scores.riskAdjusted}</div></div><div className="timing-box"><ArrowUpRight className="h-4 w-4" /><div><strong>{country.timing.label}</strong><p>{country.timing.description}</p></div></div><CountryLens country={country} /><div className="mode-list">{country.entryModes.map((mode, idx) => <div className="mode-row" key={mode.mode}><span>{idx + 1}</span><div><strong>{mode.mode}</strong><p>{mode.rationale}</p></div><Badge variant="outline">{mode.commitment}</Badge></div>)}</div><div className={`investment-decision ${decisionStyle(country.investmentRecommendation.action)}`}><div><span>Decisión por umbrales</span><strong>{country.investmentRecommendation.label}</strong></div><p>{country.investmentRecommendation.summary}</p></div><div className="financial-readout"><div className="financial-readout-head"><span>Viabilidad económica</span>{country.financial.status === "ok" ? <Badge className="source-live">Flujo de caja completo</Badge> : <Badge variant="outline">Supuestos pendientes</Badge>}</div>{country.financial.status === "ok" && <div className="financial-market-summary"><span>TAM horizonte <b>{formatMoney(country.financial.market.tamAtHorizon, country.financial.currency)}</b></span><span>SOM ingresos <b>{formatMoney(country.financial.market.somRevenueAtHorizon, country.financial.currency)}</b></span></div>}{country.financial.alternatives.map((alternative) => <div className="financial-alternative" key={alternative.key}><strong>{alternative.mode}</strong>{alternative.status === "ok" ? <div><span>ROI <b>{formatNumber(alternative.roiPct, { maximumFractionDigits: 1 })}%</b></span><span>NPV <b>{formatMoney(alternative.npv, country.financial.currency)}</b></span><span>TV <b>{formatMoney(alternative.presentValueTerminal, country.financial.currency)}</b></span>{alternative.paybackYear && <span>Recup. <b>Año {alternative.paybackYear}</b></span>}</div> : <p>Faltan: {alternative.missingInputs.slice(0, 2).join(", ")}.</p>}</div>)}</div><ScenarioOutcome country={country} />{country.flags.length > 0 && <div className="flag-list">{country.flags.map((flag) => <p key={flag}><AlertTriangle className="h-3.5 w-3.5" /> {flag}</p>)}</div>}<div className="confidence-row"><span>Confianza de evidencia</span><Progress value={country.scores.confidence} /><strong>{country.scores.confidence}%</strong></div></article>)}</div></CardContent></Card>
               <section className="caveat-callout"><CircleAlert className="h-5 w-5" /><div><strong>Condición de decisión</strong><p>{result.portfolio.caveats[0]} Antes de invertir, convierta la alternativa preferida en un caso financiero con escenarios, sensibilidad, ROI/NPV y una revisión legal, regulatoria y de socios.</p></div></section>
             </div>}
           </TabsContent>
@@ -703,6 +717,28 @@ function ScenarioOutcome({ country, compact = false }: { country: CountryResult;
     alternative: scenario.financial?.alternatives.find((alternative) => alternative.key === selectedKey) ?? scenario.financial?.alternatives.find((alternative) => alternative.status === "ok"),
   }));
   return <div className={`scenario-outcome ${compact ? "compact" : ""}`}><div className="scenario-outcome-heading"><span>{compact ? "Sensibilidad" : "Sensibilidad de la alternativa seleccionada"}</span>{!compact && <small>Base / optimista / conservador</small>}</div><div className="scenario-outcome-grid">{scenarios.map((scenario) => <div className={`scenario-outcome-row ${scenario.key} ${scenario.status !== "ok" ? "incomplete" : ""}`} key={scenario.key}><strong>{scenario.label}</strong>{scenario.alternative ? <><span>NPV <b>{formatMoney(scenario.alternative.npv, scenario.financial?.currency)}</b></span><span>ROI <b>{formatNumber(scenario.alternative.roiPct, { maximumFractionDigits: 1 })}%</b></span></> : <small>{scenario.status === "insufficient_data" ? "Complete sensibilidades" : "No significativo"}</small>}</div>)}</div></div>;
+}
+
+function CountryLens({ country }: { country: CountryResult }) {
+  const { opportunityRisk, profile, growthVariability, summary } = country.assessment;
+  return (
+    <div className="country-lens">
+      <div className="country-lens-head">
+        <span>Matriz oportunidades x riesgos</span>
+        <Badge variant="outline">{opportunityRisk.label}</Badge>
+      </div>
+      <p>{opportunityRisk.reading}</p>
+      <div className="country-lens-meta">
+        <span>Oportunidad <b>{opportunityRisk.opportunity}</b></span>
+        <span>Riesgo <b>{opportunityRisk.risk}</b></span>
+        {profile.best && <span>Perfil <b>{profile.best.label}</b></span>}
+        {growthVariability.coefficientOfVariation !== null && (
+          <span>Volatilidad del crecimiento <b>{growthVariability.coefficientOfVariation}</b> ({growthVariability.observations} años)</span>
+        )}
+        <span>Evaluación cap. 6 <b>{summary.assessedItems}/{summary.totalItems}</b></span>
+      </div>
+    </div>
+  );
 }
 
 function ComparisonMetric({ label, value, tone }: { label: string; value: string; tone?: string }) { return <div className="comparison-metric"><span>{label}</span><strong>{value}</strong>{tone && <i className={tone} />}</div>; }

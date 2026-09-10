@@ -1,7 +1,66 @@
 import { evaluateFinancials, recommendInvestmentAction, type EntryModeKey, type FinancialAssumptions, type FinancialResult, type InvestmentRecommendation, type InvestmentThresholds } from "./financialEngine";
+import { buildSituation, scoreEntryModes, type EntryModeScore, type EntryModeWeights } from "./entryModeScoring";
+import {
+  classifyCountryProfile,
+  deriveCalibration,
+  growthVariability,
+  positionOnOpportunityRiskMatrix,
+  summarizeAssessment,
+  variabilityRating,
+  type AssessmentSummary,
+  type CountryAssessment,
+  type CountryProfileClassification,
+  type DerivedCalibrationField,
+  type GrowthVariability,
+  type OpportunityRiskPosition,
+} from "./countryAssessment";
+import { itemPath } from "@shared/domain/countryAssessment";
+import type { EntryDeliveryModel } from "@shared/domain/entryModes";
 import type { GovernanceData } from "./wgi";
 
 export type EntryObjective = "market" | "resources" | "learning" | "coordination";
+
+/**
+ * Justificación documental de un juicio cualitativo.
+ *
+ * La cobertura de evidencia se calcula sobre estas notas, no sobre cuántos deslizadores
+ * se han movido: un factor evaluado en 50 tras estudiar el caso está tan documentado
+ * como uno evaluado en 80, y uno movido sin justificación no lo está en absoluto.
+ */
+export type CalibrationNote = {
+  rationale?: string | null;
+  sourceLabel?: string | null;
+};
+
+export type CalibrationNotes = Partial<Record<keyof QualitativeCalibration, CalibrationNote>>;
+
+/**
+ * Criterios eliminatorios. El libro plantea la aceptabilidad del riesgo como una pregunta
+ * de sí o no —«¿son los riesgos aceptables para accionistas y empleados?», p. 227—, no como
+ * un sumando más que un PIB grande pueda compensar.
+ */
+export type KnockOutPolicy = {
+  maxPoliticalRisk?: number | null;
+  maxEconomicRisk?: number | null;
+  maxCompetitiveRisk?: number | null;
+  maxOperationalRisk?: number | null;
+  maxCageDistance?: number | null;
+  minSafety?: number | null;
+  /** Exige gobernanza WGI disponible para admitir el país. */
+  requireGovernanceEvidence?: boolean | null;
+};
+
+export type EligibilityBreach = {
+  rule: string;
+  label: string;
+  value: number | null;
+  limit: number | null;
+};
+
+export type CountryEligibility = {
+  eligible: boolean;
+  breaches: EligibilityBreach[];
+};
 
 export type QualitativeCalibration = {
   demandQuality: number;
@@ -30,6 +89,21 @@ export type MarketData = {
   investmentRate?: number | null;
   fdiInflowUsd?: number | null;
   fdiInflowPctGdp?: number | null;
+  // Indicadores añadidos para cubrir la Tabla 6.1 (p. 231).
+  gdpPpp?: number | null;
+  gdpPerCapitaPpp?: number | null;
+  incomeDistributionGini?: number | null;
+  householdConsumptionPctGdp?: number | null;
+  savingsRate?: number | null;
+  populationGrowth?: number | null;
+  workingAgeSharePct?: number | null;
+  governmentSpendingPctGdp?: number | null;
+  tertiaryEnrolmentPct?: number | null;
+  researchersPerMillion?: number | null;
+  researchSpendingPctGdp?: number | null;
+  electricityAccessPct?: number | null;
+  /** Serie de crecimiento real, para medir la variabilidad económica (Fig. 6.13, p. 245). */
+  gdpGrowthSeries?: { year: number; value: number }[] | null;
   governance?: GovernanceData;
   sourceYear?: number | null;
   /** Timestamp of the most recent public-data refresh for this country. */
@@ -43,6 +117,15 @@ export type CountryInput = {
   code: string;
   name?: string;
   calibration?: Partial<QualitativeCalibration>;
+  /** Justificación por factor. Alimenta la cobertura de evidencia. */
+  calibrationNotes?: CalibrationNotes;
+  /**
+   * Evaluación detallada del capítulo 6. Cuando existe, los factores de país de la
+   * calibración se derivan de ella; los que no estén evaluados conservan el valor manual.
+   */
+  assessment?: CountryAssessment;
+  /** Criterios eliminatorios específicos de este país; si falta, se aplica la política general. */
+  knockOuts?: KnockOutPolicy;
 };
 
 export type EvaluationInput = {
@@ -58,6 +141,17 @@ export type EvaluationInput = {
   financialByCountry?: Record<string, FinancialAssumptions>;
   investmentThresholds?: InvestmentThresholds;
   weights?: Partial<ScoreWeights>;
+  /**
+   * Modelo de entrega de la oferta (Tabla 7.5, p. 272). Sustituye a la inferencia por
+   * expresión regular sobre el texto libre del modelo de negocio.
+   */
+  entryDeliveryModel?: EntryDeliveryModel;
+  /** Pesos de los ocho criterios de la Tabla 7.4 usados para ordenar los modos. */
+  entryModeWeights?: EntryModeWeights;
+  /** Criterios eliminatorios aplicables a todos los países salvo anulación por país. */
+  knockOuts?: KnockOutPolicy;
+  /** Variación aplicada a cada palanca del tornado de sensibilidad. Por defecto 10%. */
+  tornadoDeltaPct?: number;
 };
 
 export type ScoreWeights = {
@@ -85,6 +179,26 @@ export type CountryResult = {
     riskAdjusted: number;
     confidence: number;
   };
+  /** Desglose de la cobertura de evidencia que sustenta `scores.confidence`. */
+  evidence: {
+    publicIndicatorsAvailable: number;
+    publicIndicatorsTotal: number;
+    documentedJudgements: number;
+    totalJudgements: number;
+    recencyFactor: number;
+    /** Proporción de ítems del capítulo 6 evaluados, 0-1. */
+    assessmentCoverage: number;
+  };
+  /** Resultado de la evaluación detallada del capítulo 6. */
+  assessment: {
+    summary: AssessmentSummary;
+    /** Factores de la calibración que provienen de la evaluación en lugar del deslizador. */
+    derivedFields: DerivedCalibrationField[];
+    profile: CountryProfileClassification;
+    opportunityRisk: OpportunityRiskPosition;
+    growthVariability: GrowthVariability;
+  };
+  eligibility: CountryEligibility;
   entryModes: EntryModeRecommendation[];
   financial: FinancialResult;
   investmentRecommendation: InvestmentRecommendation;
@@ -92,13 +206,7 @@ export type CountryResult = {
   flags: string[];
 };
 
-export type EntryModeRecommendation = {
-  key: EntryModeKey;
-  mode: string;
-  score: number;
-  rationale: string;
-  commitment: "Bajo" | "Medio" | "Alto";
-};
+export type EntryModeRecommendation = EntryModeScore;
 
 export type TimingRecommendation = {
   label: string;
@@ -170,7 +278,23 @@ function labelForObjective(objective: EntryObjective) {
   }[objective];
 }
 
-function calculateConfidence(data: MarketData, calibration: QualitativeCalibration) {
+const calibrationKeys = Object.keys(defaults) as (keyof QualitativeCalibration)[];
+
+/**
+ * Cobertura de evidencia.
+ *
+ * La versión anterior contaba cuántos deslizadores se habían separado de 50, de modo que
+ * un factor evaluado deliberadamente en 50 tras leer el caso contaba como «no especificado»
+ * y uno movido al azar contaba como evidencia. Ahora se mide lo que de verdad sostiene un
+ * juicio: cuántos indicadores públicos hay, con qué antigüedad, y cuántos juicios
+ * cualitativos llevan una justificación o una fuente escrita.
+ */
+function calculateEvidence(
+  data: MarketData,
+  notes: CalibrationNotes | undefined,
+  derived: DerivedCalibrationField[],
+  assessmentCoverage: number,
+) {
   const dataPoints = [
     data.gdpUsd,
     data.gdpPerCapita,
@@ -187,132 +311,79 @@ function calculateConfidence(data: MarketData, calibration: QualitativeCalibrati
     data.governance?.regulatoryQuality,
     data.governance?.ruleOfLaw,
     data.governance?.controlOfCorruption,
-  ].filter((value) => value !== null && value !== undefined).length;
-  const manualValues = Object.values(calibration).filter((value) => value !== 50).length;
-  return clamp(20 + dataPoints * 4 + Math.min(manualValues, 8) * 2);
+  ];
+  const publicIndicatorsTotal = dataPoints.length;
+  const publicIndicatorsAvailable = dataPoints.filter((value) => value !== null && value !== undefined).length;
+
+  const currentYear = new Date().getUTCFullYear();
+  const sourceYear = data.sourceYear ?? null;
+  const age = sourceYear === null ? null : currentYear - sourceYear;
+  const recencyFactor = age === null ? 0.7 : age <= 2 ? 1 : age <= 5 ? 0.85 : 0.7;
+
+  /**
+   * Un factor cuenta como documentado si lleva justificación escrita **o** si procede de
+   * una evaluación detallada suficientemente cubierta: trece dimensiones CAGE puntuadas
+   * son mejor evidencia que una frase suelta.
+   */
+  const derivedEnough = new Set(derived.filter((field) => field.coverage >= 0.5).map((field) => field.key));
+  const documentedJudgements = calibrationKeys.filter((key) => {
+    const note = notes?.[key];
+    return Boolean(note?.rationale?.trim() || note?.sourceLabel?.trim()) || derivedEnough.has(key);
+  }).length;
+
+  return {
+    publicIndicatorsAvailable,
+    publicIndicatorsTotal,
+    documentedJudgements,
+    totalJudgements: calibrationKeys.length,
+    recencyFactor,
+    assessmentCoverage: Math.round(assessmentCoverage * 100) / 100,
+  };
 }
 
-function calculateEntryModes(
-  attractiveness: number,
-  safety: number,
+function confidenceFromEvidence(evidence: ReturnType<typeof calculateEvidence>) {
+  const publicCoverage = (evidence.publicIndicatorsAvailable / evidence.publicIndicatorsTotal) * evidence.recencyFactor;
+  const judgementCoverage = evidence.documentedJudgements / evidence.totalJudgements;
+  return clamp(Math.round(100 * (0.45 * publicCoverage + 0.55 * judgementCoverage)));
+}
+
+/**
+ * Peso del dato público de gobernanza frente al juicio del analista.
+ * Antes era una constante 0,65/0,35 aunque el dato fuera antiguo o no existiera.
+ */
+function governanceEvidenceWeight(governance: GovernanceData | undefined) {
+  if (!governance || governance.sourceStatus === "unavailable") return 0;
+  const currentYear = new Date().getUTCFullYear();
+  const age = governance.sourceYear === null ? null : currentYear - governance.sourceYear;
+  const recency = age === null ? 0.7 : age <= 3 ? 1 : age <= 6 ? 0.8 : 0.6;
+  const completeness = governance.sourceStatus === "live" ? 1 : 0.6;
+  return 0.45 * recency * completeness;
+}
+
+function evaluateEligibility(
   calibration: QualitativeCalibration,
-  objective: EntryObjective,
-  businessModel: string,
-): EntryModeRecommendation[] {
-  const risk = 100 - safety;
-  const strategicFit = objective === "market" ? 8 : objective === "resources" ? 5 : 0;
-  const directInvestment = clamp(
-    0.28 * attractiveness +
-      0.22 * safety +
-      0.2 * calibration.internalReadiness +
-      0.15 * calibration.controlNeed +
-      0.15 * calibration.governmentOpenness +
-      strategicFit,
-  );
-  const acquisition = clamp(
-    0.26 * attractiveness +
-      0.16 * safety +
-      0.18 * calibration.internalReadiness +
-      0.2 * calibration.timePressure +
-      0.1 * calibration.controlNeed +
-      0.1 * calibration.competitionAttractiveness,
-  );
-  const jointVenture = clamp(
-    0.18 * attractiveness +
-      0.12 * safety +
-      0.18 * (100 - calibration.cageDistance) +
-      0.18 * calibration.governmentOpenness +
-      0.16 * (100 - calibration.internalReadiness) +
-      0.18 * calibration.resourceFit,
-  );
-  const licensing = clamp(
-    0.22 * risk +
-      0.18 * (100 - calibration.internalReadiness) +
-      0.18 * (100 - calibration.controlNeed) +
-      0.2 * (100 - calibration.ipSensitivity) +
-      0.12 * attractiveness +
-      0.1 * calibration.timePressure,
-  );
-  const distributor = clamp(
-    0.26 * risk +
-      0.18 * (100 - calibration.internalReadiness) +
-      0.14 * (100 - calibration.controlNeed) +
-      0.14 * calibration.timePressure +
-      0.16 * attractiveness +
-      0.12 * calibration.demandQuality,
-  );
-  const office = clamp(
-    0.28 * calibration.cageDistance +
-      0.24 * risk +
-      0.18 * (100 - calibration.internalReadiness) +
-      0.15 * (100 - attractiveness) +
-      0.15 * (100 - calibration.timePressure),
-  );
-  const digital = clamp(
-    0.24 * attractiveness +
-      0.18 * safety +
-      0.16 * (100 - calibration.cageDistance) +
-      0.18 * calibration.timePressure +
-      0.12 * calibration.internalReadiness +
-      0.12 * (100 - calibration.controlNeed),
-  );
-
-  const modes: EntryModeRecommendation[] = [
-    {
-      key: "greenfield",
-      mode: "Filial propia / greenfield",
-      score: directInvestment,
-      commitment: "Alto",
-      rationale: "Maximiza el control y la captura de valor, pero requiere capacidad interna, permiso regulatorio y una exposición al riesgo razonable.",
-    },
-    {
-      key: "acquisition",
-      mode: "Adquisición",
-      score: acquisition,
-      commitment: "Alto",
-      rationale: "Acelera el acceso a activos, clientes y capacidades. Exige debida diligencia, precio disciplinado y capacidad de integración intercultural.",
-    },
-    {
-      key: "alliance",
-      mode: "Joint venture o alianza",
-      score: jointVenture,
-      commitment: "Medio",
-      rationale: "Comparte riesgo y aporta legitimidad o acceso local. La recomendación presupone un análisis de encaje estratégico, operativo, cultural y organizativo del socio.",
-    },
-    {
-      key: "licensing",
-      mode: "Licencia o franquicia",
-      score: licensing,
-      commitment: "Bajo",
-      rationale: "Reduce la inversión y la exposición, a cambio de menor control sobre mercado, calidad y conocimiento. Es menos apropiada cuando el IP es muy sensible.",
-    },
-    {
-      key: "distributor",
-      mode: "Agente o distribuidor",
-      score: distributor,
-      commitment: "Bajo",
-      rationale: "Permite probar demanda y cobertura comercial con bajo compromiso. Debe incluir hitos de revisión para evitar dependencia o pérdida de conocimiento del cliente.",
-    },
-    {
-      key: "office",
-      mode: "Oficina de representación / observatorio",
-      score: office,
-      commitment: "Bajo",
-      rationale: "Opción de aprendizaje y construcción de relaciones cuando la distancia, la incertidumbre o el conocimiento local todavía limitan una entrada más comprometida.",
-    },
-  ];
-
-  if (/(digital|saas|software|plataforma|marketplace|e-commerce|ecommerce)/i.test(businessModel)) {
-    modes.push({
-      key: "digital",
-      mode: "Entrada digital o híbrida",
-      score: digital,
-      commitment: "Bajo",
-      rationale: "Adecuada cuando la oferta puede desplegarse digitalmente; requiere validar regulación, localización, pagos, datos y la necesidad de una capa física o de socios locales.",
-    });
+  safety: number,
+  governance: GovernanceData | undefined,
+  policy: KnockOutPolicy | undefined,
+): CountryEligibility {
+  if (!policy) return { eligible: true, breaches: [] };
+  const breaches: EligibilityBreach[] = [];
+  const maxRule = (limit: number | null | undefined, value: number, rule: string, label: string) => {
+    if (limit === null || limit === undefined) return;
+    if (value > limit) breaches.push({ rule, label, value, limit });
+  };
+  maxRule(policy.maxPoliticalRisk, calibration.politicalRisk, "maxPoliticalRisk", "Riesgo político por encima del máximo admitido");
+  maxRule(policy.maxEconomicRisk, calibration.economicRisk, "maxEconomicRisk", "Riesgo económico por encima del máximo admitido");
+  maxRule(policy.maxCompetitiveRisk, calibration.competitiveRisk, "maxCompetitiveRisk", "Riesgo competitivo por encima del máximo admitido");
+  maxRule(policy.maxOperationalRisk, calibration.operationalRisk, "maxOperationalRisk", "Riesgo operativo por encima del máximo admitido");
+  maxRule(policy.maxCageDistance, calibration.cageDistance, "maxCageDistance", "Distancia CAGE por encima del máximo admitido");
+  if (policy.minSafety !== null && policy.minSafety !== undefined && safety < policy.minSafety) {
+    breaches.push({ rule: "minSafety", label: "Seguridad agregada por debajo del mínimo admitido", value: safety, limit: policy.minSafety });
   }
-
-  return modes.sort((a, b) => b.score - a.score);
+  if (policy.requireGovernanceEvidence && (!governance || governance.sourceStatus === "unavailable")) {
+    breaches.push({ rule: "requireGovernanceEvidence", label: "Se exige evidencia de gobernanza y no hay datos WGI disponibles", value: null, limit: null });
+  }
+  return { eligible: breaches.length === 0, breaches };
 }
 
 function recommendTiming(attractiveness: number, safety: number, calibration: QualitativeCalibration): TimingRecommendation {
@@ -339,7 +410,22 @@ export function evaluateStrategy(input: EvaluationInput): EvaluationResult {
   const totalWeight = Object.values(weights).reduce((sum, value) => sum + value, 0) || 1;
   const countries = input.countryInputs.map((country) => {
     const data = input.marketData[country.code] ?? { sourceStatus: "unavailable" as const };
-    const calibration = { ...defaults, ...country.calibration };
+    const manualCalibration = { ...defaults, ...country.calibration };
+
+    /**
+     * Variabilidad económica a partir de la serie pública de crecimiento. Si el analista
+     * no ha puntuado ese ítem a mano, se rellena con el dato; si lo ha puntuado, manda él.
+     */
+    const variability = growthVariability(data.gdpGrowthSeries?.map((point) => point.value));
+    const variabilityPath = itemPath("risk", "economic", "variability");
+    const derivedVariability = variabilityRating(variability.coefficientOfVariation);
+    const assessmentInput: CountryAssessment | undefined =
+      country.assessment && derivedVariability !== null && country.assessment.ratings?.[variabilityPath] == null
+        ? { ...country.assessment, ratings: { ...country.assessment.ratings, [variabilityPath]: derivedVariability } }
+        : country.assessment;
+
+    const { calibration, derived: derivedFields } = deriveCalibration(assessmentInput, manualCalibration);
+    const assessmentSummary = summarizeAssessment(assessmentInput);
 
     const macroMarket = mean([
       logNormalize(data.gdpUsd, 20_000_000_000, 25_000_000_000_000),
@@ -361,17 +447,24 @@ export function evaluateStrategy(input: EvaluationInput): EvaluationResult {
     const governmentEvidence = governance?.sourceStatus === "unavailable"
       ? null
       : mean([governance?.governmentEffectiveness ?? Number.NaN, governance?.regulatoryQuality ?? Number.NaN, governance?.ruleOfLaw ?? Number.NaN, governance?.controlOfCorruption ?? Number.NaN]);
-    const government = clamp(governmentEvidence === null ? calibration.governmentOpenness : 0.65 * calibration.governmentOpenness + 0.35 * governmentEvidence);
+    // El dato objetivo pesa más cuanto más reciente y completo sea, en lugar de un 0,35 fijo.
+    const evidenceWeight = governanceEvidenceWeight(governance);
+    const blend = (judgement: number, evidenceValue: number | null) =>
+      evidenceValue === null || evidenceWeight === 0 ? judgement : (1 - evidenceWeight) * judgement + evidenceWeight * evidenceValue;
+    const government = clamp(blend(calibration.governmentOpenness, governmentEvidence));
     const distanceFit = clamp(100 - calibration.cageDistance);
-    const politicalExposure = governance?.politicalStability === null || governance?.politicalStability === undefined
-      ? calibration.politicalRisk
-      : 0.65 * calibration.politicalRisk + 0.35 * (100 - governance.politicalStability);
-    const operationalExposure = governance?.governmentEffectiveness === null || governance?.governmentEffectiveness === undefined
-      ? calibration.operationalRisk
-      : 0.65 * calibration.operationalRisk + 0.35 * (100 - governance.governmentEffectiveness);
-    const competitiveExposure = governance?.controlOfCorruption === null || governance?.controlOfCorruption === undefined
-      ? calibration.competitiveRisk
-      : 0.65 * calibration.competitiveRisk + 0.35 * (100 - governance.controlOfCorruption);
+    const politicalExposure = blend(
+      calibration.politicalRisk,
+      governance?.politicalStability === null || governance?.politicalStability === undefined ? null : 100 - governance.politicalStability,
+    );
+    const operationalExposure = blend(
+      calibration.operationalRisk,
+      governance?.governmentEffectiveness === null || governance?.governmentEffectiveness === undefined ? null : 100 - governance.governmentEffectiveness,
+    );
+    const competitiveExposure = blend(
+      calibration.competitiveRisk,
+      governance?.controlOfCorruption === null || governance?.controlOfCorruption === undefined ? null : 100 - governance.controlOfCorruption,
+    );
     const safety = clamp(
       100 - mean([politicalExposure, calibration.economicRisk, competitiveExposure, operationalExposure]),
     );
@@ -393,19 +486,59 @@ export function evaluateStrategy(input: EvaluationInput): EvaluationResult {
     if (calibration.competitionAttractiveness <= 35) flags.push("Contexto competitivo desfavorable: valide rivalidad, barreras y poder de canal antes de comprometer inversión.");
     if (data.sourceStatus !== "live") flags.push("Datos macroeconómicos incompletos o no disponibles: la puntuación se apoya más en calibración cualitativa.");
     if (governance?.sourceStatus === "unavailable") flags.push("Gobernanza WGI no disponible: el componente de gobierno y riesgo se apoya solo en la calibración cualitativa.");
-    const modeRanking = calculateEntryModes(attractiveness, safety, calibration, input.objective, input.businessModel);
+
+    const evidence = calculateEvidence(data, country.calibrationNotes, derivedFields, assessmentSummary.coverage);
+    const confidence = confidenceFromEvidence(evidence);
+    if (evidence.documentedJudgements < evidence.totalJudgements) {
+      flags.push(`Juicios cualitativos sin justificación documentada: ${evidence.totalJudgements - evidence.documentedJudgements} de ${evidence.totalJudgements}. Complete la evaluación detallada del país o registre la fuente que sostiene cada factor.`);
+    }
+    if (assessmentSummary.sustainabilityConcerns.length) {
+      flags.push(`Cuestiones ambientales o sociales señaladas: ${assessmentSummary.sustainabilityConcerns.length}. El libro las plantea como filtro previo a la inversión, no como matiz (p. 242).`);
+    }
+    if (variability.coefficientOfVariation !== null && variability.coefficientOfVariation >= 1.1) {
+      flags.push(`Crecimiento muy volátil: coeficiente de variación ${variability.coefficientOfVariation} sobre ${variability.observations} años. Dos países con el mismo crecimiento medio y distinta dispersión no tienen el mismo riesgo económico (p. 245).`);
+    }
+
+    const eligibility = evaluateEligibility(calibration, safety, governance, country.knockOuts ?? input.knockOuts);
+    for (const breach of eligibility.breaches) {
+      flags.push(breach.limit === null ? `Criterio eliminatorio: ${breach.label}.` : `Criterio eliminatorio: ${breach.label} (${breach.value} frente al límite ${breach.limit}).`);
+    }
+
+    const includeDigital = input.entryDeliveryModel
+      ? input.entryDeliveryModel !== "relational"
+      : /(digital|saas|software|plataforma|marketplace|e-commerce|ecommerce)/i.test(input.businessModel);
+    const modeRanking = scoreEntryModes(
+      buildSituation({
+        objective: input.objective,
+        attractiveness,
+        safety,
+        internalReadiness: calibration.internalReadiness,
+        timePressure: calibration.timePressure,
+        controlNeed: calibration.controlNeed,
+        ipSensitivity: calibration.ipSensitivity,
+      }),
+      { includeDigital, weights: input.entryModeWeights },
+    );
     const entryModes = modeRanking.slice(0, 3);
     const financial = evaluateFinancials(
       input.financialByCountry?.[country.code],
       modeRanking.map(({ key, mode }) => ({ key, mode })),
       input.horizonYears,
+      { tornadoDeltaPct: input.tornadoDeltaPct },
     );
-    const investmentRecommendation = recommendInvestmentAction(
-      financial,
-      riskAdjusted,
-      calculateConfidence(data, calibration),
-      input.investmentThresholds,
-    );
+    const evaluatedRecommendation = recommendInvestmentAction(financial, riskAdjusted, confidence, input.investmentThresholds);
+    // Un criterio eliminatorio no se pondera con el resto: cierra el mercado.
+    const investmentRecommendation: InvestmentRecommendation = eligibility.eligible
+      ? evaluatedRecommendation
+      : {
+          ...evaluatedRecommendation,
+          action: "discard",
+          label: "Descartar (criterio eliminatorio)",
+          summary: "El mercado incumple al menos un criterio eliminatorio de la política de inversión. La puntuación agregada no compensa un umbral declarado como no negociable.",
+          reasons: eligibility.breaches.map((breach) =>
+            breach.limit === null ? breach.label : `${breach.label}: ${breach.value} frente al límite ${breach.limit}.`,
+          ),
+        };
 
     return {
       code: country.code,
@@ -421,8 +554,18 @@ export function evaluateStrategy(input: EvaluationInput): EvaluationResult {
         safety,
         attractiveness,
         riskAdjusted,
-        confidence: calculateConfidence(data, calibration),
+        confidence,
       },
+      evidence,
+      assessment: {
+        summary: assessmentSummary,
+        derivedFields,
+        profile: classifyCountryProfile(data, assessmentInput),
+        // La matriz de síntesis del libro cruza oportunidad de mercado y competitiva con riesgo.
+        opportunityRisk: positionOnOpportunityRiskMatrix(attractiveness, 100 - safety),
+        growthVariability: variability,
+      },
+      eligibility,
       entryModes,
       financial,
       investmentRecommendation,
@@ -431,22 +574,33 @@ export function evaluateStrategy(input: EvaluationInput): EvaluationResult {
     } satisfies CountryResult;
   });
 
-  countries.sort((a, b) => b.scores.riskAdjusted - a.scores.riskAdjusted);
-  const leader = countries[0];
+  // Un país excluido por criterio eliminatorio nunca encabeza la comparación.
+  countries.sort((a, b) => {
+    if (a.eligibility.eligible !== b.eligibility.eligible) return a.eligibility.eligible ? -1 : 1;
+    return b.scores.riskAdjusted - a.scores.riskAdjusted;
+  });
+  const leader = countries.find((country) => country.eligibility.eligible);
+  const excluded = countries.filter((country) => !country.eligibility.eligible);
   const caveats = [
     "La comparación no sustituye el análisis específico de industria, validación de clientes, regulación ni debida diligencia.",
     "Los indicadores públicos son señales de contexto; la decisión debe comprobarse con evidencia local y un caso financiero ajustado al riesgo.",
+    "Los pesos de atractividad dependen del tipo de industria y de la ambición global declarada; el libro no fija una ponderación universal (pp. 228 y 248).",
   ];
+  if (excluded.length) {
+    caveats.push(`${excluded.length} mercado(s) quedan fuera por criterio eliminatorio: ${excluded.map((country) => country.name).join(", ")}.`);
+  }
 
   return {
     generatedAt: new Date().toISOString(),
-    methodology: `Evaluación multicriterio basada en ambición, atractividad, riesgo, distancia y modo de entrada para el objetivo de ${labelForObjective(input.objective)}.`,
+    methodology: `Evaluación multicriterio basada en ambición, atractividad, riesgo, distancia y modo de entrada para el objetivo de ${labelForObjective(input.objective)}. Los modos se ordenan cruzando el perfil de la Tabla 7.4 (Lasserre y Monteiro, 5.ª ed., p. 271) con las necesidades y restricciones del caso; los criterios eliminatorios se aplican antes de cualquier ponderación.`,
     countries,
     portfolio: {
       leadingCountry: leader?.name,
       recommendation: leader
         ? `${leader.name} lidera la comparación actual con una puntuación ajustada por riesgo de ${leader.scores.riskAdjusted}/100. La política de inversión indica: ${leader.investmentRecommendation.label}. ${leader.investmentRecommendation.summary}`
-        : "Añada al menos un país para construir una comparación.",
+        : countries.length
+          ? "Ningún mercado supera los criterios eliminatorios definidos. Revise la política o amplíe el universo de países."
+          : "Añada al menos un país para construir una comparación.",
       caveats,
     },
   };

@@ -5,7 +5,11 @@ import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import * as db from "./db";
 import { evaluateStrategy, type EntryObjective, type EvaluationInput, type MarketData } from "./strategy/engine";
-import { getWorldBankMarketData, publicSources } from "./strategy/worldBank";
+import { getIndicatorPoints, getWorldBankMarketData, publicSources } from "./strategy/worldBank";
+import { fitPenetrationCurve, middleClassEffect } from "./strategy/marketCurves";
+import { critiqueAssessment, extractCaseEvidence, proposeAssessmentBlock, type CaseSource } from "./ai/caseCopilot";
+import { extractPdfText } from "./ai/pdfText";
+import { storageGetSignedUrl, storagePut } from "./storage";
 import { getWgiGovernanceData } from "./strategy/wgi";
 import { financialPublicSources, getCountryFinancialReference } from "./strategy/countryFinancialData";
 
@@ -26,10 +30,55 @@ const calibrationSchema = z.object({
   ipSensitivity: score.optional(),
 });
 
+const calibrationNoteSchema = z.object({
+  rationale: z.string().max(1200).nullable().optional(),
+  sourceLabel: z.string().max(300).nullable().optional(),
+});
+
+const calibrationNotesSchema = z.object({
+  demandQuality: calibrationNoteSchema.optional(),
+  resourceFit: calibrationNoteSchema.optional(),
+  competitionAttractiveness: calibrationNoteSchema.optional(),
+  governmentOpenness: calibrationNoteSchema.optional(),
+  cageDistance: calibrationNoteSchema.optional(),
+  politicalRisk: calibrationNoteSchema.optional(),
+  economicRisk: calibrationNoteSchema.optional(),
+  competitiveRisk: calibrationNoteSchema.optional(),
+  operationalRisk: calibrationNoteSchema.optional(),
+  internalReadiness: calibrationNoteSchema.optional(),
+  timePressure: calibrationNoteSchema.optional(),
+  controlNeed: calibrationNoteSchema.optional(),
+  ipSensitivity: calibrationNoteSchema.optional(),
+});
+
+const knockOutPolicySchema = z.object({
+  maxPoliticalRisk: score.nullable().optional(),
+  maxEconomicRisk: score.nullable().optional(),
+  maxCompetitiveRisk: score.nullable().optional(),
+  maxOperationalRisk: score.nullable().optional(),
+  maxCageDistance: score.nullable().optional(),
+  minSafety: score.nullable().optional(),
+  requireGovernanceEvidence: z.boolean().nullable().optional(),
+});
+
+const countryAssessmentSchema = z.object({
+  // Clave `bloque.grupo.item`; el valor 0-4 o null cuando el ítem no se ha evaluado.
+  ratings: z.record(z.string().max(120), z.number().min(0).max(4).nullable()).optional(),
+  notes: z.record(z.string().max(120), z.string().max(1200)).optional(),
+  incentives: z.array(z.string().max(80)).max(40).optional(),
+  sustainabilityConcerns: z.array(z.string().max(80)).max(20).optional(),
+  lifeCycleCluster: z.enum(["developing", "emerging", "fastIndustrializing", "industrialized"]).nullable().optional(),
+  easeOfDoingBusinessScore: z.number().min(0).max(100).nullable().optional(),
+  profileOverride: z.enum(["hub", "emergingGiant", "fastIndustrializing", "developing", "oecd", "resourceRich"]).nullable().optional(),
+});
+
 const countrySchema = z.object({
   code: z.string().min(2).max(3),
   name: z.string().min(2).max(100).optional(),
   calibration: calibrationSchema.optional(),
+  calibrationNotes: calibrationNotesSchema.optional(),
+  assessment: countryAssessmentSchema.optional(),
+  knockOuts: knockOutPolicySchema.optional(),
 });
 
 const governanceSchema = z.object({
@@ -53,6 +102,19 @@ const marketDataSchema = z.object({
   investmentRate: z.number().nullable().optional(),
   fdiInflowUsd: z.number().nullable().optional(),
   fdiInflowPctGdp: z.number().nullable().optional(),
+  gdpPpp: z.number().nullable().optional(),
+  gdpPerCapitaPpp: z.number().nullable().optional(),
+  incomeDistributionGini: z.number().nullable().optional(),
+  householdConsumptionPctGdp: z.number().nullable().optional(),
+  savingsRate: z.number().nullable().optional(),
+  populationGrowth: z.number().nullable().optional(),
+  workingAgeSharePct: z.number().nullable().optional(),
+  governmentSpendingPctGdp: z.number().nullable().optional(),
+  tertiaryEnrolmentPct: z.number().nullable().optional(),
+  researchersPerMillion: z.number().nullable().optional(),
+  researchSpendingPctGdp: z.number().nullable().optional(),
+  electricityAccessPct: z.number().nullable().optional(),
+  gdpGrowthSeries: z.array(z.object({ year: z.number().int(), value: z.number() })).max(60).nullable().optional(),
   governance: governanceSchema.optional(),
   sourceYear: z.number().nullable().optional(),
   lastUpdatedAt: z.string().nullable().optional(),
@@ -64,6 +126,11 @@ const modeFinancialProfileSchema = z.object({
   initialInvestment: z.number().nonnegative().nullable().optional(),
   annualOperatingCost: z.number().nonnegative().nullable().optional(),
   revenueCapturePct: z.number().min(0).max(100).nullable().optional(),
+  economicModel: z.enum(["operator", "royalty", "channel", "cost_only"]).nullable().optional(),
+  royaltyRatePct: z.number().min(0).max(100).nullable().optional(),
+  upfrontFee: z.number().nonnegative().nullable().optional(),
+  componentMarginPct: z.number().min(0).max(100).nullable().optional(),
+  channelMarginPct: z.number().min(0).max(100).nullable().optional(),
 });
 
 const financialDataProvenanceSchema = z.object({
@@ -91,8 +158,11 @@ const financialAssumptionsSchema = z.object({
   samPct: z.number().min(0).max(100).nullable().optional(),
   somPctYearOne: z.number().min(0).max(100).nullable().optional(),
   somPctHorizon: z.number().min(0).max(100).nullable().optional(),
+  somRampShape: z.enum(["linear", "s_curve", "manual"]).nullable().optional(),
+  somPctByYear: z.array(z.number().min(0).max(100).nullable()).max(25).nullable().optional(),
   operatingMarginPct: z.number().min(-100).max(100).nullable().optional(),
   taxRatePct: z.number().min(0).max(100).nullable().optional(),
+  taxLossCarryforward: z.boolean().nullable().optional(),
   taxRateDataMode: z.enum(["public", "manual"]).optional(),
   taxReference: financialDataProvenanceSchema.nullable().optional(),
   workingCapitalPctRevenue: z.number().min(-100).max(100).nullable().optional(),
@@ -117,6 +187,7 @@ const financialAssumptionsSchema = z.object({
 
 const investmentThresholdsSchema = z.object({
   currency: z.string().min(1).max(10).nullable().optional(),
+  roiBasis: z.enum(["operating_horizon", "including_terminal"]).nullable().optional(),
   advanceMinRiskAdjusted: z.number().min(0).max(100).nullable().optional(),
   testMinRiskAdjusted: z.number().min(0).max(100).nullable().optional(),
   minConfidence: z.number().min(0).max(100).nullable().optional(),
@@ -148,6 +219,19 @@ const evaluationSchema = z.object({
     distance: z.number().min(0).max(100).optional(),
     risk: z.number().min(0).max(100).optional(),
   }).optional(),
+  entryDeliveryModel: z.enum(["relational", "digital", "hybrid"]).optional(),
+  entryModeWeights: z.object({
+    upFrontInvestment: z.number().min(0).max(100).optional(),
+    speedOfEntry: z.number().min(0).max(100).optional(),
+    marketPenetration: z.number().min(0).max(100).optional(),
+    marketControl: z.number().min(0).max(100).optional(),
+    politicalRiskExposure: z.number().min(0).max(100).optional(),
+    technologicalLeakage: z.number().min(0).max(100).optional(),
+    managerialComplexity: z.number().min(0).max(100).optional(),
+    financialReturnPotential: z.number().min(0).max(100).optional(),
+  }).optional(),
+  knockOuts: knockOutPolicySchema.optional(),
+  tornadoDeltaPct: z.number().min(1).max(90).optional(),
 });
 
 const approvalStatusSchema = z.enum(["not_started", "in_review", "approved", "changes_requested", "on_hold", "closed"]);
@@ -180,6 +264,21 @@ function defaultApprovalMilestones(recommendation: "advance" | "test", responsib
     { title: third, responsible, dueAt: futureDate(reviewAt, -7), status: "pending" as const },
     { title: "Revisión de gate y decisión documentada", responsible, dueAt: reviewAt, status: "pending" as const },
   ];
+}
+
+/**
+ * Construye la fuente que se pasa al copiloto. El texto plano permite verificar las citas
+ * contra el original; un PDF solo permite exigir que la cita y el localizador existan.
+ */
+async function loadCaseSource(userId: number, documentId: number): Promise<CaseSource> {
+  const document = await db.getCaseDocument(userId, documentId);
+  if (!document) throw new Error("Documento no encontrado o sin acceso.");
+  if (document.textContent) {
+    return { text: document.textContent, label: document.filename };
+  }
+  if (!document.storageKey) throw new Error("El documento no tiene contenido utilizable.");
+  const signedUrl = await storageGetSignedUrl(document.storageKey);
+  return { documentUrl: signedUrl, mimeType: document.mimeType, label: document.filename };
 }
 
 export const appRouter = router({
@@ -226,6 +325,48 @@ export const appRouter = router({
     evaluate: protectedProcedure.input(evaluationSchema).mutation(({ input }) => {
       return evaluateStrategy(input as EvaluationInput);
     }),
+
+    /**
+     * Curva de penetración: correlaciona un indicador de consumo con la renta per cápita
+     * sobre los países indicados y devuelve el ajuste con su R (Figuras 6.4-6.5, p. 230).
+     * Los puntos pueden venir del World Bank por código de indicador o entrarse a mano.
+     */
+    fitPenetrationCurve: protectedProcedure
+      .input(z.object({
+        model: z.enum(["linear", "logarithmic", "invertedU"]).optional(),
+        points: z.array(z.object({ label: z.string().min(1).max(80), gdpPerCapita: z.number().positive(), value: z.number() })).min(3).max(120).optional(),
+        indicator: z.string().min(3).max(40).optional(),
+        countryCodes: z.array(z.string().min(2).max(3)).min(3).max(60).optional(),
+      }))
+      .mutation(async ({ input }) => {
+        if (input.points?.length) {
+          return { ...fitPenetrationCurve(input.points, input.model), points: input.points };
+        }
+        if (!input.indicator || !input.countryCodes?.length) {
+          throw new Error("Indique puntos explícitos o un indicador con su lista de países.");
+        }
+        const points = await getIndicatorPoints(input.indicator, input.countryCodes);
+        if (points.length < 3) throw new Error("La fuente pública no devolvió suficientes observaciones para ajustar una curva.");
+        return { ...fitPenetrationCurve(points, input.model), points };
+      }),
+
+    /**
+     * Efecto clase media: cuánto crece el segmento por encima de un umbral de renta
+     * cuando la renta media sube (Figura 6.6, p. 232).
+     */
+    middleClassEffect: protectedProcedure
+      .input(z.object({
+        gdpPerCapita: z.number().positive(),
+        gini: z.number().min(1).max(99),
+        threshold: z.number().positive(),
+        incomeGrowthPct: z.number().min(-90).max(500),
+        upperThreshold: z.number().positive().nullable().optional(),
+      }))
+      .mutation(({ input }) => {
+        const result = middleClassEffect(input);
+        if (!result) throw new Error("Los parámetros no permiten calcular la distribución de renta.");
+        return result;
+      }),
 
     saveScenario: protectedProcedure
       .input(z.object({ name: z.string().min(2).max(180), evaluation: evaluationSchema }))
@@ -301,6 +442,211 @@ export const appRouter = router({
       .mutation(({ ctx, input }) => {
         const { milestoneId, dueAt, ...changes } = input;
         return db.updateApprovalMilestone(ctx.user.id, milestoneId, { ...changes, dueAt: dueAt === undefined ? undefined : dueAt === null ? null : new Date(dueAt) });
+      }),
+  }),
+
+  /** Casos de estudio: documentos y libro de evidencias. */
+  case: router({
+    create: protectedProcedure
+      .input(z.object({
+        title: z.string().min(2).max(200),
+        decisionQuestion: z.string().max(2000).nullable().optional(),
+        companyName: z.string().max(180).nullable().optional(),
+        homeCountry: z.string().max(120).nullable().optional(),
+        industry: z.string().max(180).nullable().optional(),
+        subIndustry: z.string().max(180).nullable().optional(),
+        caseYear: z.number().int().min(1900).max(2100).nullable().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => ({ id: await db.createCase({ userId: ctx.user.id, ...input }) })),
+
+    update: protectedProcedure
+      .input(z.object({
+        caseId: z.number().int().positive(),
+        title: z.string().min(2).max(200).optional(),
+        decisionQuestion: z.string().max(2000).nullable().optional(),
+        companyName: z.string().max(180).nullable().optional(),
+        homeCountry: z.string().max(120).nullable().optional(),
+        industry: z.string().max(180).nullable().optional(),
+        subIndustry: z.string().max(180).nullable().optional(),
+        caseYear: z.number().int().min(1900).max(2100).nullable().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const { caseId, ...values } = input;
+        await db.updateCase(ctx.user.id, caseId, values);
+        return db.getCase(ctx.user.id, caseId);
+      }),
+
+    list: protectedProcedure.query(({ ctx }) => db.listCases(ctx.user.id)),
+
+    get: protectedProcedure
+      .input(z.object({ caseId: z.number().int().positive() }))
+      .query(({ ctx, input }) => db.getCase(ctx.user.id, input.caseId)),
+
+    /** Texto pegado. Es la vía preferente: permite verificar las citas contra el original. */
+    addTextDocument: protectedProcedure
+      .input(z.object({
+        caseId: z.number().int().positive(),
+        filename: z.string().min(1).max(260),
+        text: z.string().min(50).max(400_000),
+      }))
+      .mutation(async ({ ctx, input }) => ({
+        id: await db.addCaseDocument({
+          userId: ctx.user.id,
+          caseId: input.caseId,
+          filename: input.filename,
+          mimeType: "text/plain",
+          textContent: input.text,
+          bytes: Buffer.byteLength(input.text, "utf8"),
+        }),
+      })),
+
+    /** PDF u otro binario. Sin texto no se pueden verificar las citas contra el original. */
+    uploadDocument: protectedProcedure
+      .input(z.object({
+        caseId: z.number().int().positive(),
+        filename: z.string().min(1).max(260),
+        mimeType: z.string().min(3).max(120),
+        contentBase64: z.string().min(16).max(28_000_000),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const buffer = Buffer.from(input.contentBase64, "base64");
+        if (!buffer.length) throw new Error("El contenido del fichero está vacío o mal codificado.");
+        const safeName = input.filename.replace(/[^A-Za-z0-9._-]+/g, "_").slice(0, 120);
+        const stored = await storagePut(`cases/${ctx.user.id}/${input.caseId}/${safeName}`, buffer, input.mimeType);
+        /**
+         * Se extrae el texto en el momento de subir. Con texto se puede comprobar que las
+         * citas del copiloto están de verdad en el documento; sin él, solo se puede exigir
+         * que existan.
+         */
+        const extraction = input.mimeType.includes("pdf") ? await extractPdfText(buffer) : { text: null, pages: null, note: "Formato sin extracción de texto." };
+        return {
+          id: await db.addCaseDocument({
+            userId: ctx.user.id,
+            caseId: input.caseId,
+            filename: input.filename,
+            mimeType: input.mimeType,
+            storageKey: stored.key,
+            textContent: extraction.text,
+            bytes: buffer.length,
+          }),
+          textExtracted: Boolean(extraction.text),
+          pages: extraction.pages,
+          note: extraction.note,
+        };
+      }),
+
+    listEvidence: protectedProcedure
+      .input(z.object({ caseId: z.number().int().positive() }))
+      .query(({ ctx, input }) => db.listEvidence(ctx.user.id, input.caseId)),
+
+    addEvidence: protectedProcedure
+      .input(z.object({
+        caseId: z.number().int().positive(),
+        entries: z.array(z.object({
+          kind: z.enum(["document", "public_data", "interview", "assumption", "ai_extraction"]),
+          claim: z.string().min(3).max(2000),
+          sourceLabel: z.string().min(1).max(300),
+          documentId: z.number().int().positive().nullable().optional(),
+          locator: z.string().max(160).nullable().optional(),
+          quote: z.string().max(4000).nullable().optional(),
+          url: z.string().max(1000).nullable().optional(),
+          retrievedAt: z.string().max(80).nullable().optional(),
+          reliability: z.number().int().min(1).max(5).optional(),
+          targetPath: z.string().max(160).nullable().optional(),
+          countryCode: z.string().max(3).nullable().optional(),
+          status: z.enum(["accepted", "suggested", "rejected"]).optional(),
+        })).min(1).max(200),
+      }))
+      .mutation(({ ctx, input }) => db.addEvidence(ctx.user.id, input.caseId, input.entries)),
+
+    setEvidenceStatus: protectedProcedure
+      .input(z.object({ evidenceId: z.number().int().positive(), status: z.enum(["accepted", "suggested", "rejected"]) }))
+      .mutation(async ({ ctx, input }) => {
+        await db.setEvidenceStatus(ctx.user.id, input.evidenceId, input.status);
+        return { ok: true };
+      }),
+
+    updateEvidence: protectedProcedure
+      .input(z.object({
+        evidenceId: z.number().int().positive(),
+        claim: z.string().min(3).max(2000).optional(),
+        sourceLabel: z.string().min(1).max(300).optional(),
+        locator: z.string().max(160).nullable().optional(),
+        targetPath: z.string().max(160).nullable().optional(),
+        reliability: z.number().int().min(1).max(5).optional(),
+        countryCode: z.string().max(3).nullable().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const { evidenceId, ...values } = input;
+        await db.updateEvidence(ctx.user.id, evidenceId, values);
+        return { ok: true };
+      }),
+
+    deleteEvidence: protectedProcedure
+      .input(z.object({ evidenceId: z.number().int().positive() }))
+      .mutation(async ({ ctx, input }) => {
+        await db.deleteEvidence(ctx.user.id, input.evidenceId);
+        return { ok: true };
+      }),
+  }),
+
+  /**
+   * Copiloto de caso. Todo lo que devuelve es una propuesta: entra en el libro de
+   * evidencias con estado `suggested` y no alimenta ningún cálculo hasta que se acepta.
+   */
+  ai: router({
+    extractEvidence: protectedProcedure
+      .input(z.object({
+        caseId: z.number().int().positive(),
+        documentId: z.number().int().positive(),
+        context: z.string().max(2000).optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const source = await loadCaseSource(ctx.user.id, input.documentId);
+        const extraction = await extractCaseEvidence(source, { context: input.context });
+        const stored = await db.addEvidence(ctx.user.id, input.caseId, extraction.evidence.map((entry) => ({
+          kind: "ai_extraction" as const,
+          claim: entry.claim,
+          sourceLabel: source.label,
+          documentId: input.documentId,
+          locator: entry.locator,
+          quote: entry.quote,
+          reliability: entry.reliability,
+          targetPath: entry.targetPath,
+          countryCode: entry.countryCode,
+          createdBy: "ai" as const,
+          status: "suggested" as const,
+          quoteVerified: entry.quoteVerified,
+        })));
+        return { evidence: stored, discarded: extraction.discarded, model: extraction.model };
+      }),
+
+    proposeBlock: protectedProcedure
+      .input(z.object({
+        documentId: z.number().int().positive(),
+        blockKey: z.enum(["market", "resources", "industry", "cage", "risk"]),
+        countryName: z.string().min(1).max(120),
+        context: z.string().max(2000).optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const source = await loadCaseSource(ctx.user.id, input.documentId);
+        return proposeAssessmentBlock(input.blockKey, source, { countryName: input.countryName, context: input.context });
+      }),
+
+    critique: protectedProcedure
+      .input(z.object({
+        documentId: z.number().int().positive(),
+        blockKey: z.enum(["market", "resources", "industry", "cage", "risk"]),
+        countryName: z.string().max(120).optional(),
+        ratings: z.array(z.object({
+          itemPath: z.string().min(3).max(160),
+          value: z.number().min(0).max(4),
+          rationale: z.string().max(1200).nullable().optional(),
+        })).max(80),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const source = await loadCaseSource(ctx.user.id, input.documentId);
+        return critiqueAssessment(input.blockKey, input.ratings, source, { countryName: input.countryName });
       }),
   }),
 });

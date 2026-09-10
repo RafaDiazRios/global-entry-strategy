@@ -1,16 +1,24 @@
-export type EntryModeKey =
-  | "greenfield"
-  | "acquisition"
-  | "alliance"
-  | "licensing"
-  | "distributor"
-  | "office"
-  | "digital";
+import { entryMode, type EconomicModel, type EntryModeKey } from "@shared/domain/entryModes";
+
+export type { EntryModeKey, EconomicModel };
 
 export type ModeFinancialProfile = {
   initialInvestment?: number | null;
   annualOperatingCost?: number | null;
   revenueCapturePct?: number | null;
+  /**
+   * Sobrescribe el modelo económico por defecto del modo. Solo para casos atípicos:
+   * una franquicia que opera sus propias unidades, por ejemplo.
+   */
+  economicModel?: EconomicModel | null;
+  /** Modelo royalty: porcentaje sobre las ventas del licenciatario. */
+  royaltyRatePct?: number | null;
+  /** Modelo royalty: pago inicial único, en moneda local. */
+  upfrontFee?: number | null;
+  /** Modelo royalty: margen sobre componentes o producto intermedio vendido al licenciatario. */
+  componentMarginPct?: number | null;
+  /** Modelo canal: margen que retiene la empresa sobre las ventas que pasan por el distribuidor. */
+  channelMarginPct?: number | null;
 };
 
 export type SensitivityScenarioKey = "base" | "optimistic" | "conservative";
@@ -46,8 +54,22 @@ export type FinancialAssumptions = {
   samPct?: number | null;
   somPctYearOne?: number | null;
   somPctHorizon?: number | null;
+  /**
+   * Forma de la rampa de cuota entre el año 1 y el horizonte.
+   * `linear` reproduce el comportamiento anterior. `s_curve` refleja las curvas de
+   * penetración del capítulo 6 (Figs. 6.4-6.5, p. 230), donde la adopción arranca
+   * despacio, acelera y se satura. `manual` usa `somPctByYear`.
+   */
+  somRampShape?: "linear" | "s_curve" | "manual" | null;
+  /** Cuota por año cuando `somRampShape` es `manual`. Un hueco invalida el cálculo. */
+  somPctByYear?: (number | null)[] | null;
   operatingMarginPct?: number | null;
   taxRatePct?: number | null;
+  /**
+   * Reconoce el arrastre de bases imponibles negativas. Por defecto activo: una entrada
+   * greenfield con pérdidas iniciales no paga impuestos hasta compensarlas.
+   */
+  taxLossCarryforward?: boolean | null;
   taxRateDataMode?: "public" | "manual";
   taxReference?: FinancialDataProvenance | null;
   workingCapitalPctRevenue?: number | null;
@@ -59,9 +81,19 @@ export type FinancialAssumptions = {
   modeProfiles?: Partial<Record<EntryModeKey, ModeFinancialProfile>>;
 };
 
+export type RoiBasis = "operating_horizon" | "including_terminal";
+
 export type InvestmentThresholds = {
   /** Leave blank to use the reporting currency of each country. */
   currency?: string | null;
+  /**
+   * Base del ROI que se compara con los umbrales.
+   * `operating_horizon`: flujo libre acumulado del horizonte, sin valor terminal.
+   * `including_terminal`: valor presente de todos los flujos, incluido el terminal.
+   * El NPV siempre incluye el valor terminal; declarar la base evita comparar
+   * dos magnitudes distintas contra dos umbrales.
+   */
+  roiBasis?: RoiBasis | null;
   advanceMinRiskAdjusted?: number | null;
   testMinRiskAdjusted?: number | null;
   minConfidence?: number | null;
@@ -75,6 +107,7 @@ export type InvestmentThresholds = {
 
 export const defaultInvestmentThresholds: Required<Omit<InvestmentThresholds, "currency" | "testMaxInitialInvestment">> & Pick<InvestmentThresholds, "currency" | "testMaxInitialInvestment"> = {
   currency: null,
+  roiBasis: "operating_horizon",
   advanceMinRiskAdjusted: 65,
   testMinRiskAdjusted: 50,
   minConfidence: 60,
@@ -90,6 +123,8 @@ export type AnnualProjection = {
   year: number;
   revenue: number;
   operatingProfit: number;
+  /** Base imponible tras aplicar el arrastre de pérdidas disponible. */
+  taxableProfit: number;
   taxes: number;
   changeInWorkingCapital: number;
   freeCashFlow: number;
@@ -101,8 +136,15 @@ export type FinancialModeResult = {
   key: EntryModeKey;
   mode: string;
   status: "ok" | "insufficient_data" | "not_meaningful";
+  /** Modelo económico aplicado: operador, royalty, canal o solo coste. */
+  economicModel: EconomicModel;
   roiPct: number | null;
+  /** ROI incluyendo el valor presente del valor terminal. Base alternativa de umbral. */
+  roiIncludingTerminalPct: number | null;
+  /** Valor presente de todas las entradas dividido por la inversión inicial. */
+  valueMultiple: number | null;
   npv: number | null;
+  /** Año de recuperación con interpolación dentro del año en que se cruza el cero. */
   paybackYear: number | null;
   cumulativeOperatingProfit: number | null;
   cumulativeFreeCashFlow: number | null;
@@ -153,8 +195,34 @@ export type FinancialScenarioResult = {
   note: string;
 };
 
+export type TornadoLeverKey =
+  | "priceRevenue"
+  | "somCapture"
+  | "operatingMargin"
+  | "initialInvestment"
+  | "annualOperatingCost"
+  | "discountRate"
+  | "fxRate"
+  | "taxRate";
+
+export type TornadoEntry = {
+  key: TornadoLeverKey;
+  label: string;
+  deltaPct: number;
+  lowNpv: number | null;
+  highNpv: number | null;
+  /** Amplitud del NPV entre el extremo bajo y el alto. Ordena la sensibilidad. */
+  swing: number | null;
+};
+
 export type FinancialResult = FinancialCaseResult & {
   scenarios: FinancialScenarioResult[];
+  /**
+   * Sensibilidad de una palanca cada vez sobre la alternativa con mejor NPV.
+   * Los tres escenarios fijos mueven precio, margen y divisa a la vez y no permiten
+   * saber cuál de ellos manda; el tornado sí.
+   */
+  tornado: { modeKey: EntryModeKey | null; mode: string | null; baseNpv: number | null; deltaPct: number; levers: TornadoEntry[] };
 };
 
 export type InvestmentRecommendation = {
@@ -186,6 +254,35 @@ function round(value: number) {
   return Math.round(value * 100) / 100;
 }
 
+/**
+ * Progreso de la rampa de cuota entre el año 1 (0) y el horizonte (1).
+ * La curva en S es una logística normalizada para que respete exactamente ambos extremos.
+ */
+function rampProgress(index: number, horizonYears: number, shape: FinancialAssumptions["somRampShape"]) {
+  if (horizonYears <= 1) return 1;
+  const t = index / (horizonYears - 1);
+  if (shape !== "s_curve") return t;
+  const k = 6;
+  const logistic = (x: number) => 1 / (1 + Math.exp(-k * (x - 0.5)));
+  const low = logistic(0);
+  const high = logistic(1);
+  return (logistic(t) - low) / (high - low);
+}
+
+function somPctForYear(
+  index: number,
+  horizonYears: number,
+  assumptions: FinancialAssumptions,
+  somYearOne: number,
+  somHorizon: number,
+) {
+  if (assumptions.somRampShape === "manual") {
+    const value = asNumber(assumptions.somPctByYear?.[index]);
+    return value;
+  }
+  return somYearOne + (somHorizon - somYearOne) * rampProgress(index, horizonYears, assumptions.somRampShape);
+}
+
 function calculateMarket(assumptions: FinancialAssumptions, horizonYears: number) {
   const tamYearOne = asNumber(assumptions.tamYearOne);
   const growth = asNumber(assumptions.annualMarketGrowthPct);
@@ -193,6 +290,11 @@ function calculateMarket(assumptions: FinancialAssumptions, horizonYears: number
   const somYearOne = asNumber(assumptions.somPctYearOne);
   const somHorizon = asNumber(assumptions.somPctHorizon);
   if ([tamYearOne, growth, samPct, somYearOne, somHorizon].some((value) => value === null)) return null;
+  if (assumptions.somRampShape === "manual") {
+    const provided = assumptions.somPctByYear ?? [];
+    const complete = Array.from({ length: horizonYears }, (_, index) => asNumber(provided[index]) !== null).every(Boolean);
+    if (!complete) return null;
+  }
 
   const tamAtHorizon = tamYearOne! * Math.pow(1 + growth! / 100, Math.max(0, horizonYears - 1));
   const samAtHorizon = tamAtHorizon * (samPct! / 100);
@@ -201,13 +303,12 @@ function calculateMarket(assumptions: FinancialAssumptions, horizonYears: number
     tamYearOne: round(tamYearOne!),
     tamAtHorizon: round(tamAtHorizon),
     samAtHorizon: round(samAtHorizon),
-    somRevenueYearOne: round(samYearOne * (somYearOne! / 100)),
-    somRevenueAtHorizon: round(samAtHorizon * (somHorizon! / 100)),
+    somRevenueYearOne: round(samYearOne * ((somPctForYear(0, horizonYears, assumptions, somYearOne!, somHorizon!) ?? somYearOne!) / 100)),
+    somRevenueAtHorizon: round(samAtHorizon * ((somPctForYear(horizonYears - 1, horizonYears, assumptions, somYearOne!, somHorizon!) ?? somHorizon!) / 100)),
     annualRevenue: Array.from({ length: horizonYears }, (_, index) => {
       const tam = tamYearOne! * Math.pow(1 + growth! / 100, index);
       const sam = tam * (samPct! / 100);
-      const progress = horizonYears === 1 ? 1 : index / (horizonYears - 1);
-      const somPct = somYearOne! + (somHorizon! - somYearOne!) * progress;
+      const somPct = somPctForYear(index, horizonYears, assumptions, somYearOne!, somHorizon!) ?? 0;
       return sam * (somPct / 100);
     }),
   };
@@ -245,6 +346,15 @@ function missingCoreInputs(assumptions: FinancialAssumptions) {
   return missing;
 }
 
+function resolveEconomicModel(mode: ModeForFinance, profile: ModeFinancialProfile): EconomicModel {
+  if (profile.economicModel) return profile.economicModel;
+  try {
+    return entryMode(mode.key).economicModel;
+  } catch {
+    return "operator";
+  }
+}
+
 function calculateMode(
   assumptions: FinancialAssumptions,
   market: NonNullable<ReturnType<typeof calculateMarket>> | null,
@@ -253,65 +363,124 @@ function calculateMode(
   revenueMultiplier = 1,
 ): FinancialModeResult {
   const profile = assumptions.modeProfiles?.[mode.key] ?? {};
+  const economicModel = resolveEconomicModel(mode, profile);
+  const isOperator = economicModel === "operator";
+  const isRoyalty = economicModel === "royalty";
+  const isChannel = economicModel === "channel";
+  const isCostOnly = economicModel === "cost_only";
+
   const investment = asNumber(profile.initialInvestment);
   const annualCost = asNumber(profile.annualOperatingCost);
   const capture = asNumber(profile.revenueCapturePct);
+  const royaltyRate = asNumber(profile.royaltyRatePct);
+  const componentMargin = asNumber(profile.componentMarginPct) ?? 0;
+  const upfrontFee = asNumber(profile.upfrontFee) ?? 0;
+  const channelMargin = asNumber(profile.channelMarginPct);
   const margin = asNumber(assumptions.operatingMarginPct);
   const taxRate = asNumber(assumptions.taxRatePct);
   const workingCapitalPctRevenue = asNumber(assumptions.workingCapitalPctRevenue);
   const discount = asNumber(assumptions.discountRatePct);
   const terminalGrowth = asNumber(assumptions.terminalGrowthPct);
+  const carryforwardEnabled = assumptions.taxLossCarryforward !== false;
   const { fxRate } = resolveCurrencies(assumptions);
+
+  /**
+   * Cada modelo económico exige inputs distintos. Una licencia no tiene margen operativo
+   * sobre las ventas del mercado ni capital de trabajo propio; una oficina de representación
+   * no tiene ingresos. Pedir los mismos once campos a los siete modos era la razón por la que
+   * todos ellos producían el mismo flujo de caja con distinta escala.
+   */
   const missing = [
-    ...(market ? [] : ["variables de mercado TAM/SAM/SOM"]),
+    ...(isCostOnly || market ? [] : ["variables de mercado TAM/SAM/SOM"]),
     ...(investment === null ? ["inversión inicial"] : []),
     ...(annualCost === null ? ["coste operativo anual"] : []),
-    ...(capture === null ? ["captura de ingresos"] : []),
-    ...(margin === null ? ["margen operativo"] : []),
+    ...(!isCostOnly && capture === null ? ["captura de ingresos"] : []),
+    ...(isOperator && margin === null ? ["margen operativo"] : []),
+    ...(isRoyalty && royaltyRate === null ? ["tasa de royalty"] : []),
+    ...(isChannel && channelMargin === null ? ["margen de canal"] : []),
     ...(taxRate === null ? ["tasa fiscal"] : []),
-    ...(workingCapitalPctRevenue === null ? ["capital de trabajo"] : []),
+    ...((isOperator || isChannel) && workingCapitalPctRevenue === null ? ["capital de trabajo"] : []),
     ...(discount === null ? ["tasa de descuento"] : []),
-    ...(terminalGrowth === null ? ["crecimiento terminal"] : []),
+    ...(!isCostOnly && terminalGrowth === null ? ["crecimiento terminal"] : []),
     ...(fxRate === null || fxRate <= 0 ? ["tipo de cambio"] : []),
   ];
   const blank = (status: FinancialModeResult["status"], issues: string[]): FinancialModeResult => ({
-    key: mode.key, mode: mode.mode, status, roiPct: null, npv: null, paybackYear: null, cumulativeOperatingProfit: null,
+    key: mode.key, mode: mode.mode, status, economicModel, roiPct: null, roiIncludingTerminalPct: null, valueMultiple: null,
+    npv: null, paybackYear: null, cumulativeOperatingProfit: null,
     cumulativeFreeCashFlow: null, initialInvestment: investment === null || fxRate === null ? investment : round(investment * fxRate),
     annualOperatingCost: annualCost === null || fxRate === null ? annualCost : round(annualCost * fxRate), revenueCapturePct: capture,
     terminalValue: null, presentValueTerminal: null, annualProjection: [], missingInputs: issues,
   });
   if (missing.length) return blank("insufficient_data", missing);
-  if (investment! <= 0) return blank("not_meaningful", ["La inversión inicial debe ser positiva para calcular ROI y recuperación."]);
-  if (discount! <= terminalGrowth!) return blank("not_meaningful", ["La tasa de descuento debe superar el crecimiento terminal para calcular el valor terminal por perpetuidad."]);
+  // Un modelo de operador sin inversión no permite hablar de retorno sobre inversión.
+  if (isOperator && investment! <= 0) return blank("not_meaningful", ["La inversión inicial debe ser positiva para calcular ROI y recuperación."]);
+  if (!isCostOnly && discount! <= terminalGrowth!) return blank("not_meaningful", ["La tasa de descuento debe superar el crecimiento terminal para calcular el valor terminal por perpetuidad."]);
 
   const investmentReporting = investment! * fxRate!;
   const annualCostReporting = annualCost! * fxRate!;
+  const workingCapitalRate = isOperator || isChannel ? workingCapitalPctRevenue! / 100 : 0;
+
+  /** Ingreso que retiene la empresa en cada modelo, a partir de las ventas del mercado. */
+  const incomeFor = (localSomRevenue: number, year: number) => {
+    if (isCostOnly) return 0;
+    const marketSales = localSomRevenue * (capture! / 100) * fxRate! * revenueMultiplier;
+    if (isRoyalty) {
+      const recurring = marketSales * ((royaltyRate! + componentMargin) / 100);
+      return recurring + (year === 1 ? upfrontFee * fxRate! : 0);
+    }
+    if (isChannel) return marketSales * (channelMargin! / 100);
+    return marketSales;
+  };
+
+  /** El margen operativo solo aplica al modelo de operador; royalty y canal ya llegan netos. */
+  const operatingProfitFor = (income: number) => (isOperator ? income * (margin! / 100) : income) - annualCostReporting;
+
   let priorWorkingCapital = 0;
   let cumulativeCash = -investmentReporting;
   let cumulativeOperatingProfit = 0;
   let cumulativeFreeCashFlow = 0;
   let npv = -investmentReporting;
   let paybackYear: number | null = null;
+  let lossCarryforward = 0;
 
-  const annualProjection = market!.annualRevenue.map((localSomRevenue, index) => {
-    const revenue = localSomRevenue * (capture! / 100) * fxRate! * revenueMultiplier;
-    const operatingProfit = revenue * (margin! / 100) - annualCostReporting;
-    const taxes = Math.max(operatingProfit, 0) * (taxRate! / 100);
-    const workingCapitalBalance = revenue * (workingCapitalPctRevenue! / 100);
+  const revenueSeries = isCostOnly
+    ? Array.from({ length: horizonYears }, () => 0)
+    : market!.annualRevenue;
+
+  const annualProjection = revenueSeries.map((localSomRevenue, index) => {
+    const revenue = incomeFor(localSomRevenue, index + 1);
+    const operatingProfit = operatingProfitFor(revenue);
+    // Escudo fiscal: las pérdidas de los primeros años compensan bases positivas posteriores.
+    const taxableProfit = carryforwardEnabled
+      ? Math.max(0, operatingProfit - lossCarryforward)
+      : Math.max(0, operatingProfit);
+    if (carryforwardEnabled) {
+      lossCarryforward = operatingProfit >= 0
+        ? Math.max(0, lossCarryforward - operatingProfit)
+        : lossCarryforward + Math.abs(operatingProfit);
+    }
+    const taxes = taxableProfit * (taxRate! / 100);
+    const workingCapitalBalance = revenue * workingCapitalRate;
     const changeInWorkingCapital = workingCapitalBalance - priorWorkingCapital;
     priorWorkingCapital = workingCapitalBalance;
     const freeCashFlow = operatingProfit - taxes - changeInWorkingCapital;
     const discountFactor = 1 / Math.pow(1 + discount! / 100, index + 1);
     const presentValue = freeCashFlow * discountFactor;
+    const openingCash = cumulativeCash;
     cumulativeOperatingProfit += operatingProfit;
     cumulativeFreeCashFlow += freeCashFlow;
     cumulativeCash += freeCashFlow;
     npv += presentValue;
-    if (paybackYear === null && cumulativeCash >= 0) paybackYear = index + 1;
+    // Recuperación interpolada dentro del año en que el acumulado cruza cero.
+    if (paybackYear === null && cumulativeCash >= 0) {
+      const fraction = freeCashFlow > 0 ? Math.min(1, Math.max(0, -openingCash / freeCashFlow)) : 1;
+      paybackYear = round(index + fraction);
+    }
     return {
       year: index + 1,
       revenue: round(revenue),
       operatingProfit: round(operatingProfit),
+      taxableProfit: round(taxableProfit),
       taxes: round(taxes),
       changeInWorkingCapital: round(changeInWorkingCapital),
       freeCashFlow: round(freeCashFlow),
@@ -320,21 +489,36 @@ function calculateMode(
     };
   });
 
-  const finalRevenue = annualProjection.at(-1)?.revenue ?? 0;
-  const terminalRevenue = finalRevenue * (1 + terminalGrowth! / 100);
-  const terminalOperatingProfit = terminalRevenue * (margin! / 100) - annualCostReporting;
-  const terminalTaxes = Math.max(terminalOperatingProfit, 0) * (taxRate! / 100);
-  const terminalWorkingCapitalChange = terminalRevenue * (workingCapitalPctRevenue! / 100) - finalRevenue * (workingCapitalPctRevenue! / 100);
-  const terminalFcf = terminalOperatingProfit - terminalTaxes - terminalWorkingCapitalChange;
-  const terminalValue = terminalFcf / (discount! / 100 - terminalGrowth! / 100);
-  const presentValueTerminal = terminalValue / Math.pow(1 + discount! / 100, horizonYears);
-  npv += presentValueTerminal;
+  let terminalValue: number | null = null;
+  let presentValueTerminal: number | null = null;
+  if (!isCostOnly) {
+    const finalRevenue = annualProjection.at(-1)?.revenue ?? 0;
+    // El pago inicial de una licencia no se perpetúa: el valor terminal solo recoge el flujo recurrente.
+    const recurringFinalRevenue = isRoyalty && horizonYears === 1 ? finalRevenue - upfrontFee * fxRate! : finalRevenue;
+    const terminalRevenue = recurringFinalRevenue * (1 + terminalGrowth! / 100);
+    const terminalOperatingProfit = operatingProfitFor(terminalRevenue);
+    const terminalTaxable = carryforwardEnabled
+      ? Math.max(0, terminalOperatingProfit - lossCarryforward)
+      : Math.max(0, terminalOperatingProfit);
+    const terminalTaxes = terminalTaxable * (taxRate! / 100);
+    const terminalWorkingCapitalChange = (terminalRevenue - recurringFinalRevenue) * workingCapitalRate;
+    const terminalFcf = terminalOperatingProfit - terminalTaxes - terminalWorkingCapitalChange;
+    terminalValue = terminalFcf / (discount! / 100 - terminalGrowth! / 100);
+    presentValueTerminal = terminalValue / Math.pow(1 + discount! / 100, horizonYears);
+    npv += presentValueTerminal;
+  }
+
+  const hasInvestment = investmentReporting > 0;
+  const valueMultiple = hasInvestment ? (npv + investmentReporting) / investmentReporting : null;
 
   return {
     key: mode.key,
     mode: mode.mode,
     status: "ok",
-    roiPct: round(((cumulativeFreeCashFlow - investmentReporting) / investmentReporting) * 100),
+    economicModel,
+    roiPct: hasInvestment ? round(((cumulativeFreeCashFlow - investmentReporting) / investmentReporting) * 100) : null,
+    roiIncludingTerminalPct: valueMultiple === null ? null : round((valueMultiple - 1) * 100),
+    valueMultiple: valueMultiple === null ? null : round(valueMultiple),
     npv: round(npv),
     paybackYear,
     cumulativeOperatingProfit: round(cumulativeOperatingProfit),
@@ -342,8 +526,8 @@ function calculateMode(
     initialInvestment: round(investmentReporting),
     annualOperatingCost: round(annualCostReporting),
     revenueCapturePct: capture,
-    terminalValue: round(terminalValue),
-    presentValueTerminal: round(presentValueTerminal),
+    terminalValue: terminalValue === null ? null : round(terminalValue),
+    presentValueTerminal: presentValueTerminal === null ? null : round(presentValueTerminal),
     annualProjection,
     missingInputs: [],
   };
@@ -378,7 +562,7 @@ function evaluateFinancialCase(
       : { tamYearOne: asNumber(provided.tamYearOne), tamAtHorizon: null, samAtHorizon: null, somRevenueYearOne: null, somRevenueAtHorizon: null },
     alternatives,
     missingInputs,
-    methodology: "TAM y SAM se proyectan con el crecimiento anual indicado; el SOM se interpola linealmente entre año 1 y el horizonte. Los flujos libres se calculan como EBIT después de impuestos menos el incremento de capital de trabajo; no se reconoce un activo fiscal por pérdidas. Los importes se convierten a moneda de reporte usando el tipo indicado. NPV descuenta los flujos libres y el valor terminal por perpetuidad: TV = FCF del año siguiente / (tasa de descuento − crecimiento terminal), incluido el incremento terminal de capital de trabajo. ROI usa flujo libre acumulado sin valor terminal.",
+    methodology: "TAM y SAM se proyectan con el crecimiento anual indicado; el SOM sigue la rampa elegida entre año 1 y horizonte (lineal, curva en S o definida año a año). Cada modo usa su propio modelo económico: operador (margen sobre las ventas capturadas), royalty (pago inicial más porcentaje sobre las ventas del licenciatario y margen en componentes, sin capital de trabajo), canal (margen del distribuidor) y solo coste (oficina de representación, sin ingresos ni valor terminal). Los flujos libres se calculan como EBIT menos impuestos menos el incremento de capital de trabajo, reconociendo el arrastre de bases imponibles negativas salvo que se desactive. Los importes se convierten a moneda de reporte usando el tipo indicado. NPV descuenta los flujos libres y el valor terminal por perpetuidad: TV = FCF del año siguiente / (tasa de descuento − crecimiento terminal), incluido el incremento terminal de capital de trabajo. Se publican dos bases de retorno: ROI sobre flujo libre acumulado del horizonte, sin valor terminal, y ROI incluyendo el valor presente del valor terminal; la política de umbrales declara cuál usa. La recuperación se interpola dentro del año en que el flujo acumulado cruza cero.",
   };
 }
 
@@ -434,14 +618,145 @@ function evaluateSensitivityScenario(
   return { key: definition.key, label: definition.label, priceRevenuePct, operatingMarginPctPoints, fxRatePct, status: scenarioStatus(financial), financial, missingInputs: financial.missingInputs, note: `${definition.note}${noFxNote}` };
 }
 
+const tornadoLevers: {
+  key: TornadoLeverKey;
+  label: string;
+  /** Devuelve los supuestos y el multiplicador de ingreso para un factor dado (1 ± delta). */
+  apply: (assumptions: FinancialAssumptions, factor: number, modeKey: EntryModeKey) => { assumptions: FinancialAssumptions; revenueMultiplier: number } | null;
+}[] = [
+  {
+    key: "priceRevenue",
+    label: "Precio / ingreso realizado",
+    apply: (assumptions, factor) => ({ assumptions, revenueMultiplier: factor }),
+  },
+  {
+    key: "somCapture",
+    label: "Cuota alcanzada (SOM)",
+    apply: (assumptions, factor) => ({
+      assumptions: {
+        ...assumptions,
+        somPctYearOne: asNumber(assumptions.somPctYearOne) === null ? assumptions.somPctYearOne : assumptions.somPctYearOne! * factor,
+        somPctHorizon: asNumber(assumptions.somPctHorizon) === null ? assumptions.somPctHorizon : assumptions.somPctHorizon! * factor,
+        somPctByYear: assumptions.somPctByYear?.map((value) => (asNumber(value) === null ? value : value! * factor)) ?? assumptions.somPctByYear,
+      },
+      revenueMultiplier: 1,
+    }),
+  },
+  {
+    key: "operatingMargin",
+    label: "Margen operativo",
+    apply: (assumptions, factor) => {
+      const margin = asNumber(assumptions.operatingMarginPct);
+      if (margin === null) return null;
+      return { assumptions: { ...assumptions, operatingMarginPct: Math.max(-100, Math.min(100, margin * factor)) }, revenueMultiplier: 1 };
+    },
+  },
+  {
+    key: "initialInvestment",
+    label: "Inversión inicial",
+    apply: (assumptions, factor, modeKey) => {
+      const profile = assumptions.modeProfiles?.[modeKey];
+      const investment = asNumber(profile?.initialInvestment);
+      if (!profile || investment === null) return null;
+      return {
+        assumptions: { ...assumptions, modeProfiles: { ...assumptions.modeProfiles, [modeKey]: { ...profile, initialInvestment: investment * factor } } },
+        revenueMultiplier: 1,
+      };
+    },
+  },
+  {
+    key: "annualOperatingCost",
+    label: "Coste operativo anual",
+    apply: (assumptions, factor, modeKey) => {
+      const profile = assumptions.modeProfiles?.[modeKey];
+      const cost = asNumber(profile?.annualOperatingCost);
+      if (!profile || cost === null) return null;
+      return {
+        assumptions: { ...assumptions, modeProfiles: { ...assumptions.modeProfiles, [modeKey]: { ...profile, annualOperatingCost: cost * factor } } },
+        revenueMultiplier: 1,
+      };
+    },
+  },
+  {
+    key: "discountRate",
+    label: "Tasa de descuento",
+    apply: (assumptions, factor) => {
+      const discount = asNumber(assumptions.discountRatePct);
+      const terminalGrowth = asNumber(assumptions.terminalGrowthPct);
+      if (discount === null) return null;
+      const adjusted = discount * factor;
+      // Un descuento por debajo del crecimiento terminal rompe la perpetuidad: se descarta la palanca.
+      if (terminalGrowth !== null && adjusted <= terminalGrowth) return null;
+      return { assumptions: { ...assumptions, discountRatePct: adjusted }, revenueMultiplier: 1 };
+    },
+  },
+  {
+    key: "fxRate",
+    label: "Tipo de cambio",
+    apply: (assumptions, factor) => {
+      const currencies = resolveCurrencies(assumptions);
+      if (!currencies.fxRequired || currencies.fxRate === null) return null;
+      return { assumptions: { ...assumptions, fxRateToReportingCurrency: currencies.fxRate * factor }, revenueMultiplier: 1 };
+    },
+  },
+  {
+    key: "taxRate",
+    label: "Tasa fiscal",
+    apply: (assumptions, factor) => {
+      const taxRate = asNumber(assumptions.taxRatePct);
+      if (taxRate === null) return null;
+      return { assumptions: { ...assumptions, taxRatePct: Math.max(0, Math.min(100, taxRate * factor)) }, revenueMultiplier: 1 };
+    },
+  },
+];
+
+function buildTornado(
+  assumptions: FinancialAssumptions | undefined,
+  baseCase: FinancialCaseResult,
+  horizonYears: number,
+  deltaPct: number,
+): FinancialResult["tornado"] {
+  const provided = assumptions ?? {};
+  const selected = baseCase.alternatives
+    .filter((alternative) => alternative.status === "ok" && alternative.npv !== null && alternative.economicModel !== "cost_only")
+    .sort((a, b) => (b.npv ?? -Infinity) - (a.npv ?? -Infinity))[0];
+  if (!selected) return { modeKey: null, mode: null, baseNpv: null, deltaPct, levers: [] };
+
+  const modeOption: ModeForFinance = { key: selected.key, mode: selected.mode };
+  const npvFor = (factor: number, lever: (typeof tornadoLevers)[number]) => {
+    const variant = lever.apply(provided, factor, selected.key);
+    if (!variant) return null;
+    const result = evaluateFinancialCase(variant.assumptions, [modeOption], horizonYears, variant.revenueMultiplier);
+    const alternative = result.alternatives[0];
+    return alternative?.status === "ok" ? alternative.npv : null;
+  };
+
+  const levers = tornadoLevers
+    .map((lever): TornadoEntry | null => {
+      const down = npvFor(1 - deltaPct / 100, lever);
+      const up = npvFor(1 + deltaPct / 100, lever);
+      if (down === null || up === null) return null;
+      const lowNpv = Math.min(down, up);
+      const highNpv = Math.max(down, up);
+      return { key: lever.key, label: lever.label, deltaPct, lowNpv: round(lowNpv), highNpv: round(highNpv), swing: round(highNpv - lowNpv) };
+    })
+    .filter((entry): entry is TornadoEntry => entry !== null)
+    .sort((a, b) => (b.swing ?? 0) - (a.swing ?? 0));
+
+  return { modeKey: selected.key, mode: selected.mode, baseNpv: selected.npv, deltaPct, levers };
+}
+
 export function evaluateFinancials(
   assumptions: FinancialAssumptions | undefined,
   modeOptions: ModeForFinance[],
   horizonYears: number,
+  options?: { tornadoDeltaPct?: number },
 ): FinancialResult {
   const baseCase = evaluateFinancialCase(assumptions, modeOptions, horizonYears);
   const scenarios = scenarioDefinition.map((definition) => evaluateSensitivityScenario(definition, assumptions, modeOptions, horizonYears));
-  return { ...baseCase, scenarios };
+  const deltaPct = options?.tornadoDeltaPct && options.tornadoDeltaPct > 0 ? options.tornadoDeltaPct : 10;
+  const tornado = buildTornado(assumptions, baseCase, horizonYears, deltaPct);
+  return { ...baseCase, scenarios, tornado };
 }
 
 export function recommendInvestmentAction(
@@ -451,15 +766,22 @@ export function recommendInvestmentAction(
   thresholds?: InvestmentThresholds,
 ): InvestmentRecommendation {
   const policy: InvestmentThresholds = { ...defaultInvestmentThresholds, ...thresholds };
-  const validAlternatives = financial.alternatives.filter((alternative) => alternative.status === "ok" && alternative.npv !== null);
-  const selected = validAlternatives.sort((a, b) => (b.npv ?? -Infinity) - (a.npv ?? -Infinity) || (b.roiPct ?? -Infinity) - (a.roiPct ?? -Infinity))[0] ?? null;
+  const roiBasis: RoiBasis = policy.roiBasis ?? "operating_horizon";
+  const roiBasisLabel = roiBasis === "including_terminal" ? "ROI incluyendo valor terminal" : "ROI sobre flujo del horizonte";
+  const roiOf = (alternative: FinancialModeResult | null) =>
+    alternative === null ? null : roiBasis === "including_terminal" ? alternative.roiIncludingTerminalPct : alternative.roiPct;
+  // La oficina de representación no compite por NPV: su valor es la opción que abre, no su flujo.
+  const validAlternatives = financial.alternatives.filter(
+    (alternative) => alternative.status === "ok" && alternative.npv !== null && alternative.economicModel !== "cost_only",
+  );
+  const selected = validAlternatives.sort((a, b) => (b.npv ?? -Infinity) - (a.npv ?? -Infinity) || ((roiOf(b) ?? -Infinity) - (roiOf(a) ?? -Infinity)))[0] ?? null;
   const base = {
     selectedMode: selected?.mode ?? null,
     selectedModeKey: selected?.key ?? null,
     evaluatedMetrics: {
       riskAdjusted,
       confidence,
-      roiPct: selected?.roiPct ?? null,
+      roiPct: roiOf(selected),
       npv: selected?.npv ?? null,
       paybackYear: selected?.paybackYear ?? null,
       initialInvestment: selected?.initialInvestment ?? null,
@@ -473,17 +795,26 @@ export function recommendInvestmentAction(
   if (!selected) missing.push("una alternativa de entrada con flujo de caja completo y valor terminal válido");
   const policyCurrency = policy.currency?.trim().toUpperCase();
   if (policyCurrency && financial.reportingCurrency && policyCurrency !== financial.reportingCurrency) missing.push(`la moneda de umbrales (${policyCurrency}) debe coincidir con la moneda de reporte (${financial.reportingCurrency})`);
+  /**
+   * Una cobertura de evidencia insuficiente no es un veredicto económico negativo: es la
+   * ausencia de base para emitir veredicto. Antes degradaba a «Descartar», lo que hacía
+   * indistinguible un mercado malo de un mercado sin documentar.
+   */
+  const minConfidence = policy.minConfidence ?? 60;
+  if (confidence < minConfidence) {
+    missing.push(`cobertura de evidencia ${confidence}% frente al mínimo exigido ${minConfidence}%: documente los juicios cualitativos y complete los indicadores públicos antes de decidir`);
+  }
   if (missing.length) {
-    return { ...base, action: "insufficient_data", label: "Completar evidencia", summary: "No se emite una decisión de inversión porque faltan datos financieros o existe una inconsistencia de moneda.", reasons: missing };
+    return { ...base, action: "insufficient_data", label: "Completar evidencia", summary: "No se emite una decisión de inversión porque falta evidencia, faltan datos financieros o existe una inconsistencia de moneda.", reasons: missing };
   }
 
   const metrics = base.evaluatedMetrics;
   const investmentLimitPass = policy.testMaxInitialInvestment === null || policy.testMaxInitialInvestment === undefined || (metrics.initialInvestment ?? Infinity) <= policy.testMaxInitialInvestment;
   const advancePasses = [
     { pass: riskAdjusted >= (policy.advanceMinRiskAdjusted ?? 65), reason: `Puntuación ajustada por riesgo ${riskAdjusted}/100 frente al mínimo de avanzar ${policy.advanceMinRiskAdjusted}/100.` },
-    { pass: confidence >= (policy.minConfidence ?? 60), reason: `Confianza de evidencia ${confidence}% frente al mínimo ${policy.minConfidence}%.` },
+    { pass: confidence >= minConfidence, reason: `Cobertura de evidencia ${confidence}% frente al mínimo ${minConfidence}%.` },
     { pass: (metrics.npv ?? -Infinity) >= (policy.advanceMinNpv ?? 0), reason: `NPV ${metrics.npv} frente al mínimo de avanzar ${policy.advanceMinNpv}.` },
-    { pass: (metrics.roiPct ?? -Infinity) >= (policy.advanceMinRoiPct ?? 20), reason: `ROI ${metrics.roiPct}% frente al mínimo de avanzar ${policy.advanceMinRoiPct}%.` },
+    { pass: (metrics.roiPct ?? -Infinity) >= (policy.advanceMinRoiPct ?? 20), reason: `${roiBasisLabel} ${metrics.roiPct}% frente al mínimo de avanzar ${policy.advanceMinRoiPct}%.` },
     { pass: metrics.paybackYear !== null && metrics.paybackYear <= (policy.advanceMaxPaybackYears ?? 5), reason: `Recuperación ${metrics.paybackYear === null ? "no alcanzada" : `año ${metrics.paybackYear}`} frente al máximo de avanzar año ${policy.advanceMaxPaybackYears}.` },
     { pass: investmentLimitPass, reason: policy.testMaxInitialInvestment === null || policy.testMaxInitialInvestment === undefined ? "No hay límite de inversión para prueba." : `Inversión inicial ${metrics.initialInvestment} frente al límite ${policy.testMaxInitialInvestment}.` },
   ];
@@ -493,9 +824,9 @@ export function recommendInvestmentAction(
 
   const testPasses = [
     { pass: riskAdjusted >= (policy.testMinRiskAdjusted ?? 50), reason: `Puntuación ajustada por riesgo ${riskAdjusted}/100 frente al mínimo de prueba ${policy.testMinRiskAdjusted}/100.` },
-    { pass: confidence >= (policy.minConfidence ?? 60), reason: `Confianza de evidencia ${confidence}% frente al mínimo ${policy.minConfidence}%.` },
+    { pass: confidence >= minConfidence, reason: `Cobertura de evidencia ${confidence}% frente al mínimo ${minConfidence}%.` },
     { pass: (metrics.npv ?? -Infinity) >= (policy.testMinNpv ?? 0), reason: `NPV ${metrics.npv} frente al mínimo de prueba ${policy.testMinNpv}.` },
-    { pass: (metrics.roiPct ?? -Infinity) >= (policy.testMinRoiPct ?? 0), reason: `ROI ${metrics.roiPct}% frente al mínimo de prueba ${policy.testMinRoiPct}%.` },
+    { pass: (metrics.roiPct ?? -Infinity) >= (policy.testMinRoiPct ?? 0), reason: `${roiBasisLabel} ${metrics.roiPct}% frente al mínimo de prueba ${policy.testMinRoiPct}%.` },
     { pass: investmentLimitPass, reason: policy.testMaxInitialInvestment === null || policy.testMaxInitialInvestment === undefined ? "No hay límite de inversión para prueba." : `Inversión inicial ${metrics.initialInvestment} frente al límite ${policy.testMaxInitialInvestment}.` },
   ];
   if (testPasses.every((criterion) => criterion.pass)) {

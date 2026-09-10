@@ -31,7 +31,7 @@ describe("evaluateFinancials", () => {
     expect(alternative.roiPct).toBe(90);
     expect(alternative.terminalValue).toBe(100.75);
     expect(alternative.npv).toBe(81.04);
-    expect(alternative.paybackYear).toBe(2);
+    expect(alternative.paybackYear).toBe(1.88);
   });
 
   it("converts local flows to a reporting currency when an FX rate is provided", () => {
@@ -98,5 +98,146 @@ describe("recommendInvestmentAction", () => {
   it("does not issue an investment decision with incomplete financial evidence", () => {
     const incomplete = evaluateFinancials({ currency: "USD", tamYearOne: 1 }, [{ key: "greenfield", mode: "Filial propia / greenfield" }], 3);
     expect(recommendInvestmentAction(incomplete, 90, 90).action).toBe("insufficient_data");
+  });
+});
+
+describe("modelos económicos por modo", () => {
+  const marketOnly = {
+    currency: "USD",
+    tamYearOne: 1000,
+    annualMarketGrowthPct: 0,
+    samPct: 50,
+    somPctYearOne: 10,
+    somPctHorizon: 10,
+    operatingMarginPct: 20,
+    taxRatePct: 20,
+    workingCapitalPctRevenue: 10,
+    discountRatePct: 10,
+    terminalGrowthPct: 2,
+  } as const;
+
+  it("valora una licencia por royalty y no como una filial propia", () => {
+    const assumptions = {
+      ...marketOnly,
+      modeProfiles: {
+        greenfield: { initialInvestment: 10, annualOperatingCost: 0, revenueCapturePct: 100 },
+        licensing: { initialInvestment: 10, annualOperatingCost: 0, revenueCapturePct: 100, royaltyRatePct: 7, upfrontFee: 5, componentMarginPct: 1 },
+      },
+    };
+    const result = evaluateFinancials(assumptions, [
+      { key: "greenfield", mode: "Filial propia / greenfield" },
+      { key: "licensing", mode: "Licencia o franquicia" },
+    ], 3);
+    const greenfield = result.alternatives.find((alternative) => alternative.key === "greenfield")!;
+    const licensing = result.alternatives.find((alternative) => alternative.key === "licensing")!;
+
+    expect(greenfield.economicModel).toBe("operator");
+    expect(licensing.economicModel).toBe("royalty");
+    // Ventas del licenciatario 50; royalty 7% + margen de componentes 1% = 4, más el pago inicial de 5 en el año 1.
+    expect(licensing.annualProjection[0].revenue).toBe(9);
+    expect(licensing.annualProjection[1].revenue).toBe(4);
+    // Una licencia no inmoviliza capital de trabajo propio.
+    expect(licensing.annualProjection.every((year) => year.changeInWorkingCapital === 0)).toBe(true);
+    expect(licensing.npv).not.toBe(greenfield.npv);
+    // El pago inicial no se perpetúa en el valor terminal.
+    expect(licensing.terminalValue).toBeLessThan(greenfield.terminalValue!);
+  });
+
+  it("aplica el margen de canal a un distribuidor", () => {
+    const result = evaluateFinancials({
+      ...marketOnly,
+      modeProfiles: { distributor: { initialInvestment: 2, annualOperatingCost: 0, revenueCapturePct: 100, channelMarginPct: 30 } },
+    }, [{ key: "distributor", mode: "Agente o distribuidor" }], 3);
+    const distributor = result.alternatives[0];
+    expect(distributor.economicModel).toBe("channel");
+    expect(distributor.annualProjection[0].revenue).toBe(15);
+  });
+
+  it("trata la oficina de representación como coste sin valor terminal", () => {
+    const result = evaluateFinancials({
+      ...marketOnly,
+      modeProfiles: { office: { initialInvestment: 3, annualOperatingCost: 4, revenueCapturePct: 0 } },
+    }, [{ key: "office", mode: "Oficina de representación / observatorio" }], 3);
+    const office = result.alternatives[0];
+    expect(office.economicModel).toBe("cost_only");
+    expect(office.status).toBe("ok");
+    expect(office.terminalValue).toBeNull();
+    expect(office.npv).toBeLessThan(0);
+    // No compite por NPV: la decisión de inversión no puede seleccionarla.
+    expect(recommendInvestmentAction(result, 90, 90).selectedModeKey).not.toBe("office");
+  });
+});
+
+describe("escudo fiscal, rampa y bases de retorno", () => {
+  const lossMaking = {
+    currency: "USD",
+    tamYearOne: 1000,
+    annualMarketGrowthPct: 0,
+    samPct: 50,
+    somPctYearOne: 2,
+    somPctHorizon: 20,
+    operatingMarginPct: 20,
+    taxRatePct: 25,
+    workingCapitalPctRevenue: 0,
+    discountRatePct: 10,
+    terminalGrowthPct: 2,
+    modeProfiles: { greenfield: { initialInvestment: 10, annualOperatingCost: 3, revenueCapturePct: 100 } },
+  } as const;
+
+  it("compensa pérdidas iniciales antes de tributar", () => {
+    const withShield = evaluateFinancials(lossMaking, [{ key: "greenfield", mode: "Filial propia / greenfield" }], 4).alternatives[0];
+    const withoutShield = evaluateFinancials({ ...lossMaking, taxLossCarryforward: false }, [{ key: "greenfield", mode: "Filial propia / greenfield" }], 4).alternatives[0];
+
+    expect(withShield.annualProjection[0].operatingProfit).toBeLessThan(0);
+    expect(withShield.annualProjection[0].taxes).toBe(0);
+    // La base imponible del primer año rentable queda reducida por las pérdidas acumuladas.
+    const firstProfitable = withShield.annualProjection.find((year) => year.operatingProfit > 0)!;
+    expect(firstProfitable.taxableProfit).toBeLessThan(firstProfitable.operatingProfit);
+    expect(withShield.npv!).toBeGreaterThan(withoutShield.npv!);
+  });
+
+  it("respeta los extremos de la rampa en curva en S y difiere del reparto lineal", () => {
+    const linear = evaluateFinancials(lossMaking, [{ key: "greenfield", mode: "Filial propia / greenfield" }], 5).alternatives[0];
+    const sCurve = evaluateFinancials({ ...lossMaking, somRampShape: "s_curve" }, [{ key: "greenfield", mode: "Filial propia / greenfield" }], 5).alternatives[0];
+
+    expect(sCurve.annualProjection[0].revenue).toBe(linear.annualProjection[0].revenue);
+    expect(sCurve.annualProjection[4].revenue).toBe(linear.annualProjection[4].revenue);
+    expect(sCurve.annualProjection[1].revenue).toBeLessThan(linear.annualProjection[1].revenue);
+  });
+
+  it("exige la serie completa cuando la rampa es manual", () => {
+    const incomplete = evaluateFinancials({ ...lossMaking, somRampShape: "manual", somPctByYear: [2, null, 20] }, [{ key: "greenfield", mode: "Filial propia / greenfield" }], 3);
+    expect(incomplete.status).toBe("insufficient_data");
+  });
+
+  it("publica las dos bases de retorno y compara contra la declarada", () => {
+    const result = evaluateFinancials(lossMaking, [{ key: "greenfield", mode: "Filial propia / greenfield" }], 4);
+    const alternative = result.alternatives[0];
+    expect(alternative.roiPct).not.toBe(alternative.roiIncludingTerminalPct);
+    expect(alternative.valueMultiple).toBeGreaterThan(0);
+
+    const horizonBasis = recommendInvestmentAction(result, 90, 90, { roiBasis: "operating_horizon", advanceMinRoiPct: 20, advanceMaxPaybackYears: 10 });
+    const terminalBasis = recommendInvestmentAction(result, 90, 90, { roiBasis: "including_terminal", advanceMinRoiPct: 20, advanceMaxPaybackYears: 10 });
+    expect(horizonBasis.evaluatedMetrics.roiPct).toBe(alternative.roiPct);
+    expect(terminalBasis.evaluatedMetrics.roiPct).toBe(alternative.roiIncludingTerminalPct);
+  });
+
+  it("ordena las palancas del tornado por amplitud de NPV", () => {
+    const result = evaluateFinancials(lossMaking, [{ key: "greenfield", mode: "Filial propia / greenfield" }], 4, { tornadoDeltaPct: 15 });
+    expect(result.tornado.modeKey).toBe("greenfield");
+    expect(result.tornado.deltaPct).toBe(15);
+    expect(result.tornado.levers.length).toBeGreaterThan(3);
+    const swings = result.tornado.levers.map((lever) => lever.swing ?? 0);
+    expect([...swings].sort((a, b) => b - a)).toEqual(swings);
+    // La divisa no es palanca cuando moneda local y de reporte coinciden.
+    expect(result.tornado.levers.some((lever) => lever.key === "fxRate")).toBe(false);
+  });
+
+  it("no emite veredicto cuando la cobertura de evidencia es insuficiente", () => {
+    const result = evaluateFinancials(lossMaking, [{ key: "greenfield", mode: "Filial propia / greenfield" }], 4);
+    const recommendation = recommendInvestmentAction(result, 90, 30, { minConfidence: 60 });
+    expect(recommendation.action).toBe("insufficient_data");
+    expect(recommendation.label).toBe("Completar evidencia");
+    expect(recommendation.reasons.join(" ")).toContain("cobertura de evidencia");
   });
 });
