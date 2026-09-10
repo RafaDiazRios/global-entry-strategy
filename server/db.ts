@@ -84,7 +84,72 @@ export async function saveStrategyScenario(values: InsertStrategyScenario) {
 export async function listStrategyScenarios(userId: number) {
   const db = await getDb();
   if (!db) return [];
-  return db.select({ id: strategyScenarios.id, name: strategyScenarios.name, companyName: strategyScenarios.companyName, homeCountry: strategyScenarios.homeCountry, industry: strategyScenarios.industry, businessModel: strategyScenarios.businessModel, objective: strategyScenarios.objective, horizonYears: strategyScenarios.horizonYears, sourceRefreshAt: strategyScenarios.sourceRefreshAt, createdAt: strategyScenarios.createdAt, updatedAt: strategyScenarios.updatedAt }).from(strategyScenarios).where(eq(strategyScenarios.userId, userId)).orderBy(desc(strategyScenarios.updatedAt));
+  return db.select({ id: strategyScenarios.id, name: strategyScenarios.name, companyName: strategyScenarios.companyName, homeCountry: strategyScenarios.homeCountry, industry: strategyScenarios.industry, businessModel: strategyScenarios.businessModel, objective: strategyScenarios.objective, horizonYears: strategyScenarios.horizonYears, caseId: strategyScenarios.caseId, sourceRefreshAt: strategyScenarios.sourceRefreshAt, createdAt: strategyScenarios.createdAt, updatedAt: strategyScenarios.updatedAt }).from(strategyScenarios).where(eq(strategyScenarios.userId, userId)).orderBy(desc(strategyScenarios.updatedAt));
+}
+
+/* ------------------------------------------------------------------------------------ */
+/* Archivo de escenarios: abrir, actualizar, duplicar y borrar                           */
+/* ------------------------------------------------------------------------------------ */
+
+async function ensureScenarioRow(userId: number, scenarioId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const rows = await db.select().from(strategyScenarios).where(and(eq(strategyScenarios.id, scenarioId), eq(strategyScenarios.userId, userId))).limit(1);
+  const row = rows[0];
+  if (!row) throw new Error("Escenario no encontrado o sin acceso.");
+  return { db, row };
+}
+
+/** Devuelve el escenario entero, con los dos documentos JSON, para volver a abrirlo. */
+export async function getStrategyScenario(userId: number, scenarioId: number) {
+  const { row } = await ensureScenarioRow(userId, scenarioId);
+  return row;
+}
+
+export async function updateStrategyScenario(
+  userId: number,
+  scenarioId: number,
+  values: Partial<{ name: string; companyName: string; homeCountry: string; industry: string; businessModel: string; objective: InsertStrategyScenario["objective"]; horizonYears: number; caseId: number | null; inputJson: unknown; resultJson: unknown; sourceRefreshAt: Date }>
+) {
+  const { db } = await ensureScenarioRow(userId, scenarioId);
+  await db.update(strategyScenarios).set({ ...values, updatedAt: new Date() }).where(eq(strategyScenarios.id, scenarioId));
+  return getStrategyScenario(userId, scenarioId);
+}
+
+/**
+ * Duplicar copia el análisis pero no sus puertas de decisión: una revisión aprobada lo fue
+ * sobre unos supuestos concretos y no se hereda al clonarlos.
+ */
+export async function duplicateStrategyScenario(userId: number, scenarioId: number, name: string) {
+  const { db, row } = await ensureScenarioRow(userId, scenarioId);
+  const inserted = await db.insert(strategyScenarios).values({
+    userId,
+    name,
+    companyName: row.companyName,
+    homeCountry: row.homeCountry,
+    industry: row.industry,
+    businessModel: row.businessModel,
+    objective: row.objective,
+    horizonYears: row.horizonYears,
+    caseId: row.caseId,
+    inputJson: row.inputJson,
+    resultJson: row.resultJson,
+    sourceRefreshAt: row.sourceRefreshAt,
+  }).returning({ id: strategyScenarios.id });
+  return inserted[0].id;
+}
+
+/** Al borrar un escenario se van con él sus puertas de decisión y los hitos de estas. */
+export async function deleteStrategyScenario(userId: number, scenarioId: number) {
+  const { db } = await ensureScenarioRow(userId, scenarioId);
+  const approvals = await db.select({ id: strategyApprovals.id }).from(strategyApprovals).where(eq(strategyApprovals.scenarioId, scenarioId));
+  const approvalIds = approvals.map((approval) => approval.id);
+  if (approvalIds.length) {
+    await db.delete(strategyApprovalMilestones).where(inArray(strategyApprovalMilestones.approvalId, approvalIds));
+    await db.delete(strategyApprovals).where(eq(strategyApprovals.scenarioId, scenarioId));
+  }
+  await db.delete(strategyScenarios).where(eq(strategyScenarios.id, scenarioId));
+  return { deletedApprovals: approvalIds.length };
 }
 
 export async function listStrategyScenariosForRefresh() {

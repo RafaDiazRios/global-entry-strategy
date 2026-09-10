@@ -432,6 +432,51 @@ export const appRouter = router({
 
     listScenarios: protectedProcedure.query(({ ctx }) => db.listStrategyScenarios(ctx.user.id)),
 
+    /** Abrir un escenario guardado: devuelve los dos documentos para rehidratar el formulario. */
+    getScenario: protectedProcedure
+      .input(z.object({ scenarioId: z.number().int().positive() }))
+      .query(({ ctx, input }) => db.getStrategyScenario(ctx.user.id, input.scenarioId)),
+
+    /**
+     * Actualizar reevalúa siempre. Guardar el resultado que traiga el cliente permitiría que
+     * un escenario quedara con supuestos nuevos y conclusiones viejas.
+     */
+    updateScenario: protectedProcedure
+      .input(z.object({
+        scenarioId: z.number().int().positive(),
+        name: z.string().min(2).max(180).optional(),
+        caseId: z.number().int().positive().nullable().optional(),
+        evaluation: evaluationSchema.optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const values: Parameters<typeof db.updateStrategyScenario>[2] = {};
+        if (input.name !== undefined) values.name = input.name;
+        if (input.caseId !== undefined) values.caseId = input.caseId;
+        let result: unknown = null;
+        if (input.evaluation) {
+          result = evaluateStrategy(input.evaluation as EvaluationInput);
+          values.companyName = input.evaluation.companyName;
+          values.homeCountry = input.evaluation.homeCountry;
+          values.industry = input.evaluation.industry;
+          values.businessModel = input.evaluation.businessModel;
+          values.objective = input.evaluation.objective as EntryObjective;
+          values.horizonYears = input.evaluation.horizonYears;
+          values.inputJson = input.evaluation;
+          values.resultJson = result;
+          values.sourceRefreshAt = new Date();
+        }
+        const row = await db.updateStrategyScenario(ctx.user.id, input.scenarioId, values);
+        return { scenario: row, result: result ?? row?.resultJson ?? null };
+      }),
+
+    duplicateScenario: protectedProcedure
+      .input(z.object({ scenarioId: z.number().int().positive(), name: z.string().min(2).max(180) }))
+      .mutation(({ ctx, input }) => db.duplicateStrategyScenario(ctx.user.id, input.scenarioId, input.name)),
+
+    deleteScenario: protectedProcedure
+      .input(z.object({ scenarioId: z.number().int().positive() }))
+      .mutation(({ ctx, input }) => db.deleteStrategyScenario(ctx.user.id, input.scenarioId)),
+
     listApprovals: protectedProcedure
       .input(z.object({ scenarioId: z.number().int().positive() }))
       .query(({ ctx, input }) => db.listApprovalWorkflows(ctx.user.id, input.scenarioId)),

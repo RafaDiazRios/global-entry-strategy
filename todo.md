@@ -116,6 +116,13 @@ compatible. Las migraciones ya están aplicadas: no hay que ejecutar nada contra
 la herramienta usa el índice de solapamiento y lo dice en pantalla. El selector de convención está
 preparado en el motor: añadir la oficial es una entrada más en `CONVENTIONS`.
 
+### Archivo de escenarios
+
+- [x] Abrir un escenario guardado y rehidratar el formulario entero: perfil, países, calibración con sus justificaciones, evaluación del capítulo 6, datos de mercado, caso económico, umbrales y pesos.
+- [x] Actualizar el escenario abierto, que reevalúa en el servidor para que no queden supuestos nuevos con conclusiones viejas, y «Guardar como nuevo» para bifurcar.
+- [x] Duplicar, renombrar, borrar y buscar. Al borrar se van con él sus puertas de decisión y los hitos; al duplicar no se heredan, porque se aprobaron sobre los supuestos del original.
+- [x] El escenario queda vinculado al caso activo mediante `caseId`, que existía en la base desde la Fase 5 y no se usaba.
+
 ## Fases siguientes del blueprint v2
 - [ ] Fase 4 — capítulos 7 y 8: fases de ventana, ritmo, opción real, build-borrow-buy, cuatro encajes, socio, integración y modelos económicos de adquisición y JV.
 - [ ] Fase 6 — motor de coherencia, índice de exhaustividad e informe ampliado.

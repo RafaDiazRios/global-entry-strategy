@@ -20,6 +20,7 @@ import { countryCatalog } from "@shared/domain/countries";
 import { CountryAssessmentPanel, assessmentProgress, emptyAssessment, type CountryAssessmentState } from "@/components/CountryAssessmentPanel";
 import { CaseWorkspace } from "@/components/CaseWorkspace";
 import { GlobalStrategyPanel } from "@/components/GlobalStrategyPanel";
+import { ScenarioArchive } from "@/components/ScenarioArchive";
 
 type Objective = "market" | "resources" | "learning" | "coordination";
 type Status = "live" | "partial" | "unavailable";
@@ -203,6 +204,10 @@ export default function Home() {
   const fetchGovernanceData = trpc.strategy.fetchGovernanceData.useMutation();
   const evaluation = trpc.strategy.evaluate.useMutation();
   const saveScenario = trpc.strategy.saveScenario.useMutation();
+  const updateScenario = trpc.strategy.updateScenario.useMutation();
+  const duplicateScenario = trpc.strategy.duplicateScenario.useMutation();
+  const deleteScenario = trpc.strategy.deleteScenario.useMutation();
+  const trpcUtils = trpc.useUtils();
   const proposeBlock = trpc.ai.proposeBlock.useMutation();
   const critiqueBlock = trpc.ai.critique.useMutation();
 
@@ -507,10 +512,73 @@ export default function Home() {
     } catch (error) { toast.error(error instanceof Error ? error.message : "No se pudo generar la evaluación."); }
   }
 
+  /**
+   * Rehidratar un escenario guardado.
+   *
+   * Lo guardado es la entrada completa de la evaluación, así que abrir un escenario es
+   * repartir ese documento por el estado del formulario. La región de cada país no viaja en
+   * la entrada —no interviene en el cálculo— y se recupera del catálogo.
+   */
+  function applyScenario(scenarioId: number, name: string, input: ReturnType<typeof buildInput>, savedResult: Evaluation | null, linkedCaseId: number | null) {
+    setScenarioName(name);
+    setCompanyName(input.companyName ?? "");
+    setHomeCountry(input.homeCountry ?? "");
+    setIndustry(input.industry ?? "");
+    setBusinessModel(input.businessModel ?? "");
+    setValueProposition(input.valueProposition ?? "");
+    setObjective((input.objective ?? "market") as Objective);
+    setHorizonYears(String(input.horizonYears ?? 3));
+
+    const restored: Candidate[] = (input.countryInputs ?? []).map((country) => ({
+      code: country.code,
+      name: country.name,
+      region: countryCatalog.find((entry) => entry.code === country.code)?.region ?? "",
+      calibration: country.calibration,
+      notes: country.calibrationNotes ?? {},
+      assessment: country.assessment ?? { ...emptyAssessment },
+    }));
+    setCandidates(restored);
+    setActiveCountry(restored[0]?.code);
+    setComparisonCodes(restored.slice(0, 3).map((candidate) => candidate.code));
+    setMarketData(input.marketData ?? {});
+    setFinancialByCountry(input.financialByCountry ?? {});
+    if (input.investmentThresholds) setInvestmentThresholds(input.investmentThresholds);
+    if (input.weights) setWeights(input.weights);
+
+    // Los filtros de cribado son del momento, no del escenario: se dejan abiertos para no
+    // esconder países que el análisis guardado sí incluía.
+    setPopMin("0");
+    setGdpMin("0");
+    setGrowthMin("-100");
+    setExcludedCodes("");
+
+    setResult(savedResult);
+    setSavedScenarioId(scenarioId);
+    if (linkedCaseId !== null) setCaseId(linkedCaseId);
+    setActiveTab(savedResult ? "decision" : "calibrate");
+  }
+
+  async function updateSavedScenario() {
+    if (savedScenarioId === null) return;
+    if (!formValid) { toast.error("El escenario está incompleto: complete el perfil y deje al menos un país tras el filtro."); return; }
+    try {
+      const updated = await updateScenario.mutateAsync({
+        scenarioId: savedScenarioId,
+        name: scenarioName.trim() || "Análisis sin título",
+        caseId: caseId,
+        evaluation: buildInput(),
+      });
+      setResult(updated.result as Evaluation);
+      trpcUtils.strategy.listScenarios.invalidate();
+      toast.success("Escenario actualizado y reevaluado con los supuestos de ahora.");
+    } catch (error) { toast.error(error instanceof Error ? error.message : "No se pudo actualizar el escenario."); }
+  }
+
   async function persistScenario() {
     if (!formValid) { toast.error("No hay un escenario completo que guardar."); return; }
     try {
       const saved = await saveScenario.mutateAsync({ name: scenarioName.trim() || "Análisis sin título", evaluation: buildInput() });
+      if (caseId !== null) await updateScenario.mutateAsync({ scenarioId: saved.id, caseId });
       setResult(saved.result as Evaluation);
       setSavedScenarioId(saved.id);
       scenariosQuery.refetch();
@@ -554,7 +622,16 @@ export default function Home() {
           <div className="header-actions">
             <div className="scenario-name"><Label htmlFor="scenario">Escenario</Label><Input id="scenario" value={scenarioName} onChange={(event) => setScenarioName(event.target.value)} /></div>
             <Button variant="outline" onClick={exportPdfReport} disabled={!result}><FileDown className="mr-2 h-4 w-4" /> PDF</Button>
-            <Button onClick={persistScenario} disabled={saveScenario.isPending || !formValid}><Save className="mr-2 h-4 w-4" /> Guardar</Button>
+            <div className="flex items-center gap-2">
+              {savedScenarioId !== null && (
+                <Button onClick={updateSavedScenario} disabled={updateScenario.isPending || !formValid}>
+                  {updateScenario.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />} Actualizar
+                </Button>
+              )}
+              <Button variant={savedScenarioId === null ? "default" : "outline"} onClick={persistScenario} disabled={saveScenario.isPending || !formValid}>
+                <Save className="mr-2 h-4 w-4" /> {savedScenarioId === null ? "Guardar" : "Guardar como nuevo"}
+              </Button>
+            </div>
           </div>
         </header>
 
@@ -670,7 +747,11 @@ export default function Home() {
           </TabsContent>
         </Tabs>
 
-        <section className="history-strip"><div><div className="step-tag">HISTORIAL</div><h2>Escenarios guardados</h2></div><div className="history-list">{!isAuthenticated ? <span>Inicie sesión para conservar análisis.</span> : scenariosQuery.isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : scenariosQuery.data?.length ? scenariosQuery.data.slice(0, 4).map((scenario) => <div className="history-item" key={scenario.id}><div><strong>{scenario.name}</strong><span>{scenario.companyName} · {scenario.industry}</span></div><Badge variant="outline">{scenario.objective}</Badge></div>) : <span>Los análisis guardados aparecerán aquí.</span>}</div></section>
+        <ScenarioArchive
+          isAuthenticated={isAuthenticated}
+          currentScenarioId={savedScenarioId}
+          onOpen={(scenario) => applyScenario(scenario.id, scenario.name, scenario.inputJson as ReturnType<typeof buildInput>, (scenario.resultJson as Evaluation | null) ?? null, scenario.caseId)}
+        />
       </div>
     </DashboardLayout>
   );
