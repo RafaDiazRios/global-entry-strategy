@@ -80,7 +80,7 @@ El botón **PDF** genera localmente un informe detallado que incluye mandato, ta
 
 - Node.js 22+
 - pnpm 10+
-- Una base de datos MySQL 8 o TiDB
+- Una base de datos PostgreSQL 15 o superior (Supabase, Neon o la que prefiera)
 - Credenciales de OAuth de Google para el acceso
 - Opcional: una API compatible con OpenAI para el copiloto, y un bucket S3 o compatible para los PDF de casos
 
@@ -145,7 +145,7 @@ La aplicación permite actualización manual en el panel de mercados. También e
 
 ## Despliegue
 
-Servidor Express con MySQL, empaquetado con `Dockerfile`. Se despliega en Railway, Render, Fly.io o un VPS. El acceso es Google OAuth con lista blanca de correos: **si `ALLOWED_EMAILS` está vacío no entra nadie**, para que una instalación a medio configurar quede cerrada y no abierta. Instrucciones paso a paso en [docs/DESPLIEGUE.md](docs/DESPLIEGUE.md).
+Servidor Express con PostgreSQL, empaquetado con `Dockerfile`. Se despliega en Railway, Render, Fly.io o un VPS. El acceso es Google OAuth con lista blanca de correos: **si `ALLOWED_EMAILS` está vacío no entra nadie**, para que una instalación a medio configurar quede cerrada y no abierta. Instrucciones paso a paso en [docs/DESPLIEGUE.md](docs/DESPLIEGUE.md).
 
 ## Límites y principios de gobierno
 

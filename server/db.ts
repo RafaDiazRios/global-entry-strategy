@@ -1,5 +1,6 @@
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/mysql2";
+import { drizzle } from "drizzle-orm/postgres-js";
+import postgres from "postgres";
 import { InsertStrategyScenario, InsertUser, strategyApprovalMilestones, strategyApprovals, strategyCaseDocuments, strategyCases, strategyEvidence, strategyScenarios, users } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
@@ -25,9 +26,25 @@ export type ApprovalWorkflow = {
   milestones: { id: number; approvalId: number; title: string; responsible: string | null; dueAt: Date | null; status: MilestoneStatus; evidence: string | null; createdAt: Date; updatedAt: Date }[];
 };
 
+/**
+ * Conexión a PostgreSQL.
+ *
+ * `prepare: false` es obligatorio a través del pooler en modo transacción de Supabase, que
+ * no admite sentencias preparadas. Con conexión directa solo cuesta un poco de rendimiento,
+ * así que se deja puesto siempre y una variable menos que equivocar al desplegar.
+ */
+function createClient(url: string) {
+  const local = /@(localhost|127\.0\.0\.1)[:/]/.test(url);
+  return postgres(url, {
+    prepare: false,
+    max: 5,
+    ssl: local || /sslmode=/.test(url) ? undefined : "require",
+  });
+}
+
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
-    try { _db = drizzle(process.env.DATABASE_URL); }
+    try { _db = drizzle(createClient(process.env.DATABASE_URL)); }
     catch (error) { console.warn("[Database] Failed to connect:", error); _db = null; }
   }
   return _db;
@@ -47,7 +64,7 @@ export async function upsertUser(user: InsertUser): Promise<void> {
   updateSet.lastSignedIn = values.lastSignedIn;
   if (user.role !== undefined) { values.role = user.role; updateSet.role = user.role; }
 
-  await db.insert(users).values(values).onDuplicateKeyUpdate({ set: updateSet });
+  await db.insert(users).values(values).onConflictDoUpdate({ target: users.openId, set: updateSet });
 }
 
 export async function getUserByOpenId(openId: string) {
@@ -60,8 +77,8 @@ export async function getUserByOpenId(openId: string) {
 export async function saveStrategyScenario(values: InsertStrategyScenario) {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
-  const result = await db.insert(strategyScenarios).values(values);
-  return result[0].insertId;
+  const result = await db.insert(strategyScenarios).values(values).returning({ id: strategyScenarios.id });
+  return result[0].id;
 }
 
 export async function listStrategyScenarios(userId: number) {
@@ -117,8 +134,8 @@ export async function createApprovalWorkflow(input: {
   const db = await ensureScenarioOwnership(input.userId, input.scenarioId);
   const existing = await db.select({ id: strategyApprovals.id }).from(strategyApprovals).where(and(eq(strategyApprovals.userId, input.userId), eq(strategyApprovals.scenarioId, input.scenarioId), eq(strategyApprovals.countryCode, input.countryCode))).limit(1);
   if (existing[0]) return loadApprovalWorkflow(input.userId, existing[0].id);
-  const inserted = await db.insert(strategyApprovals).values({ userId: input.userId, scenarioId: input.scenarioId, countryCode: input.countryCode, countryName: input.countryName, recommendation: input.recommendation, responsible: input.responsible, reviewer: input.reviewer ?? null, reviewAt: input.reviewAt, notes: input.notes ?? null });
-  const approvalId = inserted[0].insertId;
+  const inserted = await db.insert(strategyApprovals).values({ userId: input.userId, scenarioId: input.scenarioId, countryCode: input.countryCode, countryName: input.countryName, recommendation: input.recommendation, responsible: input.responsible, reviewer: input.reviewer ?? null, reviewAt: input.reviewAt, notes: input.notes ?? null }).returning({ id: strategyApprovals.id });
+  const approvalId = inserted[0].id;
   if (input.milestones.length) await db.insert(strategyApprovalMilestones).values(input.milestones.map((milestone) => ({ approvalId, title: milestone.title, responsible: milestone.responsible ?? null, dueAt: milestone.dueAt ?? null, status: milestone.status ?? "pending", evidence: milestone.evidence ?? null })));
   const created = await loadApprovalWorkflow(input.userId, approvalId);
   if (!created) throw new Error("No se pudo crear el flujo de aprobación.");
@@ -204,8 +221,8 @@ export async function createCase(input: { userId: number; title: string; decisio
     industry: input.industry ?? null,
     subIndustry: input.subIndustry ?? null,
     caseYear: input.caseYear ?? null,
-  });
-  return inserted[0].insertId;
+  }).returning({ id: strategyCases.id });
+  return inserted[0].id;
 }
 
 export async function updateCase(userId: number, caseId: number, values: Partial<{ title: string; decisionQuestion: string | null; companyName: string | null; homeCountry: string | null; industry: string | null; subIndustry: string | null; caseYear: number | null }>) {
@@ -236,8 +253,8 @@ export async function addCaseDocument(input: { userId: number; caseId: number; f
     storageKey: input.storageKey ?? null,
     textContent: input.textContent ?? null,
     bytes: input.bytes ?? null,
-  });
-  return inserted[0].insertId;
+  }).returning({ id: strategyCaseDocuments.id });
+  return inserted[0].id;
 }
 
 export async function getCaseDocument(userId: number, documentId: number) {

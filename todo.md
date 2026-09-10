@@ -88,11 +88,19 @@ los botones de IA devuelven error.
 - [x] `Dockerfile`, `.env.example` y guía de despliegue en `docs/DESPLIEGUE.md`.
 - [x] Extracción de texto de PDF en el servidor, que hace verificables las citas también en documentos subidos.
 
+### Base de datos en PostgreSQL
+
+- [x] Esquema y consultas portados de MySQL a PostgreSQL: `drizzle/schema.ts` sobre `pg-core`, cliente `postgres.js` con `prepare: false`, `onConflictDoUpdate` y `returning` en lugar de `insertId`.
+- [x] Las cuatro migraciones de MySQL sustituidas por una inicial de PostgreSQL, idempotente, más una segunda que cierra el acceso público.
+- [x] Índices por `userId`, `caseId` y `approvalId`, y unicidad de país por escenario en las puertas de decisión, que antes solo comprobaba el código.
+- [x] Tablas creadas en Supabase en un esquema propio, `entry_strategy`, sin permisos para los roles `anon` y `authenticated` y con RLS activo sin políticas.
+
 ### Antes de desplegar
 
-Credenciales de Google con el URI de redirección exacto, `DATABASE_URL`, `JWT_SECRET` de al
-menos 32 caracteres y `ALLOWED_EMAILS`. El copiloto necesita además `LLM_API_KEY` y
-`LLM_MODEL`, y los PDF de casos un bucket S3 o compatible.
+Credenciales de Google con el URI de redirección exacto, `DATABASE_URL` con la cadena del
+pooler de sesión de Supabase, `JWT_SECRET` de al menos 32 caracteres y `ALLOWED_EMAILS`. El
+copiloto necesita además `LLM_API_KEY` y `LLM_MODEL`, y los PDF de casos un bucket S3 o
+compatible. Las migraciones ya están aplicadas: no hay que ejecutar nada contra la base.
 
 ## Fases siguientes del blueprint v2
 - [ ] Fase 3 — capítulo 5: ambición global, GRI/GCI, roles de país, posicionamiento, cadena de valor y Transfer-Adapt-Create.
