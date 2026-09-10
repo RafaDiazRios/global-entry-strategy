@@ -2,6 +2,7 @@ import { z } from "zod";
 import { emptyAmbitionInput, type AmbitionInput } from "@shared/domain/globalAmbition";
 import { emptyPositioningInput, type PositioningInput } from "@shared/domain/globalPositioning";
 import { emptyEntryStrategyInput, type EntryStrategyInput } from "@shared/domain/entryStrategy";
+import { emptyPartneringInput, type PartneringInput } from "@shared/domain/partnering";
 
 /**
  * Validación de los bloques del capítulo 5 antes de guardarlos.
@@ -135,4 +136,48 @@ export const entryStrategyInputSchema = z.object({
 export function parseEntryStrategy(payload: unknown): EntryStrategyInput {
   const parsed = entryStrategyInputSchema.safeParse(payload);
   return parsed.success ? (parsed.data as EntryStrategyInput) : emptyEntryStrategyInput();
+}
+
+const bbbAxes = z.object({
+  internal_relevance: z.number().min(0).max(4).nullable().optional(),
+  tradability: z.number().min(0).max(4).nullable().optional(),
+  partner_closeness: z.number().min(0).max(4).nullable().optional(),
+  integration_capacity: z.number().min(0).max(4).nullable().optional(),
+});
+
+export const partneringInputSchema = z.object({
+  gaps: z.array(z.object({
+    id: z.string().max(40),
+    label: z.string().min(1).max(180),
+    axes: bbbAxes,
+    chosenRoute: z.enum(["build", "borrow_contract", "borrow_alliance", "buy"]).nullable(),
+    note: text(800),
+  })).max(40),
+  partnerType: z.enum(["supplier", "customer_distributor", "competitor", "diversifier", "investor", "government"]).nullable(),
+  partnerCategory: z.string().max(40).nullable(),
+  partnerName: z.string().max(180).nullable(),
+  fits: z.array(z.object({
+    id: z.enum(["strategic", "capability", "cultural", "organizational"]),
+    score: z.number().min(0).max(4).nullable(),
+    evidence: text(1200),
+  })).max(4),
+  realOption: z.object({
+    premium: z.number().finite().nullable(),
+    currency: z.string().max(8).nullable(),
+    trialYears: z.number().min(0).max(20).nullable(),
+    triggers: z.array(z.object({
+      id: z.string().max(40),
+      signal: z.string().min(1).max(300),
+      threshold: text(200),
+      stance: z.enum(["hold", "expand", "retreat"]),
+    })).max(10),
+    expansionPathId: z.string().max(60).nullable(),
+    retreatPathId: z.string().max(60).nullable(),
+    note: text(1200),
+  }),
+});
+
+export function parsePartnering(payload: unknown): PartneringInput {
+  const parsed = partneringInputSchema.safeParse(payload);
+  return parsed.success ? (parsed.data as PartneringInput) : emptyPartneringInput();
 }

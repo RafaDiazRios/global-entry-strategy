@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { AlertTriangle, Compass, DoorOpen, Layers, Loader2, Save } from "lucide-react";
+import { AlertTriangle, Compass, DoorOpen, Handshake, Layers, Loader2, Save } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,6 +17,7 @@ import {
   type RegionSetId,
 } from "@shared/domain/globalAmbition";
 import { emptyEntryStrategyInput, type Band, type ClimateBand, type EntryStrategyInput } from "@shared/domain/entryStrategy";
+import { emptyPartneringInput, type PartneringInput } from "@shared/domain/partnering";
 import {
   emptyPositioningInput,
   VALUE_CHAIN_FUNCTIONS,
@@ -69,10 +70,12 @@ function Loaded({ caseId }: { caseId: number }) {
         <TabsTrigger value="ambition"><Compass className="mr-2 h-4 w-4" />Ambición global</TabsTrigger>
         <TabsTrigger value="positioning"><Layers className="mr-2 h-4 w-4" />Posicionamiento</TabsTrigger>
         <TabsTrigger value="entry"><DoorOpen className="mr-2 h-4 w-4" />Entrada</TabsTrigger>
+        <TabsTrigger value="partnering"><Handshake className="mr-2 h-4 w-4" />Vía y socio</TabsTrigger>
       </TabsList>
       <TabsContent value="ambition"><AmbitionBlock caseId={caseId} reference={reference.data} /></TabsContent>
       <TabsContent value="positioning"><PositioningBlock caseId={caseId} reference={reference.data} /></TabsContent>
       <TabsContent value="entry"><EntryBlock caseId={caseId} reference={reference.data} /></TabsContent>
+      <TabsContent value="partnering"><PartneringBlock caseId={caseId} reference={reference.data} /></TabsContent>
     </Tabs>
   );
 }
@@ -869,6 +872,291 @@ function EntryBlock({ caseId, reference }: { caseId: number; reference: Referenc
             </select>
             <p className="mt-1 text-xs text-muted-foreground">{reference.digitalEntryProvenance}</p>
           </div>
+        </CardContent>
+      </Card>
+
+      {analysis && analysis.warnings.length > 0 && (
+        <Card>
+          <CardHeader><CardTitle className="text-base">Coherencia</CardTitle></CardHeader>
+          <CardContent className="space-y-2">
+            {analysis.warnings.map((warning) => (
+              <div key={warning.id} className="flex gap-2 rounded-md border p-3 text-sm">
+                <AlertTriangle className={`mt-0.5 h-4 w-4 shrink-0 ${warning.severity === "block" ? "text-destructive" : "text-amber-500"}`} />
+                <div>
+                  <p>{warning.message}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{warning.provenance}</p>
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      <SaveBar dirty={dirty} pending={save.isPending} completeness={analysis?.completeness ?? null} onSave={() => save.mutate({ caseId, payload: draft })} />
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------------------------ */
+/* M5 — Vía de acceso y socio (capítulos 7 y 8)                                          */
+/* ------------------------------------------------------------------------------------ */
+
+function PartneringBlock({ caseId, reference }: { caseId: number; reference: Reference }) {
+  const utils = trpc.useUtils();
+  const query = trpc.globalStrategy.getPartnering.useQuery({ caseId });
+  const positioning = trpc.globalStrategy.getPositioning.useQuery({ caseId });
+  const [draft, setDraft] = useState<PartneringInput>(emptyPartneringInput());
+  const [dirty, setDirty] = useState(false);
+
+  useEffect(() => {
+    if (query.data && !dirty) setDraft(query.data.input);
+  }, [query.data, dirty]);
+
+  const save = trpc.globalStrategy.savePartnering.useMutation({
+    onSuccess: () => {
+      setDirty(false);
+      utils.globalStrategy.getPartnering.invalidate({ caseId });
+      toast.success("Vía de acceso y socio guardados");
+    },
+    onError: (error) => toast.error(error.message),
+  });
+
+  const analysis = query.data;
+  const update = (patch: Partial<PartneringInput>) => { setDraft((current) => ({ ...current, ...patch })); setDirty(true); };
+  const newId = () => Math.random().toString(36).slice(2, 10);
+
+  /** Las capacidades marcadas «crear» en el Transfer-Adapt-Create son la entrada natural. */
+  const importable = (positioning.data?.resourceGap.toCreate ?? []).filter(
+    (entry) => !draft.gaps.some((gap) => gap.label === entry.label)
+  );
+
+  const verdictFor = (gapId: string) => analysis?.verdicts.find((verdict) => verdict.gapId === gapId) ?? null;
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>Qué falta y cómo conseguirlo</CardTitle>
+          <CardDescription>{reference.bbbProvenance}. El árbol responde en orden y se detiene en la pregunta que decide; no promedia.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {importable.length > 0 && (
+            <div className="rounded-md border bg-muted/40 p-3 text-sm">
+              <p>Del Transfer-Adapt-Create hay {importable.length} capacidad(es) marcadas como «crear» que aún no están aquí.</p>
+              <Button
+                className="mt-2"
+                size="sm"
+                variant="outline"
+                onClick={() => update({ gaps: [...draft.gaps, ...importable.map((entry) => ({ id: newId(), label: entry.label, axes: {}, chosenRoute: null, note: null }))] })}
+              >
+                Traerlas
+              </Button>
+            </div>
+          )}
+
+          {draft.gaps.map((gap) => {
+            const verdict = verdictFor(gap.id);
+            return (
+              <div key={gap.id} className="space-y-3 rounded-md border p-3">
+                <div className="flex items-center gap-2">
+                  <Input value={gap.label} placeholder="Capacidad que hay que conseguir" onChange={(event) => update({ gaps: draft.gaps.map((item) => (item.id === gap.id ? { ...item, label: event.target.value } : item)) })} />
+                  <Button variant="ghost" size="sm" onClick={() => update({ gaps: draft.gaps.filter((item) => item.id !== gap.id) })}>Quitar</Button>
+                </div>
+
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {reference.bbbAxes.map((axis) => (
+                    <div key={axis.id} className="grid grid-cols-[1fr_5rem] items-center gap-2">
+                      <div>
+                        <div className="text-sm">{axis.label}</div>
+                        <div className="text-xs text-muted-foreground">{axis.question}</div>
+                      </div>
+                      <Input
+                        type="number"
+                        min={0}
+                        max={4}
+                        value={gap.axes[axis.id] ?? ""}
+                        onChange={(event) => {
+                          const raw = event.target.value;
+                          const value = raw === "" ? null : Math.max(0, Math.min(4, Number(raw)));
+                          update({ gaps: draft.gaps.map((item) => (item.id === gap.id ? { ...item, axes: { ...item.axes, [axis.id]: Number.isNaN(value as number) ? null : value } } : item)) });
+                        }}
+                      />
+                    </div>
+                  ))}
+                </div>
+
+                <div className="grid gap-2 sm:grid-cols-[14rem_1fr]">
+                  <div>
+                    <Label className="text-xs">Vía elegida</Label>
+                    <select className={select} value={gap.chosenRoute ?? ""} onChange={(event) => update({ gaps: draft.gaps.map((item) => (item.id === gap.id ? { ...item, chosenRoute: (event.target.value || null) as typeof item.chosenRoute } : item)) })}>
+                      <option value="">Sin decidir</option>
+                      {reference.bbbRoutes.map((route) => <option key={route.id} value={route.id}>{route.label}</option>)}
+                    </select>
+                  </div>
+                  {verdict && (
+                    <div className="self-end text-sm">
+                      {verdict.route ? (
+                        <>
+                          <Badge variant={verdict.divergesFromChoice ? "outline" : "default"}>El árbol dice: {reference.bbbRoutes.find((route) => route.id === verdict.route)?.label}</Badge>
+                          <p className="mt-1 text-xs text-muted-foreground">{verdict.reason}</p>
+                        </>
+                      ) : (
+                        <p className="text-xs text-muted-foreground">{verdict.reason}</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+
+          <Button variant="outline" size="sm" onClick={() => update({ gaps: [...draft.gaps, { id: newId(), label: "", axes: {}, chosenRoute: null, note: null }] })}>Añadir capacidad</Button>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>El socio</CardTitle>
+          <CardDescription>{reference.partnerTypesProvenance}. El tipo de socio cambia lo que se puede esperar y lo que hay que vigilar.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div>
+              <Label>Tipo de socio</Label>
+              <select className={select} value={draft.partnerType ?? ""} onChange={(event) => update({ partnerType: (event.target.value || null) as PartneringInput["partnerType"] })}>
+                <option value="">Sin caracterizar</option>
+                {reference.partnerTypes.map((type) => <option key={type.id} value={type.id}>{type.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <Label>Categoría</Label>
+              <select className={select} value={draft.partnerCategory ?? ""} onChange={(event) => update({ partnerCategory: event.target.value || null })}>
+                <option value="">Sin decidir</option>
+                {reference.partnerCategories.map((category) => <option key={category.id} value={category.id}>{category.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <Label>Nombre (si ya hay candidato)</Label>
+              <Input value={draft.partnerName ?? ""} onChange={(event) => update({ partnerName: event.target.value || null })} />
+            </div>
+          </div>
+
+          {analysis?.partner && (
+            <div className="grid gap-3 rounded-md border bg-muted/40 p-3 text-sm sm:grid-cols-2">
+              <div>
+                <div className="text-xs font-semibold uppercase text-muted-foreground">Lo que se busca en él</div>
+                <ul className="mt-1 space-y-1">{analysis.partner.foreignMotives.map((item) => <li key={item}>{item}</li>)}</ul>
+              </div>
+              <div>
+                <div className="text-xs font-semibold uppercase text-muted-foreground">Lo que hay que vigilar</div>
+                <ul className="mt-1 space-y-1">{analysis.partner.foreignRisks.map((item) => <li key={item}>{item}</li>)}</ul>
+              </div>
+            </div>
+          )}
+
+          <div className="space-y-3">
+            <div className="text-sm font-medium">Las cuatro pruebas de encaje · {reference.partnerFitsProvenance}</div>
+            {reference.partnerFits.map((fit) => {
+              const entry = draft.fits.find((item) => item.id === fit.id) ?? { id: fit.id, score: null, evidence: null };
+              return (
+                <div key={fit.id} className="grid gap-2 sm:grid-cols-[1fr_5rem]">
+                  <div>
+                    <div className="text-sm">{fit.label}</div>
+                    <div className="text-xs text-muted-foreground">{fit.question}</div>
+                    <Input
+                      className="mt-1"
+                      value={entry.evidence ?? ""}
+                      placeholder="Evidencia concreta, no impresión"
+                      onChange={(event) => update({ fits: reference.partnerFits.map((option) => {
+                        const existing = draft.fits.find((item) => item.id === option.id) ?? { id: option.id, score: null, evidence: null };
+                        return option.id === fit.id ? { ...existing, evidence: event.target.value } : existing;
+                      }) as PartneringInput["fits"] })}
+                    />
+                  </div>
+                  <Input
+                    type="number"
+                    min={0}
+                    max={4}
+                    value={entry.score ?? ""}
+                    onChange={(event) => {
+                      const raw = event.target.value;
+                      const value = raw === "" ? null : Math.max(0, Math.min(4, Number(raw)));
+                      update({ fits: reference.partnerFits.map((option) => {
+                        const existing = draft.fits.find((item) => item.id === option.id) ?? { id: option.id, score: null, evidence: null };
+                        return option.id === fit.id ? { ...existing, score: Number.isNaN(value as number) ? null : value } : existing;
+                      }) as PartneringInput["fits"] });
+                    }}
+                  />
+                </div>
+              );
+            })}
+            {analysis && analysis.fits.average !== null && (
+              <p className="text-xs text-muted-foreground">
+                Media {analysis.fits.average}/4 sobre {analysis.fits.answered} de {analysis.fits.total} pruebas. La media se muestra por comodidad: lo que decide es el encaje más débil, porque las cuatro no se compensan entre sí.
+              </p>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>La entrada como opción real</CardTitle>
+          <CardDescription>{reference.realOptionProvenance}. Una inversión preliminar sin señales de salida no es una opción, es una apuesta pequeña.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div>
+              <Label>Prima: inversión preliminar</Label>
+              <Input type="number" value={draft.realOption.premium ?? ""} onChange={(event) => update({ realOption: { ...draft.realOption, premium: event.target.value === "" ? null : Number(event.target.value) } })} />
+            </div>
+            <div>
+              <Label>Moneda</Label>
+              <Input maxLength={8} value={draft.realOption.currency ?? ""} placeholder="CNY" onChange={(event) => update({ realOption: { ...draft.realOption, currency: event.target.value || null } })} />
+            </div>
+            <div>
+              <Label>Periodo de observación (años)</Label>
+              <Input type="number" min={0} max={20} value={draft.realOption.trialYears ?? ""} onChange={(event) => update({ realOption: { ...draft.realOption, trialYears: event.target.value === "" ? null : Number(event.target.value) } })} />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Señales que disparan la decisión</Label>
+            {draft.realOption.triggers.map((trigger) => (
+              <div key={trigger.id} className="grid gap-2 sm:grid-cols-[1fr_1fr_8rem_auto]">
+                <Input value={trigger.signal} placeholder="Qué se observa" onChange={(event) => update({ realOption: { ...draft.realOption, triggers: draft.realOption.triggers.map((item) => (item.id === trigger.id ? { ...item, signal: event.target.value } : item)) } })} />
+                <Input value={trigger.threshold ?? ""} placeholder="Umbral verificable" onChange={(event) => update({ realOption: { ...draft.realOption, triggers: draft.realOption.triggers.map((item) => (item.id === trigger.id ? { ...item, threshold: event.target.value } : item)) } })} />
+                <select className={select} value={trigger.stance} onChange={(event) => update({ realOption: { ...draft.realOption, triggers: draft.realOption.triggers.map((item) => (item.id === trigger.id ? { ...item, stance: event.target.value as typeof item.stance } : item)) } })}>
+                  <option value="expand">Ampliar</option>
+                  <option value="hold">Mantener</option>
+                  <option value="retreat">Replegar</option>
+                </select>
+                <Button variant="ghost" size="sm" onClick={() => update({ realOption: { ...draft.realOption, triggers: draft.realOption.triggers.filter((item) => item.id !== trigger.id) } })}>Quitar</Button>
+              </div>
+            ))}
+            <Button variant="outline" size="sm" onClick={() => update({ realOption: { ...draft.realOption, triggers: [...draft.realOption.triggers, { id: newId(), signal: "", threshold: null, stance: "expand" }] } })}>Añadir señal</Button>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <Label>Si se desarrolla</Label>
+              <select className={select} value={draft.realOption.expansionPathId ?? ""} onChange={(event) => update({ realOption: { ...draft.realOption, expansionPathId: event.target.value || null } })}>
+                <option value="">Sin decidir</option>
+                {reference.optionExpansionPaths.map((path) => <option key={path.id} value={path.id}>{path.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <Label>Si no se desarrolla</Label>
+              <select className={select} value={draft.realOption.retreatPathId ?? ""} onChange={(event) => update({ realOption: { ...draft.realOption, retreatPathId: event.target.value || null } })}>
+                <option value="">Sin decidir</option>
+                {reference.optionRetreatPaths.map((path) => <option key={path.id} value={path.id}>{path.label}</option>)}
+              </select>
+            </div>
+          </div>
+
+          {analysis && !analysis.option.structured && analysis.option.missing.length > 0 && (
+            <p className="text-xs text-muted-foreground">Falta para que la opción esté estructurada: {analysis.option.missing.join("; ")}.</p>
+          )}
         </CardContent>
       </Card>
 

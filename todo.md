@@ -123,7 +123,6 @@ preparado en el motor: añadir la oficial es una entrada más en `CONVENTIONS`.
 - [x] Duplicar, renombrar, borrar y buscar. Al borrar se van con él sus puertas de decisión y los hitos; al duplicar no se heredan, porque se aprobaron sobre los supuestos del original.
 - [x] El escenario queda vinculado al caso activo mediante `caseId`, que existía en la base desde la Fase 5 y no se usaba.
 
-## Fases siguientes del blueprint v2
 ### Fase 4a — capítulo 7, primera parte
 
 - [x] Objetivos de entrada de la Tabla 7.1 con sus expectativas, indicadores, momento, tipo de país y modos típicos.
@@ -132,8 +131,21 @@ preparado en el motor: añadir la oficial es una entrada más en `CONVENTIONS`.
 - [x] Elección de modo con el mapa de la Fig. 7.3 y la rejilla de la Fig. 7.1, sobre los perfiles de la Tabla 7.4 que ya existían desde la Fase 1. Modelos de entrada digital de la Tabla 7.5.
 - [x] Seis reglas de coherencia: modo fuera de fase, inversión fuerte en fase prematura, primer entrante cuando la ventana ya se cerró, primer entrante sin justificar, ritmo gradual contra modo de compromiso alto y modo fuera del mapa.
 
-- [ ] Fase 4b — opción real, mini-caso 7.3 (Lubricador SA) con los modelos económicos por modo, y capítulo 8 completo: build-borrow-buy, cuatro encajes, análisis de socio, diseño e integración.
-- [ ] Fase 4 (original) — capítulos 7 y 8: fases de ventana, ritmo, opción real, build-borrow-buy, cuatro encajes, socio, integración y modelos económicos de adquisición y JV.
+### Fase 4b — opción real, socio y build-borrow-buy
+
+- [x] La entrada como opción real (p. 270): prima, periodo de observación, señales con umbral verificable y las dos salidas, ampliar o replegarse.
+- [x] Árbol build-borrow-buy con preguntas propias sobre el marco de Capron y Mitchell. Responde en orden y se detiene en la pregunta que decide; no promedia. Señala cuando la vía elegida no es la del árbol.
+- [x] Las cuatro pruebas de encaje (p. 278) sin compensación entre ellas: la media se muestra, pero lo que decide es el encaje más débil.
+- [x] Los seis tipos de socio local de la Tabla 7.3 con lo que se busca en cada uno y lo que hay que vigilar, más las cinco categorías de la p. 278.
+- [x] La lista de capacidades «crear» del Transfer-Adapt-Create se importa como entrada del módulo con un botón.
+- [x] Test de aceptación: el mini-caso 7.3 (Lubricador SA) resuelve sus cuatro alternativas dentro de la herramienta y da cifras distintas, con el patrón que describe la p. 270.
+
+**Incoherencia del enunciado, documentada en el propio test:** el mini-caso da costes
+administrativos de «1.200 millones de yuanes» contra un mercado de 175 millones. El fixture
+fija margen y coste anual como supuesto propio y lo dice, en lugar de reconstruir una
+función de costes que el caso no determina.
+
+## Fases siguientes del blueprint v2
 - [ ] Fase 6 — motor de coherencia, índice de exhaustividad e informe ampliado.
 
 ## Consideraciones para la siguiente evolución

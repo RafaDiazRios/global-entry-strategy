@@ -13,9 +13,11 @@ import { storageGetSignedUrl, storagePut } from "./storage";
 import { getWgiGovernanceData } from "./strategy/wgi";
 import { ambitionCompleteness, ambitionGap, computeIndices, CONVENTIONS, DEFAULT_THRESHOLDS, positionOnAmbitionMap } from "./strategy/globalAmbition";
 import { diagnoseValueChain, diagnoseValueCurve, positioningCompleteness, positioningWarnings, resolvePositioning, resourceGap } from "./strategy/globalPositioning";
-import { ambitionInputSchema, entryStrategyInputSchema, parseAmbition, parseEntryStrategy, parsePositioning, positioningInputSchema } from "./strategy/globalStrategySchemas";
+import { ambitionInputSchema, entryStrategyInputSchema, parseAmbition, parseEntryStrategy, parsePartnering, parsePositioning, partneringInputSchema, positioningInputSchema } from "./strategy/globalStrategySchemas";
 import { entryStrategyCompleteness, entryStrategyWarnings, mappingShortlist, paceProfile, phaseDefinition } from "./strategy/entryStrategy";
 import * as entryDomain from "@shared/domain/entryStrategy";
+import * as partneringDomain from "@shared/domain/partnering";
+import { diagnoseFits, diagnoseRealOption, evaluateGaps, partneringCompleteness, partneringWarnings, partnerTypeRisks } from "./strategy/partnering";
 import { entryModes } from "@shared/domain/entryModes";
 import * as ambitionDomain from "@shared/domain/globalAmbition";
 import * as positioningDomain from "@shared/domain/globalPositioning";
@@ -311,6 +313,18 @@ function analyseAmbition(input: ambitionDomain.AmbitionInput) {
     completeness: ambitionCompleteness(input, indices),
     thresholds: DEFAULT_THRESHOLDS,
     convention: CONVENTIONS[0],
+  };
+}
+
+function analysePartnering(input: partneringDomain.PartneringInput) {
+  return {
+    input,
+    verdicts: evaluateGaps(input),
+    fits: diagnoseFits(input),
+    partner: partnerTypeRisks(input.partnerType),
+    option: diagnoseRealOption(input),
+    warnings: partneringWarnings(input),
+    completeness: partneringCompleteness(input),
   };
 }
 
@@ -795,6 +809,17 @@ export const appRouter = router({
       digitalEntryModels: entryDomain.DIGITAL_ENTRY_MODELS,
       digitalEntryProvenance: entryDomain.DIGITAL_ENTRY_PROVENANCE,
       entryModes: entryModes.map((mode) => ({ key: mode.key, label: mode.label })),
+      bbbAxes: partneringDomain.BBB_AXES,
+      bbbRoutes: partneringDomain.BBB_ROUTES,
+      bbbProvenance: partneringDomain.BBB_PROVENANCE,
+      partnerFits: partneringDomain.PARTNER_FITS,
+      partnerFitsProvenance: partneringDomain.PARTNER_FITS_PROVENANCE,
+      partnerTypes: partneringDomain.PARTNER_TYPES,
+      partnerTypesProvenance: partneringDomain.PARTNER_TYPES_PROVENANCE,
+      partnerCategories: partneringDomain.PARTNER_CATEGORIES,
+      optionExpansionPaths: partneringDomain.OPTION_EXPANSION_PATHS,
+      optionRetreatPaths: partneringDomain.OPTION_RETREAT_PATHS,
+      realOptionProvenance: partneringDomain.REAL_OPTION_PROVENANCE,
     })),
 
     getAmbition: protectedProcedure
@@ -809,6 +834,20 @@ export const appRouter = router({
       .mutation(async ({ ctx, input }) => {
         await db.saveCaseModule(ctx.user.id, input.caseId, "ambition", input.payload);
         return analyseAmbition(input.payload as ambitionDomain.AmbitionInput);
+      }),
+
+    getPartnering: protectedProcedure
+      .input(z.object({ caseId: z.number().int().positive() }))
+      .query(async ({ ctx, input }) => {
+        const stored = await db.getCaseModule(ctx.user.id, input.caseId, "partnering");
+        return analysePartnering(parsePartnering(stored?.payload));
+      }),
+
+    savePartnering: protectedProcedure
+      .input(z.object({ caseId: z.number().int().positive(), payload: partneringInputSchema }))
+      .mutation(async ({ ctx, input }) => {
+        await db.saveCaseModule(ctx.user.id, input.caseId, "partnering", input.payload);
+        return analysePartnering(input.payload as partneringDomain.PartneringInput);
       }),
 
     getEntryStrategy: protectedProcedure

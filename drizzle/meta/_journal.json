@@ -29,6 +29,13 @@
       "when": 1789063784238,
       "tag": "0003_modulo_de_entrada",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1789063785238,
+      "tag": "0004_modulo_de_socio",
+      "breakpoints": true
     }
   ]
 }
