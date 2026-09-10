@@ -113,4 +113,10 @@ La actualización programada de escenarios guardados debe configurarse únicamen
 
 ## Incidencias conocidas
 
+Resuelta: el paquete de producción arrastraba `vite` porque `serveStatic` y `setupVite`
+compartían fichero. La imagen solo instala dependencias de producción, así que el proceso
+moría al arrancar con `Cannot find package 'vite'`. `serveStatic` vive ahora en
+`server/_core/static.ts` y el servidor de desarrollo se carga con un import dinámico que
+esbuild deja fuera del paquete.
+
 No hay incidencias bloqueantes abiertas. La generación PDF muestra advertencias internas de ajuste de ancho en algunas tablas de jsPDF, pero la revisión de la muestra renderizada confirmó que las columnas y el contenido quedan dentro del área de página.
