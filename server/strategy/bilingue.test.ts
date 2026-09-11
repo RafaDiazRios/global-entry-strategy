@@ -15,6 +15,10 @@ import * as modes from "@shared/domain/entryModes";
 import * as coherence from "@shared/domain/coherence";
 import * as countryAssessment from "@shared/domain/countryAssessment";
 import * as countries from "@shared/domain/countries";
+import * as thesis from "@shared/domain/thesis";
+import * as approvalChain from "@shared/domain/approvalChain";
+import * as industries from "@shared/domain/industries";
+import * as assumptionMap from "@shared/domain/assumptionMap";
 import { UI_STRINGS } from "../../client/src/i18n/strings";
 
 /**
@@ -35,6 +39,10 @@ const MODULES: Record<string, Record<string, unknown>> = {
   coherence: coherence,
   countryAssessment: countryAssessment,
   countries: countries,
+  thesis: thesis,
+  approvalChain: approvalChain,
+  industries: industries,
+  assumptionMap: assumptionMap,
 };
 
 type Found = { path: string; value: Localized };
@@ -73,7 +81,7 @@ const SAME_IN_BOTH = new Set([
   "Capital", "Control", "Digital", "Global", "Hubs", "Local", "Marketing", "Pre-emption", "Regional",
   // Términos del libro que en español se usan en inglés, y una palabra que coincide.
   "Liability of foreignness", "Transfer, Adapt, Create", "8. Gates", "gradual",
-  "Cultural", "Hub",
+  "Cultural", "Hub", "Veto", "Supervisor",
 ]);
 
 /** Las citas del libro se escriben igual en los dos idiomas salvo la palabra «Tabla». */
@@ -86,7 +94,7 @@ const CITATION = /^(p\.|pp\.|Fig\.|Table|Tabla|Learning assignment)/;
 const PROPER_NOUN_PATH = /\.name$|\.examples$/;
 
 describe("cobertura bilingüe de las tablas del libro", () => {
-  it("encuentra pares en los ocho módulos, no en uno solo", () => {
+  it("encuentra pares en los doce módulos, no en uno solo", () => {
     expect(pairs.length).toBeGreaterThan(800);
     for (const name of Object.keys(MODULES)) {
       expect(pairs.some((pair) => pair.path.startsWith(`${name}.`)), name).toBe(true);
