@@ -158,7 +158,7 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState("brief");
   const [caseId, setCaseId] = useState<number | null>(null);
   const [caseDocumentId, setCaseDocumentId] = useState<number | null>(null);
-  const [strategySubTab, setStrategySubTab] = useState<"ambition" | "positioning" | "entry" | "partnering">("ambition");
+  const [strategySubTab, setStrategySubTab] = useState<"ambition" | "positioning" | "entry" | "partnering" | "coherence">("ambition");
   const [scenarioName, setScenarioName] = useState("Nuevo análisis");
   const [companyName, setCompanyName] = useState("");
   const [homeCountry, setHomeCountry] = useState("");

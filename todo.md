@@ -153,7 +153,15 @@ función de costes que el caso no determina.
 - [x] No bloquea: se puede trabajar fuera de orden y la ruta refleja lo que queda pendiente en lugar de impedirlo.
 
 ## Fases siguientes del blueprint v2
-- [ ] Fase 6 — motor de coherencia, índice de exhaustividad e informe ampliado.
+### Fase 6 — coherencia entre módulos
+
+- [x] Trece reglas cruzadas, cada una con la página del libro de la que sale la incompatibilidad. No repiten lo que ya vigila cada módulo por su cuenta.
+- [x] Índice de exhaustividad ponderado: ambición 20, posicionamiento 25, entrada 30, vía y socio 25.
+- [x] Un módulo sin empezar cuenta cero. Varias comprobaciones son condicionales y en un módulo vacío se dan por satisfechas; contarlas mostraba un 13% hecho sobre un análisis sin tocar.
+- [x] Los bloqueantes se listan aparte, y desde cada contradicción se salta al módulo que la provoca.
+
+- [ ] Informe ampliado en PDF con la sección de coherencia. Pendiente.
+- [ ] Bilingüe español/inglés con selector. Acordado; unas 1.150 cadenas, la mayoría en dominio y motores.
 
 ## Consideraciones para la siguiente evolución
 

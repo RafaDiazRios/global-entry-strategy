@@ -17,6 +17,7 @@ import { ambitionInputSchema, entryStrategyInputSchema, parseAmbition, parseEntr
 import { entryStrategyCompleteness, entryStrategyWarnings, mappingShortlist, paceProfile, phaseDefinition } from "./strategy/entryStrategy";
 import * as entryDomain from "@shared/domain/entryStrategy";
 import * as partneringDomain from "@shared/domain/partnering";
+import { completenessIndex, evaluateCoherence } from "./strategy/coherence";
 import { diagnoseFits, diagnoseRealOption, evaluateGaps, partneringCompleteness, partneringWarnings, partnerTypeRisks } from "./strategy/partnering";
 import { entryModes } from "@shared/domain/entryModes";
 import * as ambitionDomain from "@shared/domain/globalAmbition";
@@ -834,6 +835,31 @@ export const appRouter = router({
       .mutation(async ({ ctx, input }) => {
         await db.saveCaseModule(ctx.user.id, input.caseId, "ambition", input.payload);
         return analyseAmbition(input.payload as ambitionDomain.AmbitionInput);
+      }),
+
+    /**
+     * Coherencia entre módulos e índice de exhaustividad.
+     *
+     * Lee los cuatro bloques del caso y los cruza. No se guarda nada: el resultado se
+     * recalcula siempre, de modo que corregir una regla alcanza también a los casos viejos.
+     */
+    coherence: protectedProcedure
+      .input(z.object({ caseId: z.number().int().positive() }))
+      .query(async ({ ctx, input }) => {
+        const [ambition, positioning, entry, partnering] = await Promise.all([
+          db.getCaseModule(ctx.user.id, input.caseId, "ambition"),
+          db.getCaseModule(ctx.user.id, input.caseId, "positioning"),
+          db.getCaseModule(ctx.user.id, input.caseId, "entry"),
+          db.getCaseModule(ctx.user.id, input.caseId, "partnering"),
+        ]);
+        const dossier = {
+          ambition: ambition ? parseAmbition(ambition.payload) : null,
+          positioning: positioning ? parsePositioning(positioning.payload) : null,
+          entry: entry ? parseEntryStrategy(entry.payload) : null,
+          partnering: partnering ? parsePartnering(partnering.payload) : null,
+        };
+        const findings = evaluateCoherence(dossier);
+        return { findings, index: completenessIndex(dossier, findings) };
       }),
 
     getPartnering: protectedProcedure

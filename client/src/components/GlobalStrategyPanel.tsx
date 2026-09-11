@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { AlertTriangle, Compass, DoorOpen, Handshake, Layers, Loader2, Save } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Compass, DoorOpen, Handshake, Info, Layers, Loader2, Save, ShieldCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -36,7 +36,7 @@ import {
 const select =
   "h-9 w-full rounded-md border border-input bg-background px-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring";
 
-type SubTab = "ambition" | "positioning" | "entry" | "partnering";
+type SubTab = "ambition" | "positioning" | "entry" | "partnering" | "coherence";
 
 type Props = {
   caseId: number | null;
@@ -78,11 +78,13 @@ function Loaded({ caseId, subTab, onSubTabChange }: { caseId: number; subTab?: S
         <TabsTrigger value="positioning"><Layers className="mr-2 h-4 w-4" />Posicionamiento</TabsTrigger>
         <TabsTrigger value="entry"><DoorOpen className="mr-2 h-4 w-4" />Entrada</TabsTrigger>
         <TabsTrigger value="partnering"><Handshake className="mr-2 h-4 w-4" />Vía y socio</TabsTrigger>
+        <TabsTrigger value="coherence"><ShieldCheck className="mr-2 h-4 w-4" />Coherencia</TabsTrigger>
       </TabsList>
       <TabsContent value="ambition"><AmbitionBlock caseId={caseId} reference={reference.data} /></TabsContent>
       <TabsContent value="positioning"><PositioningBlock caseId={caseId} reference={reference.data} /></TabsContent>
       <TabsContent value="entry"><EntryBlock caseId={caseId} reference={reference.data} /></TabsContent>
       <TabsContent value="partnering"><PartneringBlock caseId={caseId} reference={reference.data} /></TabsContent>
+      <TabsContent value="coherence"><CoherenceBlock caseId={caseId} onGo={onSubTabChange} /></TabsContent>
     </Tabs>
   );
 }
@@ -1185,6 +1187,119 @@ function PartneringBlock({ caseId, reference }: { caseId: number; reference: Ref
       )}
 
       <SaveBar dirty={dirty} pending={save.isPending} completeness={analysis?.completeness ?? null} onSave={() => save.mutate({ caseId, payload: draft })} />
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------------------------ */
+/* Coherencia entre módulos e índice de exhaustividad                                    */
+/* ------------------------------------------------------------------------------------ */
+
+const SEVERITY_ORDER = { block: 0, warn: 1, info: 2 } as const;
+
+function CoherenceBlock({ caseId, onGo }: { caseId: number; onGo?: (tab: SubTab) => void }) {
+  const query = trpc.globalStrategy.coherence.useQuery({ caseId });
+
+  if (query.isLoading || !query.data) {
+    return (
+      <div className="flex items-center gap-2 py-10 text-sm text-muted-foreground">
+        <Loader2 className="h-4 w-4 animate-spin" /> Cruzando los cuatro módulos…
+      </div>
+    );
+  }
+
+  const { findings, index } = query.data;
+  const sorted = [...findings].sort((a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity]);
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>Índice de exhaustividad</CardTitle>
+          <CardDescription>Ponderado por el peso de cada módulo en la decisión. Un módulo sin empezar cuenta cero, no «casi hecho».</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-baseline gap-3">
+            <span className="text-4xl font-semibold tabular-nums">{index.pct}%</span>
+            <span className="text-sm text-muted-foreground">del análisis cubierto</span>
+          </div>
+          <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+            <div className="h-full bg-primary transition-all" style={{ width: `${index.pct}%` }} />
+          </div>
+
+          <div className="space-y-2">
+            {index.modules.map((module) => (
+              <div key={module.key} className="grid grid-cols-[1fr_3rem] items-center gap-3">
+                <div>
+                  <button
+                    type="button"
+                    className="text-sm hover:underline"
+                    onClick={() => onGo?.(module.key as SubTab)}
+                  >
+                    {module.label}
+                  </button>
+                  <span className="ml-2 text-xs text-muted-foreground">peso {module.weight}% · {module.answered} de {module.total}</span>
+                  <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-muted">
+                    <div className="h-full bg-primary/70" style={{ width: `${module.pct}%` }} />
+                  </div>
+                </div>
+                <span className="text-right text-sm tabular-nums text-muted-foreground">{module.pct}%</span>
+              </div>
+            ))}
+          </div>
+
+          {index.blockers.length > 0 && (
+            <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm">
+              <div className="text-xs font-semibold uppercase text-destructive">Impide cerrar la decisión</div>
+              <ul className="mt-1 space-y-1">{index.blockers.map((blocker) => <li key={blocker}>{blocker}</li>)}</ul>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Contradicciones entre módulos</CardTitle>
+          <CardDescription>
+            Trece reglas que solo tienen sentido con dos módulos delante. Lo que cada bloque vigila por su cuenta se avisa dentro de él.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {!sorted.length ? (
+            <div className="flex items-center gap-2 rounded-md border p-4 text-sm">
+              <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+              Ninguna contradicción entre lo contestado hasta ahora. Ojo: con módulos a medias, esto dice poco.
+            </div>
+          ) : (
+            sorted.map((finding) => (
+              <div key={finding.id} className="rounded-md border p-3 text-sm">
+                <div className="flex gap-2">
+                  {finding.severity === "info" ? (
+                    <Info className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                  ) : (
+                    <AlertTriangle className={`mt-0.5 h-4 w-4 shrink-0 ${finding.severity === "block" ? "text-destructive" : "text-amber-500"}`} />
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <strong>{finding.title}</strong>
+                      {finding.severity === "block" && <Badge variant="outline" className="border-destructive/50 text-destructive">bloquea</Badge>}
+                    </div>
+                    <p className="mt-1">{finding.detail}</p>
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <span className="text-xs text-muted-foreground">{finding.provenance}</span>
+                      {finding.modules.map((module) => (
+                        <Button key={module} variant="outline" size="sm" className="h-6 px-2 text-xs" onClick={() => onGo?.(module as SubTab)}>
+                          Ir a {module === "ambition" ? "Ambición" : module === "positioning" ? "Posicionamiento" : module === "entry" ? "Entrada" : "Vía y socio"}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
