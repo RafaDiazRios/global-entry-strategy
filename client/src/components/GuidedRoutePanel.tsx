@@ -1,10 +1,10 @@
 import { useMemo, useState } from "react";
-import { BookOpen, Check, ChevronDown, ChevronRight, Circle, Compass, Target } from "lucide-react";
+import { ArrowRight, BookOpen, Check, ChevronDown, ChevronRight, Circle, Compass, SkipForward, Target } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { trpc } from "@/lib/trpc";
-import { evaluateRoute, type RouteSnapshot, type StepState } from "@shared/domain/guidedRoute";
+import { evaluateRoute, emptyConfirmations, type RouteSnapshot, type StepId, type StepState } from "@shared/domain/guidedRoute";
 import { useLanguage } from "@/i18n";
 
 /**
@@ -36,6 +36,7 @@ export function GuidedRoutePanel({ caseId, scenario, onGo }: Props) {
   const [open, setOpen] = useState(true);
   const [showAll, setShowAll] = useState(false);
 
+  const utils = trpc.useUtils();
   const enabled = caseId !== null;
   const caseQuery = trpc.case.get.useQuery({ caseId: caseId ?? 0 }, { enabled });
   const evidenceQuery = trpc.case.listEvidence.useQuery({ caseId: caseId ?? 0 }, { enabled });
@@ -43,6 +44,38 @@ export function GuidedRoutePanel({ caseId, scenario, onGo }: Props) {
   const positioning = trpc.globalStrategy.getPositioning.useQuery({ caseId: caseId ?? 0 }, { enabled });
   const entry = trpc.globalStrategy.getEntryStrategy.useQuery({ caseId: caseId ?? 0 }, { enabled });
   const partnering = trpc.globalStrategy.getPartnering.useQuery({ caseId: caseId ?? 0 }, { enabled });
+  const progress = trpc.globalStrategy.getRouteProgress.useQuery({ caseId: caseId ?? 0 }, { enabled });
+
+  const saveProgress = trpc.globalStrategy.saveRouteProgress.useMutation({
+    onSuccess: () => utils.globalStrategy.getRouteProgress.invalidate({ caseId: caseId ?? 0 }),
+  });
+
+  const confirmations = progress.data ?? emptyConfirmations();
+
+  /**
+   * Confirmar es del analista, no del contador. Un paso se cierra cuando alguien lo da por
+   * bueno; y si decide seguir sin completarlo, queda registrado como saltado en vez de
+   * desaparecer, para que el informe pueda decir por dónde se pasó de largo.
+   */
+  function resolveStep(stepId: StepId, action: "confirm" | "skip") {
+    if (caseId === null) return;
+    const confirmed = confirmations.confirmed.filter((id) => id !== stepId);
+    const skipped = confirmations.skipped.filter((id) => id !== stepId);
+    if (action === "confirm") confirmed.push(stepId);
+    else skipped.push(stepId);
+    saveProgress.mutate({ caseId, payload: { confirmed, skipped } });
+  }
+
+  function reopenStep(stepId: StepId) {
+    if (caseId === null) return;
+    saveProgress.mutate({
+      caseId,
+      payload: {
+        confirmed: confirmations.confirmed.filter((id) => id !== stepId),
+        skipped: confirmations.skipped.filter((id) => id !== stepId),
+      },
+    });
+  }
 
   const route = useMemo(() => {
     const snapshot: RouteSnapshot = {
@@ -66,9 +99,10 @@ export function GuidedRoutePanel({ caseId, scenario, onGo }: Props) {
       financialReady: scenario.financialReady,
       hasResult: scenario.hasResult,
       approvalCount: scenario.approvalCount,
+      confirmations,
     };
     return evaluateRoute(snapshot);
-  }, [caseId, caseQuery.data, evidenceQuery.data, ambition.data, positioning.data, entry.data, partnering.data, scenario]);
+  }, [caseId, caseQuery.data, evidenceQuery.data, ambition.data, positioning.data, entry.data, partnering.data, scenario, confirmations]);
 
   const current = route.current;
   const visible = showAll ? route.steps : route.steps.filter((state) => state.status !== "done" || state.step.order >= (current?.step.order ?? 13) - 1);
@@ -81,6 +115,7 @@ export function GuidedRoutePanel({ caseId, scenario, onGo }: Props) {
             <Compass className="h-4 w-4 text-muted-foreground" />
             <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{ui("routeEyebrow")}</span>
             <Badge variant="outline">{route.doneCount} {ui("routeOf")} {route.total} {ui("routeProgress")}</Badge>
+            {route.skippedCount > 0 && <Badge variant="outline">{route.skippedCount} {ui("routeSkipped")}</Badge>}
           </div>
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="sm" onClick={() => setShowAll((value) => !value)}>{showAll ? ui("routeShowPending") : ui("routeShowAll")}</Button>
@@ -136,9 +171,20 @@ export function GuidedRoutePanel({ caseId, scenario, onGo }: Props) {
                   </div>
                 </div>
 
-                <Button className="mt-4" onClick={() => onGo(current.step.target, current.step.subTab)}>
-                  {ui("routeGoToStep")} {current.step.order}
-                </Button>
+                <div className="mt-4 flex flex-wrap items-center gap-2">
+                  <Button variant="outline" onClick={() => onGo(current.step.target, current.step.subTab)}>
+                    {ui("routeGoToStep")} {current.step.order}
+                  </Button>
+                  <Button disabled={!current.gateMet || saveProgress.isPending} onClick={() => resolveStep(current.step.id, "confirm")}>
+                    <ArrowRight className="mr-2 h-4 w-4" /> {ui("routeConfirm")}
+                  </Button>
+                  {!current.gateMet && (
+                    <Button variant="ghost" disabled={saveProgress.isPending} onClick={() => resolveStep(current.step.id, "skip")}>
+                      <SkipForward className="mr-2 h-4 w-4" /> {ui("routeSkip")}
+                    </Button>
+                  )}
+                </div>
+                {!current.gateMet && <p className="mt-2 text-xs text-muted-foreground">{ui("routeConfirmHint")}</p>}
               </div>
             ) : (
               <div className="mt-5 rounded-md border bg-muted/40 p-4 text-sm">
@@ -156,15 +202,23 @@ export function GuidedRoutePanel({ caseId, scenario, onGo }: Props) {
                   >
                     {state.status === "done" ? (
                       <Check className="h-4 w-4 shrink-0 text-emerald-600" />
+                    ) : state.status === "skipped" ? (
+                      <SkipForward className="h-4 w-4 shrink-0 text-amber-500" />
                     ) : (
-                      <Circle className={`h-4 w-4 shrink-0 ${state.status === "in_progress" ? "text-primary" : "text-muted-foreground/40"}`} />
+                      <Circle className={`h-4 w-4 shrink-0 ${state.status === "in_progress" || state.status === "ready" ? "text-primary" : "text-muted-foreground/40"}`} />
                     )}
                     <span className="w-6 shrink-0 tabular-nums text-muted-foreground">{state.step.order}</span>
                     <span className={state.status === "done" ? "text-muted-foreground line-through" : ""}>{t(state.step.title)}</span>
-                    {state.status !== "done" && state.progress !== null && (
+                    {state.status === "skipped" && <span className="text-xs text-amber-600">{ui("routeSkippedTag")}</span>}
+                    {state.status === "pending" && state.progress !== null && (
                       <span className="ml-auto text-xs text-muted-foreground">{Math.round(state.progress * 100)}%</span>
                     )}
                   </button>
+                  {(state.status === "done" || state.status === "skipped") && (
+                    <button type="button" className="ml-8 text-xs text-muted-foreground hover:underline" onClick={() => reopenStep(state.step.id)}>
+                      {ui("routeReopen")}
+                    </button>
+                  )}
                 </li>
               ))}
             </ol>

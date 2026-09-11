@@ -195,6 +195,8 @@ export default function Home() {
   const [marketLoadingCodes, setMarketLoadingCodes] = useState<string[]>([]);
   const [editingMarketCode, setEditingMarketCode] = useState<string | null>(null);
   const marketRefreshQueue = useRef<Promise<unknown>>(Promise.resolve());
+  /** Marca que el cambio de caso viene de restaurar un escenario, no de abrir otro caso. */
+  const restoringScenario = useRef(false);
   const [popMin, setPopMin] = useState("0");
   const [gdpMin, setGdpMin] = useState("0");
   const [growthMin, setGrowthMin] = useState("-100");
@@ -528,6 +530,54 @@ export default function Home() {
    * repartir ese documento por el estado del formulario. La región de cada país no viaja en
    * la entrada —no interviene en el cálculo— y se recupera del catálogo.
    */
+  /**
+   * Cambiar de caso vacía el formulario de escenario.
+   *
+   * El caso es la unidad de análisis: su mandato, sus evidencias y sus cuatro módulos se
+   * cargan solos porque cuelgan del identificador. Lo que no colgaba de nada era el
+   * formulario —perfil, países, calibración, economía— y se quedaba del caso anterior, de
+   * modo que una empresa nueva heredaba los mercados y los juicios de la anterior sin que
+   * nada lo advirtiera. Eso no es un inconveniente de interfaz: es contaminación entre
+   * análisis.
+   *
+   * Abrir un escenario guardado del archivo es la excepción, porque allí escenario y caso
+   * llegan juntos y coherentes; por eso `applyScenario` fija el caso con la marca puesta.
+   */
+  function resetScenarioForm() {
+    setScenarioName("Nuevo análisis");
+    setCompanyName("");
+    setHomeCountry("");
+    setIndustry("");
+    setBusinessModel("");
+    setValueProposition("");
+    setObjective("market");
+    setHorizonYears("3");
+    setCandidates([]);
+    setSelectedCode("");
+    setActiveCountry(undefined);
+    setMarketData({});
+    setFinancialByCountry({});
+    setComparisonCodes([]);
+    setResult(null);
+    setSavedScenarioId(null);
+    setCaseDocumentId(null);
+    setStrategySubTab("ambition");
+    setPopMin("0");
+    setGdpMin("0");
+    setGrowthMin("-100");
+    setExcludedCodes("");
+    setGovernanceErrors({});
+  }
+
+  function changeCase(nextCaseId: number | null) {
+    if (nextCaseId === caseId) return;
+    if (!restoringScenario.current) {
+      resetScenarioForm();
+      if (nextCaseId !== null) toast.info("Caso nuevo: el formulario se ha vaciado para no arrastrar el análisis anterior.");
+    }
+    setCaseId(nextCaseId);
+  }
+
   function applyScenario(scenarioId: number, name: string, input: ReturnType<typeof buildInput>, savedResult: Evaluation | null, linkedCaseId: number | null) {
     setScenarioName(name);
     setCompanyName(input.companyName ?? "");
@@ -563,7 +613,11 @@ export default function Home() {
 
     setResult(savedResult);
     setSavedScenarioId(scenarioId);
-    if (linkedCaseId !== null) setCaseId(linkedCaseId);
+    if (linkedCaseId !== null) {
+      restoringScenario.current = true;
+      setCaseId(linkedCaseId);
+      restoringScenario.current = false;
+    }
     setActiveTab(savedResult ? "decision" : "calibrate");
   }
 
@@ -683,7 +737,7 @@ export default function Home() {
             <TabsTrigger value="approval"><ClipboardCheck className="mr-2 h-4 w-4" /> {ui("tabGates")}</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="case" className="mt-6"><CaseWorkspace caseId={caseId} onCaseSelected={setCaseId} decisionContext={[companyName, industry, valueProposition].filter(Boolean).join(" · ")} defaults={{ companyName, homeCountry, industry }} activeDocumentId={caseDocumentId} onActiveDocumentChange={setCaseDocumentId} /></TabsContent>
+          <TabsContent value="case" className="mt-6"><CaseWorkspace caseId={caseId} onCaseSelected={changeCase} decisionContext={[companyName, industry, valueProposition].filter(Boolean).join(" · ")} defaults={{ companyName, homeCountry, industry }} activeDocumentId={caseDocumentId} onActiveDocumentChange={setCaseDocumentId} /></TabsContent>
           <TabsContent value="ambition" className="mt-6"><GlobalStrategyPanel caseId={caseId} subTab={strategySubTab} onSubTabChange={setStrategySubTab} /></TabsContent>
               <TabsContent value="brief" className="tab-enter">
             <div className="grid gap-6 xl:grid-cols-[1.45fr_.8fr]">

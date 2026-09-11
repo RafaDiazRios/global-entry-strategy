@@ -39,6 +39,15 @@ export const UI_STRINGS = {
     "Los doce pasos están cubiertos: mandato, evidencias, ambición, posicionamiento, países, evaluación, entrada, socio y decisión con su puerta de revisión. Puede exportar el informe o guardar el escenario.",
     "All twelve steps are covered: mandate, evidence, ambition, positioning, countries, assessment, entry, partner and decision with its review gate. You can export the report or save the scenario."
   ),
+  routeConfirm: loc("Confirmar y continuar", "Confirm and continue"),
+  routeSkip: loc("Continuar sin completar", "Continue without completing"),
+  routeConfirmHint: loc(
+    "Puede seguir sin completarlo: quedará marcado como saltado, no como hecho.",
+    "You can move on without completing it: it will be marked as skipped, not as done."
+  ),
+  routeSkipped: loc("saltados", "skipped"),
+  routeSkippedTag: loc("saltado", "skipped"),
+  routeReopen: loc("Reabrir este paso", "Reopen this step"),
   routeNoCase: loc(
     "La ruta empieza a medir en cuanto haya un caso abierto. Sin caso solo puede seguir el primer paso.",
     "The route starts measuring as soon as a case is open. With no case, only the first step applies."

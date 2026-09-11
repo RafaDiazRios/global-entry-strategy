@@ -36,6 +36,13 @@
       "when": 1789063785238,
       "tag": "0004_modulo_de_socio",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1789063786238,
+      "tag": "0005_ruta_guiada",
+      "breakpoints": true
     }
   ]
 }

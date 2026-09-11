@@ -13,7 +13,7 @@ import { storageGetSignedUrl, storagePut } from "./storage";
 import { getWgiGovernanceData } from "./strategy/wgi";
 import { ambitionCompleteness, ambitionGap, computeIndices, CONVENTIONS, DEFAULT_THRESHOLDS, positionOnAmbitionMap } from "./strategy/globalAmbition";
 import { diagnoseValueChain, diagnoseValueCurve, positioningCompleteness, positioningWarnings, resolvePositioning, resourceGap } from "./strategy/globalPositioning";
-import { ambitionInputSchema, entryStrategyInputSchema, parseAmbition, parseEntryStrategy, parsePartnering, parsePositioning, partneringInputSchema, positioningInputSchema } from "./strategy/globalStrategySchemas";
+import { ambitionInputSchema, entryStrategyInputSchema, parseAmbition, parseEntryStrategy, parsePartnering, parsePositioning, parseRouteProgress, partneringInputSchema, positioningInputSchema, routeProgressSchema } from "./strategy/globalStrategySchemas";
 import { entryStrategyCompleteness, entryStrategyWarnings, mappingShortlist, paceProfile, phaseDefinition } from "./strategy/entryStrategy";
 import * as entryDomain from "@shared/domain/entryStrategy";
 import * as partneringDomain from "@shared/domain/partnering";
@@ -860,6 +860,21 @@ export const appRouter = router({
         };
         const findings = evaluateCoherence(dossier);
         return { findings, index: completenessIndex(dossier, findings) };
+      }),
+
+    /** Progreso de la ruta guiada: qué pasos ha confirmado el analista y cuáles se saltó. */
+    getRouteProgress: protectedProcedure
+      .input(z.object({ caseId: z.number().int().positive() }))
+      .query(async ({ ctx, input }) => {
+        const stored = await db.getCaseModule(ctx.user.id, input.caseId, "route");
+        return parseRouteProgress(stored?.payload);
+      }),
+
+    saveRouteProgress: protectedProcedure
+      .input(z.object({ caseId: z.number().int().positive(), payload: routeProgressSchema }))
+      .mutation(async ({ ctx, input }) => {
+        await db.saveCaseModule(ctx.user.id, input.caseId, "route", input.payload);
+        return input.payload;
       }),
 
     getPartnering: protectedProcedure

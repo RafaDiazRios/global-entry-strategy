@@ -360,13 +360,28 @@ export type RouteSnapshot = {
   financialReady: boolean;
   hasResult: boolean;
   approvalCount: number;
+  confirmations: RouteConfirmations;
 };
 
-export type StepStatus = "done" | "in_progress" | "pending" | "blocked";
+/**
+ * `ready` es el estado que faltaba: el paso cumple sus condiciones pero nadie lo ha dado por
+ * bueno todavía. Avanzar solo porque un contador llegó al final quita al analista la
+ * decisión de decidir, que es lo único que esta herramienta no debería automatizar.
+ */
+export type StepStatus = "done" | "skipped" | "ready" | "in_progress" | "pending";
+
+/** Lo que el analista ha confirmado o ha decidido saltarse, guardado con el caso. */
+export type RouteConfirmations = { confirmed: StepId[]; skipped: StepId[] };
+
+export function emptyConfirmations(): RouteConfirmations {
+  return { confirmed: [], skipped: [] };
+}
 
 export type StepState = {
   step: GuidedStep;
   status: StepStatus;
+  /** Las condiciones del paso se cumplen, con independencia de que se haya confirmado. */
+  gateMet: boolean;
   /** Qué falta exactamente para darlo por hecho. */
   missing: Localized[];
   /** Progreso 0-1 cuando el paso lo tiene medido. */
@@ -378,6 +393,8 @@ export type RouteState = {
   /** El paso en el que hay que trabajar ahora. Null cuando está todo hecho. */
   current: StepState | null;
   doneCount: number;
+  /** Pasos que el analista decidió dejar atrás sin completar. */
+  skippedCount: number;
   total: number;
 };
 
@@ -467,18 +484,22 @@ export function evaluateRoute(snapshot: RouteSnapshot): RouteState {
         break;
     }
 
-    return { step, status: done ? "done" : "pending", missing, progress };
+    const confirmed = snapshot.confirmations.confirmed.includes(step.id);
+    const skipped = snapshot.confirmations.skipped.includes(step.id);
+    const status: StepStatus = confirmed ? "done" : skipped ? "skipped" : "pending";
+    return { step, status, gateMet: done, missing, progress };
   });
 
-  // El paso actual es el primero sin terminar; los anteriores hechos y los posteriores en
-  // espera. No se bloquea nada: se puede trabajar fuera de orden y la ruta lo refleja.
-  const currentIndex = states.findIndex((state) => state.status !== "done");
-  if (currentIndex >= 0) states[currentIndex].status = "in_progress";
+  // El paso actual es el primero que nadie ha resuelto: ni confirmado ni saltado. No se
+  // bloquea nada, se puede trabajar fuera de orden, y la ruta refleja lo que queda.
+  const currentIndex = states.findIndex((state) => state.status === "pending");
+  if (currentIndex >= 0) states[currentIndex].status = states[currentIndex].gateMet ? "ready" : "in_progress";
 
   return {
     steps: states,
     current: currentIndex >= 0 ? states[currentIndex] : null,
     doneCount: states.filter((state) => state.status === "done").length,
+    skippedCount: states.filter((state) => state.status === "skipped").length,
     total: states.length,
   };
 }

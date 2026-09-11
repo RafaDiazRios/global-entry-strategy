@@ -181,3 +181,18 @@ export function parsePartnering(payload: unknown): PartneringInput {
   const parsed = partneringInputSchema.safeParse(payload);
   return parsed.success ? (parsed.data as PartneringInput) : emptyPartneringInput();
 }
+
+const stepId = z.enum([
+  "case", "material", "brief", "ambition_motives", "ambition_indices", "positioning",
+  "value_chain", "countries", "assessment", "entry", "partnering", "economics",
+]);
+
+export const routeProgressSchema = z.object({
+  confirmed: z.array(stepId).max(12),
+  skipped: z.array(stepId).max(12),
+});
+
+export function parseRouteProgress(payload: unknown) {
+  const parsed = routeProgressSchema.safeParse(payload);
+  return parsed.success ? parsed.data : { confirmed: [], skipped: [] };
+}
