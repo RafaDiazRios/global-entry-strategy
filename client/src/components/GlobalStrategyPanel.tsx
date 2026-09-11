@@ -73,7 +73,12 @@ function Loaded({ caseId, subTab, onSubTabChange }: { caseId: number; subTab?: S
   }
   return (
     <Tabs value={subTab ?? "ambition"} onValueChange={(value) => onSubTabChange?.(value as SubTab)} className="space-y-6">
-      <TabsList>
+      {/*
+        La fila crece en alto y envuelve en lugar de desbordarse. Con cuatro sub-pestañas
+        cabía en una línea; al entrar Coherencia como quinta, en pantallas estrechas la
+        última quedaba cortada fuera del contenedor y parecía que no existía.
+      */}
+      <TabsList className="h-auto w-full flex-wrap justify-start gap-1">
         <TabsTrigger value="ambition"><Compass className="mr-2 h-4 w-4" />Ambición global</TabsTrigger>
         <TabsTrigger value="positioning"><Layers className="mr-2 h-4 w-4" />Posicionamiento</TabsTrigger>
         <TabsTrigger value="entry"><DoorOpen className="mr-2 h-4 w-4" />Entrada</TabsTrigger>
