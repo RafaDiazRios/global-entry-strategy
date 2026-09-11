@@ -3,6 +3,7 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { InsertStrategyScenario, InsertUser, strategyApprovalMilestones, strategyApprovals, strategyCaseDocuments, strategyCaseModules, strategyCases, strategyEvidence, strategyScenarios, users } from "../drizzle/schema";
 import { ENV } from "./_core/env";
+import { localizedError } from "@shared/localizedError";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
@@ -76,7 +77,7 @@ export async function getUserByOpenId(openId: string) {
 
 export async function saveStrategyScenario(values: InsertStrategyScenario) {
   const db = await getDb();
-  if (!db) throw new Error("Database unavailable");
+  if (!db) throw localizedError("Base de datos no disponible.", "Database unavailable.");
   const result = await db.insert(strategyScenarios).values(values).returning({ id: strategyScenarios.id });
   return result[0].id;
 }
@@ -93,10 +94,10 @@ export async function listStrategyScenarios(userId: number) {
 
 async function ensureScenarioRow(userId: number, scenarioId: number) {
   const db = await getDb();
-  if (!db) throw new Error("Database unavailable");
+  if (!db) throw localizedError("Base de datos no disponible.", "Database unavailable.");
   const rows = await db.select().from(strategyScenarios).where(and(eq(strategyScenarios.id, scenarioId), eq(strategyScenarios.userId, userId))).limit(1);
   const row = rows[0];
-  if (!row) throw new Error("Escenario no encontrado o sin acceso.");
+  if (!row) throw localizedError("Escenario no encontrado o sin acceso.", "Scenario not found, or no access to it.");
   return { db, row };
 }
 
@@ -160,21 +161,21 @@ export async function listStrategyScenariosForRefresh() {
 
 export async function refreshStrategyScenario(id: number, inputJson: unknown, resultJson: unknown) {
   const db = await getDb();
-  if (!db) throw new Error("Database unavailable");
+  if (!db) throw localizedError("Base de datos no disponible.", "Database unavailable.");
   await db.update(strategyScenarios).set({ inputJson, resultJson, sourceRefreshAt: new Date() }).where(eq(strategyScenarios.id, id));
 }
 
 async function ensureScenarioOwnership(userId: number, scenarioId: number) {
   const db = await getDb();
-  if (!db) throw new Error("Database unavailable");
+  if (!db) throw localizedError("Base de datos no disponible.", "Database unavailable.");
   const scenario = await db.select({ id: strategyScenarios.id }).from(strategyScenarios).where(and(eq(strategyScenarios.id, scenarioId), eq(strategyScenarios.userId, userId))).limit(1);
-  if (!scenario[0]) throw new Error("Escenario no encontrado o sin acceso.");
+  if (!scenario[0]) throw localizedError("Escenario no encontrado o sin acceso.", "Scenario not found, or no access to it.");
   return db;
 }
 
 async function loadApprovalWorkflow(userId: number, approvalId: number): Promise<ApprovalWorkflow | null> {
   const db = await getDb();
-  if (!db) throw new Error("Database unavailable");
+  if (!db) throw localizedError("Base de datos no disponible.", "Database unavailable.");
   const approvals = await db.select().from(strategyApprovals).where(and(eq(strategyApprovals.id, approvalId), eq(strategyApprovals.userId, userId))).limit(1);
   const approval = approvals[0];
   if (!approval) return null;
@@ -203,15 +204,15 @@ export async function createApprovalWorkflow(input: {
   const approvalId = inserted[0].id;
   if (input.milestones.length) await db.insert(strategyApprovalMilestones).values(input.milestones.map((milestone) => ({ approvalId, title: milestone.title, responsible: milestone.responsible ?? null, dueAt: milestone.dueAt ?? null, status: milestone.status ?? "pending", evidence: milestone.evidence ?? null })));
   const created = await loadApprovalWorkflow(input.userId, approvalId);
-  if (!created) throw new Error("No se pudo crear el flujo de aprobación.");
+  if (!created) throw localizedError("No se pudo crear el flujo de aprobación.", "The approval flow could not be created.");
   return created;
 }
 
 export async function updateApprovalWorkflow(userId: number, approvalId: number, input: { status?: ApprovalStatus; responsible?: string; reviewer?: string | null; reviewAt?: Date; notes?: string | null }) {
   const db = await getDb();
-  if (!db) throw new Error("Database unavailable");
+  if (!db) throw localizedError("Base de datos no disponible.", "Database unavailable.");
   const existing = await loadApprovalWorkflow(userId, approvalId);
-  if (!existing) throw new Error("Flujo de aprobación no encontrado o sin acceso.");
+  if (!existing) throw localizedError("Flujo de aprobación no encontrado o sin acceso.", "Approval flow not found, or no access to it.");
   const changes: Record<string, unknown> = {};
   if (input.status !== undefined) changes.status = input.status;
   if (input.responsible !== undefined) changes.responsible = input.responsible;
@@ -220,17 +221,17 @@ export async function updateApprovalWorkflow(userId: number, approvalId: number,
   if (input.notes !== undefined) changes.notes = input.notes;
   if (Object.keys(changes).length) await db.update(strategyApprovals).set(changes).where(eq(strategyApprovals.id, approvalId));
   const updated = await loadApprovalWorkflow(userId, approvalId);
-  if (!updated) throw new Error("No se pudo actualizar el flujo de aprobación.");
+  if (!updated) throw localizedError("No se pudo actualizar el flujo de aprobación.", "The approval flow could not be updated.");
   return updated;
 }
 
 export async function updateApprovalMilestone(userId: number, milestoneId: number, input: { status?: MilestoneStatus; responsible?: string | null; dueAt?: Date | null; evidence?: string | null }) {
   const db = await getDb();
-  if (!db) throw new Error("Database unavailable");
+  if (!db) throw localizedError("Base de datos no disponible.", "Database unavailable.");
   const milestone = await db.select({ id: strategyApprovalMilestones.id, approvalId: strategyApprovalMilestones.approvalId }).from(strategyApprovalMilestones).where(eq(strategyApprovalMilestones.id, milestoneId)).limit(1);
-  if (!milestone[0]) throw new Error("Hito no encontrado.");
+  if (!milestone[0]) throw localizedError("Hito no encontrado.", "Milestone not found.");
   const approval = await loadApprovalWorkflow(userId, milestone[0].approvalId);
-  if (!approval) throw new Error("Sin acceso al hito solicitado.");
+  if (!approval) throw localizedError("Sin acceso al hito solicitado.", "No access to the milestone requested.");
   const changes: Record<string, unknown> = {};
   if (input.status !== undefined) changes.status = input.status;
   if (input.responsible !== undefined) changes.responsible = input.responsible;
@@ -238,7 +239,7 @@ export async function updateApprovalMilestone(userId: number, milestoneId: numbe
   if (input.evidence !== undefined) changes.evidence = input.evidence;
   if (Object.keys(changes).length) await db.update(strategyApprovalMilestones).set(changes).where(eq(strategyApprovalMilestones.id, milestoneId));
   const updated = await loadApprovalWorkflow(userId, approval.id);
-  if (!updated) throw new Error("No se pudo actualizar el hito.");
+  if (!updated) throw localizedError("No se pudo actualizar el hito.", "The milestone could not be updated.");
   return updated;
 }
 
@@ -268,15 +269,15 @@ export type EvidenceInput = {
 
 async function ensureCaseOwnership(userId: number, caseId: number) {
   const db = await getDb();
-  if (!db) throw new Error("Database unavailable");
+  if (!db) throw localizedError("Base de datos no disponible.", "Database unavailable.");
   const found = await db.select({ id: strategyCases.id }).from(strategyCases).where(and(eq(strategyCases.id, caseId), eq(strategyCases.userId, userId))).limit(1);
-  if (!found[0]) throw new Error("Caso no encontrado o sin acceso.");
+  if (!found[0]) throw localizedError("Caso no encontrado o sin acceso.", "Case not found, or no access to it.");
   return db;
 }
 
 export async function createCase(input: { userId: number; title: string; decisionQuestion?: string | null; companyName?: string | null; homeCountry?: string | null; industry?: string | null; subIndustry?: string | null; caseYear?: number | null }) {
   const db = await getDb();
-  if (!db) throw new Error("Database unavailable");
+  if (!db) throw localizedError("Base de datos no disponible.", "Database unavailable.");
   const inserted = await db.insert(strategyCases).values({
     userId: input.userId,
     title: input.title,
@@ -324,7 +325,7 @@ export async function addCaseDocument(input: { userId: number; caseId: number; f
 
 export async function getCaseDocument(userId: number, documentId: number) {
   const db = await getDb();
-  if (!db) throw new Error("Database unavailable");
+  if (!db) throw localizedError("Base de datos no disponible.", "Database unavailable.");
   const rows = await db.select().from(strategyCaseDocuments).where(and(eq(strategyCaseDocuments.id, documentId), eq(strategyCaseDocuments.userId, userId))).limit(1);
   return rows[0] ?? null;
 }
@@ -360,19 +361,19 @@ export async function listEvidence(userId: number, caseId: number) {
 
 export async function setEvidenceStatus(userId: number, evidenceId: number, status: EvidenceStatus) {
   const db = await getDb();
-  if (!db) throw new Error("Database unavailable");
+  if (!db) throw localizedError("Base de datos no disponible.", "Database unavailable.");
   await db.update(strategyEvidence).set({ status }).where(and(eq(strategyEvidence.id, evidenceId), eq(strategyEvidence.userId, userId)));
 }
 
 export async function updateEvidence(userId: number, evidenceId: number, values: Partial<{ claim: string; sourceLabel: string; locator: string | null; targetPath: string | null; reliability: number; countryCode: string | null }>) {
   const db = await getDb();
-  if (!db) throw new Error("Database unavailable");
+  if (!db) throw localizedError("Base de datos no disponible.", "Database unavailable.");
   await db.update(strategyEvidence).set(values).where(and(eq(strategyEvidence.id, evidenceId), eq(strategyEvidence.userId, userId)));
 }
 
 export async function deleteEvidence(userId: number, evidenceId: number) {
   const db = await getDb();
-  if (!db) throw new Error("Database unavailable");
+  if (!db) throw localizedError("Base de datos no disponible.", "Database unavailable.");
   await db.delete(strategyEvidence).where(and(eq(strategyEvidence.id, evidenceId), eq(strategyEvidence.userId, userId)));
 }
 

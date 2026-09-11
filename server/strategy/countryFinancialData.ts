@@ -1,4 +1,5 @@
 import { currencyForCountry } from "@shared/domain/countries";
+import { loc, type Localized } from "@shared/i18n";
 export type PublicDataStatus = "live" | "partial" | "unavailable";
 
 export type TaxReference = {
@@ -8,7 +9,7 @@ export type TaxReference = {
   sourceName: string;
   sourceUrl: string;
   retrievedAt: string;
-  note: string;
+  note: Localized;
 };
 
 export type FxReference = {
@@ -20,7 +21,7 @@ export type FxReference = {
   sourceName: string;
   sourceUrl: string;
   retrievedAt: string;
-  note: string;
+  note: Localized;
 };
 
 export type CountryFinancialReference = {
@@ -102,11 +103,17 @@ export async function getCorporateTaxReference(countryCode: string): Promise<Tax
     const dataset = await getTaxDataset();
     const result = dataset.get(normalized);
     if (!result || result.ratePct === null) {
-      return { ratePct: null, sourceYear: 2025, sourceStatus: "unavailable", sourceName: "Tax Foundation — Corporate Tax Rates Around the World", sourceUrl: taxPageUrl, retrievedAt, note: "La fuente no ofrece una tasa corporativa estatutaria comparable para este código ISO en 2025." };
+      return { ratePct: null, sourceYear: 2025, sourceStatus: "unavailable", sourceName: "Tax Foundation — Corporate Tax Rates Around the World", sourceUrl: taxPageUrl, retrievedAt, note: loc(
+        "La fuente no ofrece una tasa corporativa estatutaria comparable para este código ISO en 2025.",
+        "The source offers no comparable statutory corporate rate for this ISO code in 2025."
+      ) };
     }
-    return { ratePct: result.ratePct, sourceYear: 2025, sourceStatus: "live", sourceName: "Tax Foundation — Corporate Tax Rates Around the World", sourceUrl: taxPageUrl, retrievedAt, note: "Tasa corporativa estatutaria máxima estándar y combinada. No incorpora regímenes especiales, incentivos sectoriales, pérdidas fiscales, impuestos de distribución ni la posición particular de la empresa." };
+    return { ratePct: result.ratePct, sourceYear: 2025, sourceStatus: "live", sourceName: "Tax Foundation — Corporate Tax Rates Around the World", sourceUrl: taxPageUrl, retrievedAt, note: loc(
+      "Tasa corporativa estatutaria máxima estándar y combinada. No incorpora regímenes especiales, incentivos sectoriales, pérdidas fiscales, impuestos de distribución ni la posición particular de la empresa.",
+      "Top standard and combined statutory corporate rate. It does not take in special regimes, sector incentives, tax losses, distribution taxes or the particular position of the company."
+    ) };
   } catch (error) {
-    return { ratePct: null, sourceYear: null, sourceStatus: "unavailable", sourceName: "Tax Foundation — Corporate Tax Rates Around the World", sourceUrl: taxPageUrl, retrievedAt, note: error instanceof Error ? error.message : "No se pudo consultar la fuente de impuestos." };
+    return { ratePct: null, sourceYear: null, sourceStatus: "unavailable", sourceName: "Tax Foundation — Corporate Tax Rates Around the World", sourceUrl: taxPageUrl, retrievedAt, note: loc("No se pudo consultar la fuente de impuestos.", "The tax source could not be queried.") };
   }
 }
 
@@ -119,10 +126,13 @@ export async function getExchangeRateReference(countryCode: string, reportingCur
   const target = reportingCurrency.trim().toUpperCase() || "USD";
   const localCurrency = await getCountryCurrency(countryCode);
   if (!localCurrency) {
-    return { localCurrency: null, reportingCurrency: target, rateToReportingCurrency: null, observedAt: null, sourceStatus: "unavailable", sourceName: "Frankfurter", sourceUrl: "https://frankfurter.dev/", retrievedAt, note: "El código de país no tiene una moneda preconfigurada en el catálogo actual. Introduzca moneda y tipo de cambio manualmente." };
+    return { localCurrency: null, reportingCurrency: target, rateToReportingCurrency: null, observedAt: null, sourceStatus: "unavailable", sourceName: "Frankfurter", sourceUrl: "https://frankfurter.dev/", retrievedAt, note: loc(
+      "El código de país no tiene una moneda preconfigurada en el catálogo actual. Introduzca moneda y tipo de cambio manualmente.",
+      "The country code has no preconfigured currency in the current catalogue. Enter the currency and the exchange rate by hand."
+    ) };
   }
   if (localCurrency === target) {
-    return { localCurrency, reportingCurrency: target, rateToReportingCurrency: 1, observedAt: new Date().toISOString().slice(0, 10), sourceStatus: "live", sourceName: "Frankfurter", sourceUrl: "https://frankfurter.dev/", retrievedAt, note: "Moneda local y de reporte idénticas; se aplica tipo de cambio 1,0." };
+    return { localCurrency, reportingCurrency: target, rateToReportingCurrency: 1, observedAt: new Date().toISOString().slice(0, 10), sourceStatus: "live", sourceName: "Frankfurter", sourceUrl: "https://frankfurter.dev/", retrievedAt, note: loc("Moneda local y de reporte idénticas; se aplica tipo de cambio 1,0.", "Local and reporting currency are the same; an exchange rate of 1.0 applies.") };
   }
   try {
     const response = await fetch(`${frankfurterBaseUrl}/v2/rate/${encodeURIComponent(localCurrency)}/${encodeURIComponent(target)}`, { headers: { Accept: "application/json" } });
@@ -130,9 +140,12 @@ export async function getExchangeRateReference(countryCode: string, reportingCur
     const body = await response.json() as FrankfurterRate;
     const rate = body.rate;
     if (!Number.isFinite(rate) || !rate || rate <= 0) throw new Error("Frankfurter returned no valid rate");
-    return { localCurrency, reportingCurrency: target, rateToReportingCurrency: rate, observedAt: body.date ?? null, sourceStatus: "live", sourceName: "Frankfurter", sourceUrl: `https://api.frankfurter.dev/v2/rate/${localCurrency}/${target}`, retrievedAt, note: "Tipo de cambio de referencia al cierre de la fecha indicada. No es una cotización ejecutable, una previsión ni una cobertura de divisa." };
+    return { localCurrency, reportingCurrency: target, rateToReportingCurrency: rate, observedAt: body.date ?? null, sourceStatus: "live", sourceName: "Frankfurter", sourceUrl: `https://api.frankfurter.dev/v2/rate/${localCurrency}/${target}`, retrievedAt, note: loc(
+      "Tipo de cambio de referencia al cierre de la fecha indicada. No es una cotización ejecutable, una previsión ni una cobertura de divisa.",
+      "Reference exchange rate at the close of the date shown. It is not an executable quote, a forecast or a currency hedge."
+    ) };
   } catch (error) {
-    return { localCurrency, reportingCurrency: target, rateToReportingCurrency: null, observedAt: null, sourceStatus: "unavailable", sourceName: "Frankfurter", sourceUrl: "https://frankfurter.dev/", retrievedAt, note: error instanceof Error ? error.message : "No se pudo consultar el tipo de cambio." };
+    return { localCurrency, reportingCurrency: target, rateToReportingCurrency: null, observedAt: null, sourceStatus: "unavailable", sourceName: "Frankfurter", sourceUrl: "https://frankfurter.dev/", retrievedAt, note: loc("No se pudo consultar el tipo de cambio.", "The exchange rate could not be queried.") };
   }
 }
 
@@ -141,9 +154,35 @@ export async function getCountryFinancialReference(countryCode: string, reportin
   return { countryCode: countryCode.trim().toUpperCase(), tax, fx };
 }
 
-export const financialPublicSources = [
-  { name: "Tax Foundation — Corporate Tax Rates Around the World", status: "Conectado", coverage: "Tasas corporativas estatutarias estándar de 226 jurisdicciones; publicación 2025.", use: "Valor inicial de impuesto corporativo para sensibilidad; editable y no sustitutivo de un análisis fiscal local.", url: taxPageUrl },
-  { name: "Frankfurter", status: "Conectado", coverage: "Tipos de cambio actuales e históricos de 205 monedas, con fuentes de 94 bancos centrales.", use: "Conversión de moneda local a moneda de reporte; tipo de referencia no ejecutable y editable.", url: "https://frankfurter.dev/" },
+export const financialPublicSources: { name: string; live: boolean; status: Localized; coverage: Localized; use: Localized; url: string }[] = [
+  {
+    name: "Tax Foundation — Corporate Tax Rates Around the World",
+    live: true,
+    status: loc("Conectado", "Connected"),
+    coverage: loc(
+      "Tasas corporativas estatutarias estándar de 226 jurisdicciones; publicación 2025.",
+      "Standard statutory corporate rates for 226 jurisdictions; 2025 publication."
+    ),
+    use: loc(
+      "Valor inicial de impuesto corporativo para sensibilidad; editable y no sustitutivo de un análisis fiscal local.",
+      "A starting corporate tax value for sensitivity; editable, and no substitute for local tax analysis."
+    ),
+    url: taxPageUrl,
+  },
+  {
+    name: "Frankfurter",
+    live: true,
+    status: loc("Conectado", "Connected"),
+    coverage: loc(
+      "Tipos de cambio actuales e históricos de 205 monedas, con fuentes de 94 bancos centrales.",
+      "Current and historical exchange rates for 205 currencies, sourced from 94 central banks."
+    ),
+    use: loc(
+      "Conversión de moneda local a moneda de reporte; tipo de referencia no ejecutable y editable.",
+      "Conversion from local to reporting currency; a reference rate, not executable, and editable."
+    ),
+    url: "https://frankfurter.dev/",
+  },
 ];
 
 export { parseTaxCsv };

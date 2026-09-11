@@ -1,4 +1,4 @@
-import { pick } from "@shared/i18n";
+import { loc, pick, type Localized } from "@shared/i18n";
 import { evaluateFinancials, recommendInvestmentAction, type EntryModeKey, type FinancialAssumptions, type FinancialResult, type InvestmentRecommendation, type InvestmentThresholds } from "./financialEngine";
 import { buildSituation, scoreEntryModes, type EntryModeScore, type EntryModeWeights } from "./entryModeScoring";
 import {
@@ -53,7 +53,7 @@ export type KnockOutPolicy = {
 
 export type EligibilityBreach = {
   rule: string;
-  label: string;
+  label: Localized;
   value: number | null;
   limit: number | null;
 };
@@ -204,24 +204,24 @@ export type CountryResult = {
   financial: FinancialResult;
   investmentRecommendation: InvestmentRecommendation;
   timing: TimingRecommendation;
-  flags: string[];
+  flags: Localized[];
 };
 
 export type EntryModeRecommendation = EntryModeScore;
 
 export type TimingRecommendation = {
-  label: string;
-  description: string;
+  label: Localized;
+  description: Localized;
 };
 
 export type EvaluationResult = {
   generatedAt: string;
-  methodology: string;
+  methodology: Localized;
   countries: CountryResult[];
   portfolio: {
     leadingCountry?: string;
-    recommendation: string;
-    caveats: string[];
+    recommendation: Localized;
+    caveats: Localized[];
   };
 };
 
@@ -270,12 +270,12 @@ function logNormalize(value: number | null | undefined, low: number, high: numbe
   return normalize(Math.log10(value), Math.log10(low), Math.log10(high));
 }
 
-function labelForObjective(objective: EntryObjective) {
+function labelForObjective(objective: EntryObjective): Localized {
   return {
-    market: "desarrollo de mercado",
-    resources: "acceso a recursos",
-    learning: "aprendizaje y capacidades",
-    coordination: "coordinación regional",
+    market: loc("desarrollo de mercado", "market development"),
+    resources: loc("acceso a recursos", "resource access"),
+    learning: loc("aprendizaje y capacidades", "learning and capabilities"),
+    coordination: loc("coordinación regional", "regional coordination"),
   }[objective];
 }
 
@@ -369,20 +369,20 @@ function evaluateEligibility(
 ): CountryEligibility {
   if (!policy) return { eligible: true, breaches: [] };
   const breaches: EligibilityBreach[] = [];
-  const maxRule = (limit: number | null | undefined, value: number, rule: string, label: string) => {
+  const maxRule = (limit: number | null | undefined, value: number, rule: string, label: Localized) => {
     if (limit === null || limit === undefined) return;
     if (value > limit) breaches.push({ rule, label, value, limit });
   };
-  maxRule(policy.maxPoliticalRisk, calibration.politicalRisk, "maxPoliticalRisk", "Riesgo político por encima del máximo admitido");
-  maxRule(policy.maxEconomicRisk, calibration.economicRisk, "maxEconomicRisk", "Riesgo económico por encima del máximo admitido");
-  maxRule(policy.maxCompetitiveRisk, calibration.competitiveRisk, "maxCompetitiveRisk", "Riesgo competitivo por encima del máximo admitido");
-  maxRule(policy.maxOperationalRisk, calibration.operationalRisk, "maxOperationalRisk", "Riesgo operativo por encima del máximo admitido");
-  maxRule(policy.maxCageDistance, calibration.cageDistance, "maxCageDistance", "Distancia CAGE por encima del máximo admitido");
+  maxRule(policy.maxPoliticalRisk, calibration.politicalRisk, "maxPoliticalRisk", loc("Riesgo político por encima del máximo admitido", "Political risk above the accepted maximum"));
+  maxRule(policy.maxEconomicRisk, calibration.economicRisk, "maxEconomicRisk", loc("Riesgo económico por encima del máximo admitido", "Economic risk above the accepted maximum"));
+  maxRule(policy.maxCompetitiveRisk, calibration.competitiveRisk, "maxCompetitiveRisk", loc("Riesgo competitivo por encima del máximo admitido", "Competitive risk above the accepted maximum"));
+  maxRule(policy.maxOperationalRisk, calibration.operationalRisk, "maxOperationalRisk", loc("Riesgo operativo por encima del máximo admitido", "Operational risk above the accepted maximum"));
+  maxRule(policy.maxCageDistance, calibration.cageDistance, "maxCageDistance", loc("Distancia CAGE por encima del máximo admitido", "CAGE distance above the accepted maximum"));
   if (policy.minSafety !== null && policy.minSafety !== undefined && safety < policy.minSafety) {
-    breaches.push({ rule: "minSafety", label: "Seguridad agregada por debajo del mínimo admitido", value: safety, limit: policy.minSafety });
+    breaches.push({ rule: "minSafety", label: loc("Seguridad agregada por debajo del mínimo admitido", "Aggregate safety below the accepted minimum"), value: safety, limit: policy.minSafety });
   }
   if (policy.requireGovernanceEvidence && (!governance || governance.sourceStatus === "unavailable")) {
-    breaches.push({ rule: "requireGovernanceEvidence", label: "Se exige evidencia de gobernanza y no hay datos WGI disponibles", value: null, limit: null });
+    breaches.push({ rule: "requireGovernanceEvidence", label: loc("Se exige evidencia de gobernanza y no hay datos WGI disponibles", "Governance evidence is required and no WGI data is available"), value: null, limit: null });
   }
   return { eligible: breaches.length === 0, breaches };
 }
@@ -390,19 +390,28 @@ function evaluateEligibility(
 function recommendTiming(attractiveness: number, safety: number, calibration: QualitativeCalibration): TimingRecommendation {
   if (attractiveness >= 72 && safety >= 60 && calibration.timePressure >= 60) {
     return {
-      label: "Ventana de entrada: actuar",
-      description: "La combinación de oportunidad, riesgo tolerable y urgencia justifica preparar una entrada con hitos de ejecución y validación financiera.",
+      label: loc("Ventana de entrada: actuar", "Entry window: act"),
+      description: loc(
+        "La combinación de oportunidad, riesgo tolerable y urgencia justifica preparar una entrada con hitos de ejecución y validación financiera.",
+        "The combination of opportunity, tolerable risk and urgency justifies preparing an entry with execution milestones and financial validation."
+      ),
     };
   }
   if (attractiveness >= 58 && safety >= 45) {
     return {
-      label: "Entrada gradual / opción real",
-      description: "Existe interés estratégico, pero conviene comenzar con un compromiso reversible y definir criterios explícitos para ampliar, mantener o abandonar.",
+      label: loc("Entrada gradual / opción real", "Gradual entry / real option"),
+      description: loc(
+        "Existe interés estratégico, pero conviene comenzar con un compromiso reversible y definir criterios explícitos para ampliar, mantener o abandonar.",
+        "There is strategic interest, but it is worth starting with a reversible commitment and setting explicit criteria to expand, hold or abandon."
+      ),
     };
   }
   return {
-    label: "Observar y aprender",
-    description: "La evidencia actual no justifica una inversión material. Priorice inteligencia local, relaciones y señales que reabran la decisión.",
+    label: loc("Observar y aprender", "Watch and learn"),
+    description: loc(
+      "La evidencia actual no justifica una inversión material. Priorice inteligencia local, relaciones y señales que reabran la decisión.",
+      "Current evidence does not justify a material investment. Prioritize local intelligence, relationships and the signals that would reopen the decision."
+    ),
   };
 }
 
@@ -480,29 +489,76 @@ export function evaluateStrategy(input: EvaluationInput): EvaluationResult {
     const riskAdjusted = clamp(
       (attractiveness * (totalWeight - weights.risk) + safety * weights.risk) / totalWeight,
     );
-    const flags: string[] = [];
-    if (calibration.politicalRisk >= 70) flags.push("Riesgo político alto: limite activos hundidos y considere cobertura contractual/financiera.");
-    if (calibration.cageDistance >= 70) flags.push("Distancia CAGE alta: exija evidencia local y una ruta de aprendizaje antes de escalar.");
-    if (calibration.ipSensitivity >= 70) flags.push("Sensibilidad alta de IP: extreme controles antes de licenciar o compartir tecnología.");
-    if (calibration.competitionAttractiveness <= 35) flags.push("Contexto competitivo desfavorable: valide rivalidad, barreras y poder de canal antes de comprometer inversión.");
-    if (data.sourceStatus !== "live") flags.push("Datos macroeconómicos incompletos o no disponibles: la puntuación se apoya más en calibración cualitativa.");
-    if (governance?.sourceStatus === "unavailable") flags.push("Gobernanza WGI no disponible: el componente de gobierno y riesgo se apoya solo en la calibración cualitativa.");
+    const flags: Localized[] = [];
+    if (calibration.politicalRisk >= 70) {
+      flags.push(loc(
+        "Riesgo político alto: limite activos hundidos y considere cobertura contractual/financiera.",
+        "High political risk: limit sunk assets and consider contractual or financial cover."
+      ));
+    }
+    if (calibration.cageDistance >= 70) {
+      flags.push(loc(
+        "Distancia CAGE alta: exija evidencia local y una ruta de aprendizaje antes de escalar.",
+        "High CAGE distance: demand local evidence and a learning path before scaling."
+      ));
+    }
+    if (calibration.ipSensitivity >= 70) {
+      flags.push(loc(
+        "Sensibilidad alta de IP: extreme controles antes de licenciar o compartir tecnología.",
+        "High IP sensitivity: tighten controls before licensing or sharing technology."
+      ));
+    }
+    if (calibration.competitionAttractiveness <= 35) {
+      flags.push(loc(
+        "Contexto competitivo desfavorable: valide rivalidad, barreras y poder de canal antes de comprometer inversión.",
+        "Unfavourable competitive context: validate rivalry, barriers and channel power before committing investment."
+      ));
+    }
+    if (data.sourceStatus !== "live") {
+      flags.push(loc(
+        "Datos macroeconómicos incompletos o no disponibles: la puntuación se apoya más en calibración cualitativa.",
+        "Macroeconomic data incomplete or unavailable: the score leans more on qualitative calibration."
+      ));
+    }
+    if (governance?.sourceStatus === "unavailable") {
+      flags.push(loc(
+        "Gobernanza WGI no disponible: el componente de gobierno y riesgo se apoya solo en la calibración cualitativa.",
+        "WGI governance unavailable: the government and risk component rests on qualitative calibration alone."
+      ));
+    }
 
     const evidence = calculateEvidence(data, country.calibrationNotes, derivedFields, assessmentSummary.coverage);
     const confidence = confidenceFromEvidence(evidence);
     if (evidence.documentedJudgements < evidence.totalJudgements) {
-      flags.push(`Juicios cualitativos sin justificación documentada: ${evidence.totalJudgements - evidence.documentedJudgements} de ${evidence.totalJudgements}. Complete la evaluación detallada del país o registre la fuente que sostiene cada factor.`);
+      const undocumented = evidence.totalJudgements - evidence.documentedJudgements;
+      flags.push(loc(
+        `Juicios cualitativos sin justificación documentada: ${undocumented} de ${evidence.totalJudgements}. Complete la evaluación detallada del país o registre la fuente que sostiene cada factor.`,
+        `Qualitative judgements with no documented justification: ${undocumented} of ${evidence.totalJudgements}. Complete the detailed country assessment or record the source behind each factor.`
+      ));
     }
     if (assessmentSummary.sustainabilityConcerns.length) {
-      flags.push(`Cuestiones ambientales o sociales señaladas: ${assessmentSummary.sustainabilityConcerns.length}. El libro las plantea como filtro previo a la inversión, no como matiz (p. 242).`);
+      flags.push(loc(
+        `Cuestiones ambientales o sociales señaladas: ${assessmentSummary.sustainabilityConcerns.length}. El libro las plantea como filtro previo a la inversión, no como matiz (p. 242).`,
+        `Environmental or social issues flagged: ${assessmentSummary.sustainabilityConcerns.length}. The book frames them as a filter before investing, not as a nuance (p. 242).`
+      ));
     }
     if (variability.coefficientOfVariation !== null && variability.coefficientOfVariation >= 1.1) {
-      flags.push(`Crecimiento muy volátil: coeficiente de variación ${variability.coefficientOfVariation} sobre ${variability.observations} años. Dos países con el mismo crecimiento medio y distinta dispersión no tienen el mismo riesgo económico (p. 245).`);
+      flags.push(loc(
+        `Crecimiento muy volátil: coeficiente de variación ${variability.coefficientOfVariation} sobre ${variability.observations} años. Dos países con el mismo crecimiento medio y distinta dispersión no tienen el mismo riesgo económico (p. 245).`,
+        `Highly volatile growth: coefficient of variation ${variability.coefficientOfVariation} over ${variability.observations} years. Two countries with the same average growth and different dispersion do not carry the same economic risk (p. 245).`
+      ));
     }
 
     const eligibility = evaluateEligibility(calibration, safety, governance, country.knockOuts ?? input.knockOuts);
     for (const breach of eligibility.breaches) {
-      flags.push(breach.limit === null ? `Criterio eliminatorio: ${breach.label}.` : `Criterio eliminatorio: ${breach.label} (${breach.value} frente al límite ${breach.limit}).`);
+      flags.push(loc(
+        breach.limit === null
+          ? `Criterio eliminatorio: ${pick(breach.label, "es")}.`
+          : `Criterio eliminatorio: ${pick(breach.label, "es")} (${breach.value} frente al límite ${breach.limit}).`,
+        breach.limit === null
+          ? `Knock-out criterion: ${pick(breach.label, "en")}.`
+          : `Knock-out criterion: ${pick(breach.label, "en")} (${breach.value} against the limit of ${breach.limit}).`
+      ));
     }
 
     const includeDigital = input.entryDeliveryModel
@@ -523,9 +579,7 @@ export function evaluateStrategy(input: EvaluationInput): EvaluationResult {
     const entryModes = modeRanking.slice(0, 3);
     const financial = evaluateFinancials(
       input.financialByCountry?.[country.code],
-      // El motor financiero todavía trabaja con cadenas: se le pasa la etiqueta en español
-      // hasta que la economía por alternativa se haga bilingüe.
-      modeRanking.map(({ key, mode }) => ({ key, mode: pick(mode, "es") })),
+      modeRanking.map(({ key, mode }) => ({ key, mode })),
       input.horizonYears,
       { tornadoDeltaPct: input.tornadoDeltaPct },
     );
@@ -536,10 +590,20 @@ export function evaluateStrategy(input: EvaluationInput): EvaluationResult {
       : {
           ...evaluatedRecommendation,
           action: "discard",
-          label: "Descartar (criterio eliminatorio)",
-          summary: "El mercado incumple al menos un criterio eliminatorio de la política de inversión. La puntuación agregada no compensa un umbral declarado como no negociable.",
+          label: loc("Descartar (criterio eliminatorio)", "Discard (knock-out criterion)"),
+          summary: loc(
+            "El mercado incumple al menos un criterio eliminatorio de la política de inversión. La puntuación agregada no compensa un umbral declarado como no negociable.",
+            "The market fails at least one knock-out criterion of the investment policy. The aggregate score does not offset a threshold declared non-negotiable."
+          ),
           reasons: eligibility.breaches.map((breach) =>
-            breach.limit === null ? breach.label : `${breach.label}: ${breach.value} frente al límite ${breach.limit}.`,
+            loc(
+              breach.limit === null
+                ? pick(breach.label, "es")
+                : `${pick(breach.label, "es")}: ${breach.value} frente al límite ${breach.limit}.`,
+              breach.limit === null
+                ? pick(breach.label, "en")
+                : `${pick(breach.label, "en")}: ${breach.value} against the limit of ${breach.limit}.`
+            ),
           ),
         };
 
@@ -584,26 +648,48 @@ export function evaluateStrategy(input: EvaluationInput): EvaluationResult {
   });
   const leader = countries.find((country) => country.eligibility.eligible);
   const excluded = countries.filter((country) => !country.eligibility.eligible);
-  const caveats = [
-    "La comparación no sustituye el análisis específico de industria, validación de clientes, regulación ni debida diligencia.",
-    "Los indicadores públicos son señales de contexto; la decisión debe comprobarse con evidencia local y un caso financiero ajustado al riesgo.",
-    "Los pesos de atractividad dependen del tipo de industria y de la ambición global declarada; el libro no fija una ponderación universal (pp. 228 y 248).",
+  const caveats: Localized[] = [
+    loc(
+      "La comparación no sustituye el análisis específico de industria, validación de clientes, regulación ni debida diligencia.",
+      "This comparison does not replace industry-specific analysis, customer validation, regulation or due diligence."
+    ),
+    loc(
+      "Los indicadores públicos son señales de contexto; la decisión debe comprobarse con evidencia local y un caso financiero ajustado al riesgo.",
+      "Public indicators are context signals; the decision must be checked against local evidence and a risk-adjusted financial case."
+    ),
+    loc(
+      "Los pesos de atractividad dependen del tipo de industria y de la ambición global declarada; el libro no fija una ponderación universal (pp. 228 y 248).",
+      "Attractiveness weights depend on the type of industry and the declared global ambition; the book sets no universal weighting (pp. 228 and 248)."
+    ),
   ];
   if (excluded.length) {
-    caveats.push(`${excluded.length} mercado(s) quedan fuera por criterio eliminatorio: ${excluded.map((country) => country.name).join(", ")}.`);
+    const names = excluded.map((country) => country.name).join(", ");
+    caveats.push(loc(
+      `${excluded.length} mercado(s) quedan fuera por criterio eliminatorio: ${names}.`,
+      `${excluded.length} market(s) are excluded by a knock-out criterion: ${names}.`
+    ));
   }
 
   return {
     generatedAt: new Date().toISOString(),
-    methodology: `Evaluación multicriterio basada en ambición, atractividad, riesgo, distancia y modo de entrada para el objetivo de ${labelForObjective(input.objective)}. Los modos se ordenan cruzando el perfil de la Tabla 7.4 (Lasserre y Monteiro, 5.ª ed., p. 271) con las necesidades y restricciones del caso; los criterios eliminatorios se aplican antes de cualquier ponderación.`,
+    methodology: loc(
+      `Evaluación multicriterio basada en ambición, atractividad, riesgo, distancia y modo de entrada para el objetivo de ${pick(labelForObjective(input.objective), "es")}. Los modos se ordenan cruzando el perfil de la Tabla 7.4 (Lasserre y Monteiro, 5.ª ed., p. 271) con las necesidades y restricciones del caso; los criterios eliminatorios se aplican antes de cualquier ponderación.`,
+      `Multi-criteria evaluation based on ambition, attractiveness, risk, distance and entry mode for the objective of ${pick(labelForObjective(input.objective), "en")}. Modes are ranked by crossing the Table 7.4 profile (Lasserre and Monteiro, 5th ed., p. 271) with the needs and constraints of the case; knock-out criteria are applied before any weighting.`
+    ),
     countries,
     portfolio: {
       leadingCountry: leader?.name,
       recommendation: leader
-        ? `${leader.name} lidera la comparación actual con una puntuación ajustada por riesgo de ${leader.scores.riskAdjusted}/100. La política de inversión indica: ${leader.investmentRecommendation.label}. ${leader.investmentRecommendation.summary}`
+        ? loc(
+            `${leader.name} lidera la comparación actual con una puntuación ajustada por riesgo de ${leader.scores.riskAdjusted}/100. La política de inversión indica: ${pick(leader.investmentRecommendation.label, "es")}. ${pick(leader.investmentRecommendation.summary, "es")}`,
+            `${leader.name} leads the current comparison with a risk-adjusted score of ${leader.scores.riskAdjusted}/100. The investment policy says: ${pick(leader.investmentRecommendation.label, "en")}. ${pick(leader.investmentRecommendation.summary, "en")}`
+          )
         : countries.length
-          ? "Ningún mercado supera los criterios eliminatorios definidos. Revise la política o amplíe el universo de países."
-          : "Añada al menos un país para construir una comparación.",
+          ? loc(
+              "Ningún mercado supera los criterios eliminatorios definidos. Revise la política o amplíe el universo de países.",
+              "No market clears the knock-out criteria defined. Revisit the policy or widen the country universe."
+            )
+          : loc("Añada al menos un país para construir una comparación.", "Add at least one country to build a comparison."),
       caveats,
     },
   };

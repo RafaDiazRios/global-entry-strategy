@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { LANGUAGES, pick, type Localized } from "@shared/i18n";
+import { LANGUAGES, loc, pick, type Localized } from "@shared/i18n";
+import { localizedError, readLocalizedError } from "@shared/localizedError";
 import { emptyAmbitionInput } from "@shared/domain/globalAmbition";
 import { emptyPositioningInput } from "@shared/domain/globalPositioning";
 import { emptyEntryStrategyInput } from "@shared/domain/entryStrategy";
 import { emptyPartneringInput } from "@shared/domain/partnering";
 import { evaluateCoherence } from "./coherence";
+import { evaluateStrategy } from "./engine";
+import { evaluateFinancials, recommendInvestmentAction } from "./financialEngine";
 import { entryStrategyWarnings } from "./entryStrategy";
 import { partneringWarnings } from "./partnering";
 import * as ambition from "@shared/domain/globalAmbition";
@@ -82,6 +85,8 @@ const SAME_IN_BOTH = new Set([
   // Términos del libro que en español se usan en inglés, y una palabra que coincide.
   "Liability of foreignness", "Transfer, Adapt, Create", "8. Gates", "gradual",
   "Cultural", "Hub", "Veto", "Supervisor", "Sector", "No",
+  // Nombre del producto, siglas y palabras que se escriben igual en los dos idiomas.
+  "Global Entry Strategy Studio", "Gate", "manual", "Manual", "Base", "macro", "FX USD / local",
 ]);
 
 /** Las citas del libro se escriben igual en los dos idiomas salvo la palabra «Tabla». */
@@ -194,5 +199,85 @@ describe("los avisos que incrustan etiquetas no escupen objetos", () => {
         expect(pick(text, lang), JSON.stringify(text)).not.toContain("undefined");
       }
     }
+  });
+});
+
+/**
+ * Los dos motores también interpolan.
+ *
+ * El motor de países mete la etiqueta del criterio eliminatorio dentro del aviso, y el
+ * financiero mete el nombre del modo y las cifras dentro de cada razón. Son los sitios con
+ * más riesgo de que se cuele un objeto, porque la frase se construye dos veces —una por
+ * idioma— y basta con olvidar un `pick` en una de ellas.
+ */
+describe("los motores tampoco escupen objetos", () => {
+  const assumptions = {
+    currency: "USD", tamYearOne: 4_000_000_000, annualMarketGrowthPct: 6, samPct: 30,
+    somPctYearOne: 3, somPctHorizon: 12, operatingMarginPct: 15, taxRatePct: 25,
+    workingCapitalPctRevenue: 10, discountRatePct: 10, terminalGrowthPct: 2,
+    modeProfiles: { greenfield: { initialInvestment: 8_000_000, annualOperatingCost: 3_000_000, revenueCapturePct: 100 } },
+    sensitivityScenarios: { optimistic: { priceRevenuePct: 10, operatingMarginPctPoints: 3, fxRatePct: 0 }, conservative: { priceRevenuePct: -10, operatingMarginPctPoints: -3, fxRatePct: 0 } },
+  };
+
+  function assertClean(texts: (Localized | undefined)[]) {
+    const present = texts.filter((text): text is Localized => text !== undefined);
+    expect(present.length).toBeGreaterThan(0);
+    for (const text of present) {
+      for (const lang of LANGUAGES) {
+        expect(pick(text, lang), JSON.stringify(text)).not.toContain("[object Object]");
+        expect(pick(text, lang), JSON.stringify(text)).not.toContain("undefined");
+      }
+    }
+  }
+
+  it("el motor financiero, en sus cuatro veredictos", () => {
+    const financial = evaluateFinancials(assumptions, [{ key: "greenfield", mode: loc("Filial propia / greenfield", "Wholly owned subsidiary / greenfield") }], 4);
+    const verdicts = [
+      recommendInvestmentAction(financial, 90, 90, { advanceMinRiskAdjusted: 10, advanceMinRoiPct: -100, advanceMaxPaybackYears: 10, advanceMinNpv: 0, testMaxInitialInvestment: 1_000_000_000 }),
+      recommendInvestmentAction(financial, 90, 90, { advanceMinRoiPct: 10_000, testMinRoiPct: -100, testMinNpv: 0, testMinRiskAdjusted: 10 }),
+      recommendInvestmentAction(financial, 90, 90, { advanceMinRiskAdjusted: 99, testMinRiskAdjusted: 95 }),
+      recommendInvestmentAction(financial, 90, 10, { minConfidence: 60 }),
+    ];
+    expect(new Set(verdicts.map((verdict) => verdict.action)).size).toBe(4);
+    assertClean(verdicts.flatMap((verdict) => [verdict.label, verdict.summary, ...verdict.reasons]));
+    assertClean([financial.methodology, ...financial.missingInputs, ...financial.scenarios.flatMap((scenario) => [scenario.label, scenario.note, ...scenario.missingInputs])]);
+    assertClean(financial.tornado.levers.map((lever) => lever.label));
+  });
+
+  it("el motor de países, con un criterio eliminatorio activo", () => {
+    const result = evaluateStrategy({
+      companyName: "Prueba", homeCountry: "ES", industry: "Software", businessModel: "SaaS",
+      valueProposition: "", objective: "market", horizonYears: 4,
+      countryInputs: [{ code: "AA", name: "Mercado A", calibration: { politicalRisk: 95 } }],
+      marketData: { AA: { sourceStatus: "unavailable" } },
+      knockOuts: { maxPoliticalRisk: 40 },
+    });
+    const country = result.countries[0];
+    expect(country.eligibility.eligible).toBe(false);
+    assertClean([
+      result.methodology, result.portfolio.recommendation, ...result.portfolio.caveats,
+      country.timing.label, country.timing.description, ...country.flags,
+      country.investmentRecommendation.label, country.investmentRecommendation.summary,
+      ...country.investmentRecommendation.reasons,
+    ]);
+  });
+});
+
+/**
+ * Los errores del servidor viajan dentro del mensaje, no en un campo aparte. Si el formato
+ * cambia sin querer, el cliente dejaría de encontrar el par y enseñaría la cadena cruda con
+ * la marca delante, que es peor que no traducir.
+ */
+describe("los errores bilingües sobreviven al viaje", () => {
+  it("se vuelven a abrir en los dos idiomas", () => {
+    const error = localizedError("No encontrado.", "Not found.");
+    const reopened = readLocalizedError(error);
+    expect(pick(reopened, "es")).toBe("No encontrado.");
+    expect(pick(reopened, "en")).toBe("Not found.");
+  });
+
+  it("un error que no viene de aquí se muestra tal cual", () => {
+    expect(readLocalizedError(new Error("ECONNRESET"))).toBe("ECONNRESET");
+    expect(readLocalizedError(null)).toBe("");
   });
 });

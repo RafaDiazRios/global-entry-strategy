@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { pickAll } from "@shared/i18n";
 import { itemPath } from "@shared/domain/countryAssessment";
 import { evaluateStrategy, type CountryInput, type MarketData } from "./engine";
 import type { CountryAssessment } from "./countryAssessment";
@@ -153,7 +154,8 @@ describe("mini-caso 6.2 — Izmir Industrial Electric", () => {
     expect(angola.investmentRecommendation.action).toBe("discard");
     expect(southAfrica.eligibility.eligible).toBe(true);
     expect(result.portfolio.leadingCountry).not.toBe("Angola");
-    expect(result.portfolio.caveats.join(" ")).toContain("criterio eliminatorio");
+    expect(pickAll(result.portfolio.caveats, "es").join(" ")).toContain("criterio eliminatorio");
+    expect(pickAll(result.portfolio.caveats, "en").join(" ")).toContain("knock-out criterion");
   });
 
   it("no emite veredicto de inversión sin supuestos financieros, por completa que sea la evaluación de país", () => {

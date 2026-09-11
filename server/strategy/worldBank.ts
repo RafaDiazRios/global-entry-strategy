@@ -1,5 +1,7 @@
 import type { MarketData } from "./engine";
 import { getWgiGovernanceData } from "./wgi";
+import { localizedError } from "@shared/localizedError";
+import { loc, type Localized } from "@shared/i18n";
 
 type WorldBankRow = { date?: string; value?: number | null };
 type WorldBankResponse = [unknown, WorldBankRow[]?];
@@ -125,7 +127,7 @@ export async function getGrowthSeries(countryCode: string, fromYear = 2004, toYe
  * como los dos ejemplos de forma opuesta (Figuras 6.4 y 6.5, p. 230).
  */
 export async function getIndicatorPoints(indicator: string, countryCodes: string[]) {
-  if (!/^[A-Za-z0-9._-]{3,40}$/.test(indicator)) throw new Error("Código de indicador no válido.");
+  if (!/^[A-Za-z0-9._-]{3,40}$/.test(indicator)) throw localizedError("Código de indicador no válido.", "Invalid indicator code.");
   const codes = Array.from(new Set(countryCodes.map((code) => code.trim().toUpperCase())));
   const rows = await mapWithConcurrency(codes, 3, async (code) => {
     try {
@@ -192,33 +194,55 @@ export async function getWorldBankMarketData(countryCode: string, includeGoverna
   };
 }
 
-export const publicSources = [
+export const publicSources: { name: string; live: boolean; status: Localized; coverage: Localized; use: Localized; url: string }[] = [
   {
     name: "World Bank Open Data",
-    status: "Conectado",
-    coverage: "PIB nominal y PPA, renta per cápita, crecimiento y su serie histórica, Gini, consumo de hogares, ahorro, población y su estructura, urbanización, gasto público, matrícula terciaria, investigadores, gasto en I+D, conectividad, acceso eléctrico, comercio e inversión",
-    use: "Las cuatro familias de indicadores de la Tabla 6.1 del libro: económica, sociológica, demográfica e institucional.",
+    live: true,
+    status: loc("Conectado", "Connected"),
+    coverage: loc(
+      "PIB nominal y PPA, renta per cápita, crecimiento y su serie histórica, Gini, consumo de hogares, ahorro, población y su estructura, urbanización, gasto público, matrícula terciaria, investigadores, gasto en I+D, conectividad, acceso eléctrico, comercio e inversión",
+      "Nominal and PPP GDP, income per capita, growth and its historical series, Gini, household consumption, savings, population and its structure, urbanisation, public spending, tertiary enrolment, researchers, R&D spending, connectivity, electricity access, trade and investment"
+    ),
+    use: loc(
+      "Las cuatro familias de indicadores de la Tabla 6.1 del libro: económica, sociológica, demográfica e institucional.",
+      "The four families of indicators in Table 6.1 of the book: economic, sociological, demographic and institutional."
+    ),
     url: "https://data.worldbank.org/",
   },
   {
     name: "UNCTAD — IED",
-    status: "Conectado",
-    coverage: "Flujos netos de IED entrante en US$ y como % del PIB",
-    use: "Dato originado en UNCTAD, distribuido mediante la serie pública World Development Indicators.",
+    live: true,
+    status: loc("Conectado", "Connected"),
+    coverage: loc("Flujos netos de IED entrante en US$ y como % del PIB", "Net inward FDI flows in US$ and as a % of GDP"),
+    use: loc(
+      "Dato originado en UNCTAD, distribuido mediante la serie pública World Development Indicators.",
+      "Data originating at UNCTAD, distributed through the public World Development Indicators series."
+    ),
     url: "https://unctadstat.unctad.org/datacentre/reportInfo/US.FdiFlowsStock",
   },
   {
     name: "Worldwide Governance Indicators",
-    status: "Conectado",
-    coverage: "Estabilidad política, efectividad gubernamental, calidad regulatoria, estado de derecho y control de corrupción",
-    use: "Descarga oficial WGI 2025 con puntuaciones absolutas 0–100, para más de 200 economías.",
+    live: true,
+    status: loc("Conectado", "Connected"),
+    coverage: loc(
+      "Estabilidad política, efectividad gubernamental, calidad regulatoria, estado de derecho y control de corrupción",
+      "Political stability, government effectiveness, regulatory quality, rule of law and control of corruption"
+    ),
+    use: loc(
+      "Descarga oficial WGI 2025 con puntuaciones absolutas 0–100, para más de 200 economías.",
+      "Official WGI 2025 download with absolute 0–100 scores, for more than 200 economies."
+    ),
     url: "https://www.worldbank.org/content/dam/sites/govindicators/doc/wgidataset_with_sourcedata-2025.xlsx",
   },
   {
     name: "International Labour Organization",
-    status: "Pendiente de parametrización",
-    coverage: "Mercado laboral, empleo, salarios y capacidades",
-    use: "Siguiente extensión para disponibilidad y coste de recursos humanos.",
+    live: false,
+    status: loc("Pendiente de parametrización", "Not yet parameterised"),
+    coverage: loc("Mercado laboral, empleo, salarios y capacidades", "Labour market, employment, wages and skills"),
+    use: loc(
+      "Siguiente extensión para disponibilidad y coste de recursos humanos.",
+      "The next extension, for the availability and cost of human resources."
+    ),
     url: "https://ilostat.ilo.org/",
   },
 ];

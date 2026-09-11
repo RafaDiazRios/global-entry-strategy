@@ -1,4 +1,5 @@
 import { ENV } from "./env";
+import { localizedError } from "@shared/localizedError";
 
 export type Role = "system" | "user" | "assistant" | "tool" | "function";
 
@@ -224,7 +225,7 @@ const resolveApiUrl = () => `${resolveBaseUrl()}/chat/completions`;
 
 const assertApiKey = () => {
   if (!ENV.llmApiKey) {
-    throw new Error("LLM_API_KEY no está configurada.");
+    throw localizedError("LLM_API_KEY no está configurada.", "LLM_API_KEY is not configured.");
   }
 };
 

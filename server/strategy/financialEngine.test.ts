@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { pick, pickAll } from "@shared/i18n";
 import { evaluateFinancials, recommendInvestmentAction } from "./financialEngine";
 
 const completeAssumptions = {
@@ -52,7 +53,8 @@ describe("evaluateFinancials", () => {
   it("fails closed when discount rate does not exceed terminal growth", () => {
     const result = evaluateFinancials({ ...completeAssumptions, discountRatePct: 2, terminalGrowthPct: 2 }, [{ key: "greenfield", mode: "Filial propia / greenfield" }], 3);
     expect(result.alternatives[0].status).toBe("not_meaningful");
-    expect(result.alternatives[0].missingInputs[0]).toContain("tasa de descuento");
+    expect(pick(result.alternatives[0].missingInputs[0], "es")).toContain("tasa de descuento");
+    expect(pick(result.alternatives[0].missingInputs[0], "en")).toContain("discount rate");
   });
 
   it("calculates base, optimistic and conservative cases with price, margin and FX sensitivity", () => {
@@ -237,7 +239,8 @@ describe("escudo fiscal, rampa y bases de retorno", () => {
     const result = evaluateFinancials(lossMaking, [{ key: "greenfield", mode: "Filial propia / greenfield" }], 4);
     const recommendation = recommendInvestmentAction(result, 90, 30, { minConfidence: 60 });
     expect(recommendation.action).toBe("insufficient_data");
-    expect(recommendation.label).toBe("Completar evidencia");
-    expect(recommendation.reasons.join(" ")).toContain("cobertura de evidencia");
+    expect(pick(recommendation.label, "es")).toBe("Completar evidencia");
+    expect(pick(recommendation.label, "en")).toBe("Complete the evidence");
+    expect(pickAll(recommendation.reasons, "es").join(" ")).toContain("cobertura de evidencia");
   });
 });

@@ -28,6 +28,15 @@ import { entryModes } from "@shared/domain/entryModes";
 import * as ambitionDomain from "@shared/domain/globalAmbition";
 import * as positioningDomain from "@shared/domain/globalPositioning";
 import { financialPublicSources, getCountryFinancialReference } from "./strategy/countryFinancialData";
+import { localizedError } from "@shared/localizedError";
+import { DEFAULT_LANG, LANGUAGES, loc, pick, type Lang } from "@shared/i18n";
+
+/**
+ * El idioma solo viaja en la petición donde el servidor redacta texto nuevo: los hitos por
+ * defecto de un gate, que se guardan como texto editable, y el copiloto, que escribe frases.
+ * Todo lo demás sale en los dos idiomas y lo elige el cliente.
+ */
+const langSchema = z.enum(LANGUAGES).optional();
 
 const score = z.number().min(0).max(100);
 const calibrationSchema = z.object({
@@ -149,6 +158,9 @@ const modeFinancialProfileSchema = z.object({
   channelMarginPct: z.number().min(0).max(100).nullable().optional(),
 });
 
+/** Un par `{ es, en }` tal como lo devolvió el servidor y lo reenvía el cliente. */
+const localizedSchema = (max: number) => z.object({ es: z.string().min(1).max(max), en: z.string().min(1).max(max) });
+
 const financialDataProvenanceSchema = z.object({
   sourceStatus: z.enum(["live", "partial", "unavailable"]),
   sourceName: z.string().min(1).max(200),
@@ -156,7 +168,7 @@ const financialDataProvenanceSchema = z.object({
   sourceYear: z.number().int().nullable().optional(),
   observedAt: z.string().nullable().optional(),
   retrievedAt: z.string().min(1).max(80),
-  note: z.string().min(1).max(1500),
+  note: localizedSchema(1500),
 });
 
 const sensitivityScenarioSchema = z.object({
@@ -264,21 +276,33 @@ function futureDate(base: Date, days: number) {
   return new Date(base.getTime() + days * 24 * 60 * 60 * 1000);
 }
 
-function defaultApprovalMilestones(recommendation: "advance" | "test", responsible: string, reviewAt: Date) {
-  const first = recommendation === "advance"
-    ? "Confirmar tesis, regulación y estructura fiscal local"
-    : "Aprobar carta de prueba, hipótesis y límites de inversión";
-  const second = recommendation === "advance"
-    ? "Validar demanda, precio y economía unitaria con evidencia local"
-    : "Ejecutar prueba comercial y recoger evidencia de demanda y precio";
-  const third = recommendation === "advance"
-    ? "Cerrar plan operativo, socios críticos y riesgos de implementación"
-    : "Revisar resultados, aprendizaje y condiciones para escalar o abandonar";
+/**
+ * Los hitos se guardan como texto editable, no como pares bilingües: en cuanto alguien los
+ * reescribe dejan de ser del marco y pasan a ser del caso. Se redactan una vez, en el idioma
+ * de quien abre el gate.
+ */
+const MILESTONE_TEMPLATES = {
+  advance: [
+    loc("Confirmar tesis, regulación y estructura fiscal local", "Confirm the thesis, the regulation and the local tax structure"),
+    loc("Validar demanda, precio y economía unitaria con evidencia local", "Validate demand, price and unit economics with local evidence"),
+    loc("Cerrar plan operativo, socios críticos y riesgos de implementación", "Close the operating plan, the critical partners and the implementation risks"),
+  ],
+  test: [
+    loc("Aprobar carta de prueba, hipótesis y límites de inversión", "Approve the test charter, the hypotheses and the investment limits"),
+    loc("Ejecutar prueba comercial y recoger evidencia de demanda y precio", "Run the commercial test and collect evidence on demand and price"),
+    loc("Revisar resultados, aprendizaje y condiciones para escalar o abandonar", "Review results, learning and the conditions to scale or walk away"),
+  ],
+} as const;
+
+const GATE_REVIEW_MILESTONE = loc("Revisión de gate y decisión documentada", "Gate review and documented decision");
+
+function defaultApprovalMilestones(recommendation: "advance" | "test", responsible: string, reviewAt: Date, lang: Lang) {
+  const [first, second, third] = MILESTONE_TEMPLATES[recommendation];
   return [
-    { title: first, responsible, dueAt: futureDate(reviewAt, -21), status: "pending" as const },
-    { title: second, responsible, dueAt: futureDate(reviewAt, -14), status: "pending" as const },
-    { title: third, responsible, dueAt: futureDate(reviewAt, -7), status: "pending" as const },
-    { title: "Revisión de gate y decisión documentada", responsible, dueAt: reviewAt, status: "pending" as const },
+    { title: pick(first, lang), responsible, dueAt: futureDate(reviewAt, -21), status: "pending" as const },
+    { title: pick(second, lang), responsible, dueAt: futureDate(reviewAt, -14), status: "pending" as const },
+    { title: pick(third, lang), responsible, dueAt: futureDate(reviewAt, -7), status: "pending" as const },
+    { title: pick(GATE_REVIEW_MILESTONE, lang), responsible, dueAt: reviewAt, status: "pending" as const },
   ];
 }
 
@@ -288,11 +312,11 @@ function defaultApprovalMilestones(recommendation: "advance" | "test", responsib
  */
 async function loadCaseSource(userId: number, documentId: number): Promise<CaseSource> {
   const document = await db.getCaseDocument(userId, documentId);
-  if (!document) throw new Error("Documento no encontrado o sin acceso.");
+  if (!document) throw localizedError("Documento no encontrado o sin acceso.", "Document not found, or no access to it.");
   if (document.textContent) {
     return { text: document.textContent, label: document.filename };
   }
-  if (!document.storageKey) throw new Error("El documento no tiene contenido utilizable.");
+  if (!document.storageKey) throw localizedError("El documento no tiene contenido utilizable.", "The document has no usable content.");
   const signedUrl = await storageGetSignedUrl(document.storageKey);
   return { documentUrl: signedUrl, mimeType: document.mimeType, label: document.filename };
 }
@@ -456,10 +480,10 @@ export const appRouter = router({
           return { ...fitPenetrationCurve(input.points, input.model), points: input.points };
         }
         if (!input.indicator || !input.countryCodes?.length) {
-          throw new Error("Indique puntos explícitos o un indicador con su lista de países.");
+          throw localizedError("Indique puntos explícitos o un indicador con su lista de países.", "Give explicit points, or an indicator together with its list of countries.");
         }
         const points = await getIndicatorPoints(input.indicator, input.countryCodes);
-        if (points.length < 3) throw new Error("La fuente pública no devolvió suficientes observaciones para ajustar una curva.");
+        if (points.length < 3) throw localizedError("La fuente pública no devolvió suficientes observaciones para ajustar una curva.", "The public source did not return enough observations to fit a curve.");
         return { ...fitPenetrationCurve(points, input.model), points };
       }),
 
@@ -477,7 +501,7 @@ export const appRouter = router({
       }))
       .mutation(({ input }) => {
         const result = middleClassEffect(input);
-        if (!result) throw new Error("Los parámetros no permiten calcular la distribución de renta.");
+        if (!result) throw localizedError("Los parámetros no permiten calcular la distribución de renta.", "The parameters do not allow the income distribution to be computed.");
         return result;
       }),
 
@@ -563,15 +587,16 @@ export const appRouter = router({
         reviewAt: z.number().int().positive(),
         notes: z.string().max(4000).nullable().optional(),
         milestones: z.array(approvalMilestoneSchema).max(12).optional(),
+        lang: langSchema,
       }))
       .mutation(({ ctx, input }) => {
         const reviewAt = new Date(input.reviewAt);
-        if (!Number.isFinite(reviewAt.getTime())) throw new Error("Fecha de revisión inválida.");
+        if (!Number.isFinite(reviewAt.getTime())) throw localizedError("Fecha de revisión inválida.", "Invalid review date.");
         return db.createApprovalWorkflow({
           ...input,
           userId: ctx.user.id,
           reviewAt,
-          milestones: (input.milestones?.length ? input.milestones : defaultApprovalMilestones(input.recommendation, input.responsible, reviewAt)).map((milestone) => ({ ...milestone, dueAt: milestone.dueAt === null || milestone.dueAt === undefined ? null : new Date(milestone.dueAt) })),
+          milestones: (input.milestones?.length ? input.milestones : defaultApprovalMilestones(input.recommendation, input.responsible, reviewAt, input.lang ?? DEFAULT_LANG)).map((milestone) => ({ ...milestone, dueAt: milestone.dueAt === null || milestone.dueAt === undefined ? null : new Date(milestone.dueAt) })),
         });
       }),
 
@@ -668,7 +693,7 @@ export const appRouter = router({
       }))
       .mutation(async ({ ctx, input }) => {
         const buffer = Buffer.from(input.contentBase64, "base64");
-        if (!buffer.length) throw new Error("El contenido del fichero está vacío o mal codificado.");
+        if (!buffer.length) throw localizedError("El contenido del fichero está vacío o mal codificado.", "The file content is empty or badly encoded.");
         const safeName = input.filename.replace(/[^A-Za-z0-9._-]+/g, "_").slice(0, 120);
         const stored = await storagePut(`cases/${ctx.user.id}/${input.caseId}/${safeName}`, buffer, input.mimeType);
         /**
@@ -676,7 +701,7 @@ export const appRouter = router({
          * citas del copiloto están de verdad en el documento; sin él, solo se puede exigir
          * que existan.
          */
-        const extraction = input.mimeType.includes("pdf") ? await extractPdfText(buffer) : { text: null, pages: null, note: "Formato sin extracción de texto." };
+        const extraction = input.mimeType.includes("pdf") ? await extractPdfText(buffer) : { text: null, pages: null, note: loc("Formato sin extracción de texto.", "This format has no text extraction.") };
         return {
           id: await db.addCaseDocument({
             userId: ctx.user.id,
@@ -751,6 +776,10 @@ export const appRouter = router({
   /**
    * Copiloto de caso. Todo lo que devuelve es una propuesta: entra en el libro de
    * evidencias con estado `suggested` y no alimenta ningún cálculo hasta que se acepta.
+   *
+   * Es el único sitio donde el idioma viaja en la petición. En el resto de la API el
+   * servidor devuelve los dos idiomas y el cliente elige, pero una frase que escribe el
+   * modelo existe en un solo idioma: hay que decirle en cuál antes de que la escriba.
    */
   ai: router({
     extractEvidence: protectedProcedure
@@ -758,10 +787,11 @@ export const appRouter = router({
         caseId: z.number().int().positive(),
         documentId: z.number().int().positive(),
         context: z.string().max(2000).optional(),
+        lang: langSchema,
       }))
       .mutation(async ({ ctx, input }) => {
         const source = await loadCaseSource(ctx.user.id, input.documentId);
-        const extraction = await extractCaseEvidence(source, { context: input.context });
+        const extraction = await extractCaseEvidence(source, { context: input.context, lang: input.lang });
         const stored = await db.addEvidence(ctx.user.id, input.caseId, extraction.evidence.map((entry) => ({
           kind: "ai_extraction" as const,
           claim: entry.claim,
@@ -785,10 +815,11 @@ export const appRouter = router({
         blockKey: z.enum(["market", "resources", "industry", "cage", "risk"]),
         countryName: z.string().min(1).max(120),
         context: z.string().max(2000).optional(),
+        lang: langSchema,
       }))
       .mutation(async ({ ctx, input }) => {
         const source = await loadCaseSource(ctx.user.id, input.documentId);
-        return proposeAssessmentBlock(input.blockKey, source, { countryName: input.countryName, context: input.context });
+        return proposeAssessmentBlock(input.blockKey, source, { countryName: input.countryName, context: input.context, lang: input.lang });
       }),
 
     critique: protectedProcedure
@@ -801,10 +832,11 @@ export const appRouter = router({
           value: z.number().min(0).max(4),
           rationale: z.string().max(1200).nullable().optional(),
         })).max(80),
+        lang: langSchema,
       }))
       .mutation(async ({ ctx, input }) => {
         const source = await loadCaseSource(ctx.user.id, input.documentId);
-        return critiqueAssessment(input.blockKey, input.ratings, source, { countryName: input.countryName });
+        return critiqueAssessment(input.blockKey, input.ratings, source, { countryName: input.countryName, lang: input.lang });
       }),
   }),
 

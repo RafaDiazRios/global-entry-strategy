@@ -94,7 +94,8 @@ describe("evaluateStrategy", () => {
 
     expect(result.countries[0].scores.confidence).toBeLessThan(50);
     expect(result.countries[0].evidence.documentedJudgements).toBe(0);
-    expect(result.countries[0].flags).toContain("Datos macroeconómicos incompletos o no disponibles: la puntuación se apoya más en calibración cualitativa.");
+    expect(pickAll(result.countries[0].flags, "es")).toContain("Datos macroeconómicos incompletos o no disponibles: la puntuación se apoya más en calibración cualitativa.");
+    expect(pickAll(result.countries[0].flags, "en")).toContain("Macroeconomic data incomplete or unavailable: the score leans more on qualitative calibration.");
   });
 });
 
@@ -127,9 +128,11 @@ describe("criterios eliminatorios y modos de entrada", () => {
     expect(country.eligibility.eligible).toBe(false);
     expect(country.eligibility.breaches[0].rule).toBe("maxPoliticalRisk");
     expect(country.investmentRecommendation.action).toBe("discard");
-    expect(country.investmentRecommendation.label).toContain("eliminatorio");
+    expect(pick(country.investmentRecommendation.label, "es")).toContain("eliminatorio");
+    expect(pick(country.investmentRecommendation.label, "en")).toContain("knock-out");
     expect(result.portfolio.leadingCountry).toBeUndefined();
-    expect(country.flags.some((flag) => flag.startsWith("Criterio eliminatorio"))).toBe(true);
+    expect(pickAll(country.flags, "es").some((flag) => flag.startsWith("Criterio eliminatorio"))).toBe(true);
+    expect(pickAll(country.flags, "en").some((flag) => flag.startsWith("Knock-out criterion"))).toBe(true);
   });
 
   it("ofrece el modo digital según el modelo de entrega declarado y no por el texto libre", () => {

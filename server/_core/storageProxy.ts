@@ -10,13 +10,13 @@ export function registerStorageProxy(app: Express) {
   app.get("/files/*", async (req: Request, res: Response) => {
     const key = decodeURIComponent(String(req.params[0] ?? "")).replace(/^\/+/, "");
     if (!key || key.includes("..")) {
-      res.status(400).json({ error: "clave no válida" });
+      res.status(400).json({ error: "invalid key" });
       return;
     }
     try {
       const user = await authenticateRequest(req);
       if (!user) {
-        res.status(401).json({ error: "sesión requerida" });
+        res.status(401).json({ error: "session required" });
         return;
       }
       res.redirect(307, await storageGetSignedUrl(key));

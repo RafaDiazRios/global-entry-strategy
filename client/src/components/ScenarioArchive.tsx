@@ -5,6 +5,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { trpc } from "@/lib/trpc";
+import { useLanguage } from "@/i18n";
+import { readLocalizedError } from "@shared/localizedError";
+import { loc, type Localized } from "@shared/i18n";
+import { localizedError } from "@shared/localizedError";
 
 /**
  * Archivo de escenarios guardados.
@@ -20,14 +24,15 @@ type Props = {
   onOpen: (scenario: { id: number; name: string; inputJson: unknown; resultJson: unknown; caseId: number | null }) => void;
 };
 
-const OBJECTIVE_LABELS: Record<string, string> = {
-  market: "Mercado",
-  resources: "Recursos",
-  learning: "Aprendizaje",
-  coordination: "Coordinación",
+const OBJECTIVE_LABELS: Record<string, Localized> = {
+  market: loc("Mercado", "Market"),
+  resources: loc("Recursos", "Resources"),
+  learning: loc("Aprendizaje", "Learning"),
+  coordination: loc("Coordinación", "Coordination"),
 };
 
 export function ScenarioArchive({ isAuthenticated, currentScenarioId, onOpen }: Props) {
+  const { lang, t, ui } = useLanguage();
   const utils = trpc.useUtils();
   const scenarios = trpc.strategy.listScenarios.useQuery(undefined, { enabled: isAuthenticated });
   const [query, setQuery] = useState("");
@@ -52,11 +57,11 @@ export function ScenarioArchive({ isAuthenticated, currentScenarioId, onOpen }: 
     setBusyId(scenarioId);
     try {
       const row = await utils.strategy.getScenario.fetch({ scenarioId });
-      if (!row) throw new Error("El escenario ya no existe.");
+      if (!row) throw localizedError("El escenario ya no existe.", "That scenario no longer exists.");
       onOpen({ id: row.id, name: row.name, inputJson: row.inputJson, resultJson: row.resultJson, caseId: row.caseId ?? null });
-      toast.success(`«${row.name}» abierto con sus supuestos y su resultado guardados.`);
+      toast.success(`«${row.name}» ${ui("saOpened")}`);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "No se pudo abrir el escenario.");
+      toast.error(t(readLocalizedError(error)) || ui("saOpenFailed"));
     } finally {
       setBusyId(null);
     }
@@ -64,54 +69,54 @@ export function ScenarioArchive({ isAuthenticated, currentScenarioId, onOpen }: 
 
   async function confirmRename(scenarioId: number) {
     const name = renameValue.trim();
-    if (name.length < 2) { toast.error("El nombre necesita al menos dos caracteres."); return; }
+    if (name.length < 2) { toast.error(ui("saNameTooShort")); return; }
     try {
       await update.mutateAsync({ scenarioId, name });
       setRenaming(null);
       utils.strategy.listScenarios.invalidate();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "No se pudo renombrar.");
+      toast.error(t(readLocalizedError(error)) || ui("saRenameFailed"));
     }
   }
 
   async function clone(scenarioId: number, name: string) {
     try {
-      await duplicate.mutateAsync({ scenarioId, name: `${name} (copia)`.slice(0, 180) });
+      await duplicate.mutateAsync({ scenarioId, name: `${name} (${ui("saCopySuffix")})`.slice(0, 180) });
       utils.strategy.listScenarios.invalidate();
-      toast.success("Copia creada. Las puertas de decisión no se heredan: se aprobaron sobre los supuestos del original.");
+      toast.success(ui("saDuplicated"));
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "No se pudo duplicar.");
+      toast.error(t(readLocalizedError(error)) || ui("saDuplicateFailed"));
     }
   }
 
   async function destroy(scenarioId: number, name: string) {
-    if (!window.confirm(`Borrar «${name}» y sus puertas de decisión. Esta acción no se puede deshacer.`)) return;
+    if (!window.confirm(`${ui("saConfirmDeletePre")} «${name}» ${ui("saConfirmDeleteTail")}`)) return;
     try {
       const outcome = await remove.mutateAsync({ scenarioId });
       utils.strategy.listScenarios.invalidate();
-      toast.success(outcome.deletedApprovals ? `Escenario borrado junto con ${outcome.deletedApprovals} puerta(s) de decisión.` : "Escenario borrado.");
+      toast.success(outcome.deletedApprovals ? `${ui("saDeletedWithGatesPre")} ${outcome.deletedApprovals} ${ui("saDeletedWithGates")}` : ui("saDeleted"));
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "No se pudo borrar.");
+      toast.error(t(readLocalizedError(error)) || ui("saDeleteFailed"));
     }
   }
 
   return (
     <section className="history-strip">
       <div>
-        <div className="step-tag">ARCHIVO</div>
-        <h2>Escenarios guardados</h2>
+        <div className="step-tag">{ui("saArchive")}</div>
+        <h2>{ui("saTitle")}</h2>
         {isAuthenticated && (scenarios.data?.length ?? 0) > 0 && (
-          <Input className="mt-3 max-w-xs" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Buscar por nombre, empresa o industria" aria-label="Buscar escenarios" />
+          <Input className="mt-3 max-w-xs" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={ui("saSearchPh")} aria-label={ui("saSearchLabel")} />
         )}
       </div>
 
       <div className="history-list">
         {!isAuthenticated ? (
-          <span>Inicie sesión para conservar análisis.</span>
+          <span>{ui("saSignIn")}</span>
         ) : scenarios.isLoading ? (
           <Loader2 className="h-4 w-4 animate-spin" />
         ) : !filtered.length ? (
-          <span>{query ? "Ningún escenario coincide con la búsqueda." : "Los análisis guardados aparecerán aquí."}</span>
+          <span>{query ? ui("saNoMatch") : ui("saEmpty")}</span>
         ) : (
           filtered.map((scenario) => (
             <div className="history-item" key={scenario.id}>
@@ -127,38 +132,38 @@ export function ScenarioArchive({ isAuthenticated, currentScenarioId, onOpen }: 
                         if (event.key === "Enter") confirmRename(scenario.id);
                         if (event.key === "Escape") setRenaming(null);
                       }}
-                      aria-label="Nuevo nombre del escenario"
+                      aria-label={ui("saRenameLabel")}
                     />
-                    <Button size="sm" onClick={() => confirmRename(scenario.id)} disabled={update.isPending}>Guardar</Button>
-                    <Button size="sm" variant="ghost" onClick={() => setRenaming(null)}>Cancelar</Button>
+                    <Button size="sm" onClick={() => confirmRename(scenario.id)} disabled={update.isPending}>{ui("saSave")}</Button>
+                    <Button size="sm" variant="ghost" onClick={() => setRenaming(null)}>{ui("saCancel")}</Button>
                   </div>
                 ) : (
                   <>
                     <strong className="flex items-center gap-2">
                       {scenario.name}
-                      {currentScenarioId === scenario.id && <Badge variant="outline">abierto</Badge>}
+                      {currentScenarioId === scenario.id && <Badge variant="outline">{ui("saOpenTag")}</Badge>}
                     </strong>
                     <span>
                       {[scenario.companyName, scenario.industry].filter(Boolean).join(" · ")}
-                      {scenario.updatedAt ? ` · ${new Date(scenario.updatedAt).toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "numeric" })}` : ""}
+                      {scenario.updatedAt ? ` · ${new Date(scenario.updatedAt).toLocaleDateString(lang === "es" ? "es-ES" : "en-GB", { day: "2-digit", month: "short", year: "numeric" })}` : ""}
                     </span>
                   </>
                 )}
               </div>
 
               <div className="flex flex-wrap items-center gap-1">
-                <Badge variant="outline">{OBJECTIVE_LABELS[scenario.objective] ?? scenario.objective}</Badge>
-                {scenario.caseId && <Badge variant="outline">caso #{scenario.caseId}</Badge>}
+                <Badge variant="outline">{t(OBJECTIVE_LABELS[scenario.objective]) || scenario.objective}</Badge>
+                {scenario.caseId && <Badge variant="outline">{ui("saCase")} #{scenario.caseId}</Badge>}
                 <Button size="sm" variant="outline" onClick={() => open(scenario.id)} disabled={busyId === scenario.id}>
-                  {busyId === scenario.id ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <FolderOpen className="mr-1 h-3.5 w-3.5" />} Abrir
+                  {busyId === scenario.id ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <FolderOpen className="mr-1 h-3.5 w-3.5" />} {ui("saOpen")}
                 </Button>
-                <Button size="sm" variant="ghost" aria-label={`Renombrar ${scenario.name}`} onClick={() => { setRenaming(scenario.id); setRenameValue(scenario.name); }}>
+                <Button size="sm" variant="ghost" aria-label={`${ui("saRename")} ${scenario.name}`} onClick={() => { setRenaming(scenario.id); setRenameValue(scenario.name); }}>
                   <Pencil className="h-3.5 w-3.5" />
                 </Button>
-                <Button size="sm" variant="ghost" aria-label={`Duplicar ${scenario.name}`} onClick={() => clone(scenario.id, scenario.name)} disabled={duplicate.isPending}>
+                <Button size="sm" variant="ghost" aria-label={`${ui("saDuplicate")} ${scenario.name}`} onClick={() => clone(scenario.id, scenario.name)} disabled={duplicate.isPending}>
                   <Copy className="h-3.5 w-3.5" />
                 </Button>
-                <Button size="sm" variant="ghost" aria-label={`Borrar ${scenario.name}`} onClick={() => destroy(scenario.id, scenario.name)} disabled={remove.isPending}>
+                <Button size="sm" variant="ghost" aria-label={`${ui("saDelete")} ${scenario.name}`} onClick={() => destroy(scenario.id, scenario.name)} disabled={remove.isPending}>
                   <Trash2 className="h-3.5 w-3.5" />
                 </Button>
               </div>
@@ -170,8 +175,7 @@ export function ScenarioArchive({ isAuthenticated, currentScenarioId, onOpen }: 
       {isAuthenticated && (scenarios.data?.length ?? 0) > 0 && (
         <p className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
           <Archive className="h-3.5 w-3.5" />
-          Abrir un escenario reemplaza lo que haya en el formulario. Los filtros de cribado no se restauran: se dejan
-          abiertos para no ocultar países que el análisis guardado sí incluía.
+          {ui("saFootnote")}
         </p>
       )}
     </section>

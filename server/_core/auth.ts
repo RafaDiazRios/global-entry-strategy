@@ -6,6 +6,7 @@ import type { User } from "../../drizzle/schema";
 import * as db from "../db";
 import { getSessionCookieOptions } from "./cookies";
 import { ENV } from "./env";
+import { loc, pick, resolveLang, type Lang, type Localized } from "@shared/i18n";
 
 /**
  * Autenticación con Google, sin plataforma intermedia.
@@ -130,7 +131,7 @@ export function registerAuthRoutes(app: Express) {
     const expectedNonce = readCookie(req, OAUTH_STATE_COOKIE);
     res.clearCookie(OAUTH_STATE_COOKIE, { path: "/", secure: true, sameSite: "lax" });
     if (!code || !state || !expectedNonce || state !== expectedNonce) {
-      res.status(403).send(renderAuthError("La sesión de login no es válida. Vuelva a intentarlo."));
+      res.status(403).send(renderAuthError(req, loc("La sesión de login no es válida. Vuelva a intentarlo.", "The login session is not valid. Please try again.")));
       return;
     }
 
@@ -148,7 +149,7 @@ export function registerAuthRoutes(app: Express) {
       });
       const tokens = (await tokenResponse.json()) as GoogleTokenResponse;
       if (!tokenResponse.ok || !tokens.id_token) {
-        throw new AuthError(tokens.error_description || tokens.error || "Google no devolvió un id_token.");
+        throw new AuthError(tokens.error_description || tokens.error || "Google returned no id_token.");
       }
 
       const { payload } = await jwtVerify(tokens.id_token, googleKeys, {
@@ -158,10 +159,13 @@ export function registerAuthRoutes(app: Express) {
       const claims = payload as GoogleIdTokenClaims;
       const emailVerified = claims.email_verified === true || claims.email_verified === "true";
       if (!claims.sub || !claims.email || !emailVerified) {
-        throw new AuthError("Google no confirmó un correo verificado para esta cuenta.");
+        throw new AuthError("Google did not confirm a verified email for this account.");
       }
       if (!isEmailAllowed(claims.email)) {
-        res.status(403).send(renderAuthError(`La cuenta ${claims.email} no está autorizada en esta instalación.`));
+        res.status(403).send(renderAuthError(req, loc(
+          `La cuenta ${claims.email} no está autorizada en esta instalación.`,
+          `The account ${claims.email} is not authorised on this installation.`
+        )));
         return;
       }
 
@@ -179,13 +183,24 @@ export function registerAuthRoutes(app: Express) {
       res.cookie(COOKIE_NAME, sessionToken, { ...getSessionCookieOptions(req), maxAge: SESSION_MAX_AGE_MS });
       res.redirect(302, "/");
     } catch (error) {
-      console.error("[Auth] Falló el callback de Google", error);
-      res.status(500).send(renderAuthError("No se pudo completar el inicio de sesión."));
+      console.error("[Auth] Google callback failed", error);
+      res.status(500).send(renderAuthError(req, loc("No se pudo completar el inicio de sesión.", "The sign-in could not be completed.")));
     }
   });
 }
 
-function renderAuthError(message: string) {
-  const safe = message.replace(/[<>&"]/g, (character) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;" })[character] ?? character);
-  return `<!doctype html><html lang="es"><head><meta charset="utf-8"><title>No se pudo iniciar sesión</title><style>body{font-family:system-ui,sans-serif;max-width:34rem;margin:12vh auto;padding:0 1.5rem;line-height:1.6;color:#161b21}a{color:#1b4a6b}</style></head><body><h1>No se pudo iniciar sesión</h1><p>${safe}</p><p><a href="/api/auth/login">Volver a intentarlo</a></p></body></html>`;
+const AUTH_ERROR_PAGE: Record<Lang, { title: string; retry: string }> = {
+  es: { title: "No se pudo iniciar sesión", retry: "Volver a intentarlo" },
+  en: { title: "Could not sign in", retry: "Try again" },
+};
+
+/**
+ * Esta página se sirve antes de que exista sesión, así que no hay preferencia de idioma
+ * guardada que consultar. Lo único disponible es lo que declara el navegador.
+ */
+function renderAuthError(req: Request, message: Localized) {
+  const lang = resolveLang(req.headers["accept-language"]);
+  const page = AUTH_ERROR_PAGE[lang];
+  const escape = (text: string) => text.replace(/[<>&"]/g, (character) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;" })[character] ?? character);
+  return `<!doctype html><html lang="${lang}"><head><meta charset="utf-8"><title>${escape(page.title)}</title><style>body{font-family:system-ui,sans-serif;max-width:34rem;margin:12vh auto;padding:0 1.5rem;line-height:1.6;color:#161b21}a{color:#1b4a6b}</style></head><body><h1>${escape(page.title)}</h1><p>${escape(pick(message, lang))}</p><p><a href="/api/auth/login">${escape(page.retry)}</a></p></body></html>`;
 }

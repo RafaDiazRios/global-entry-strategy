@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { InvokeResult } from "../_core/llm";
 import { critiqueAssessment, extractCaseEvidence, proposeAssessmentBlock, verifyQuote } from "./caseCopilot";
+import { pickAll } from "@shared/i18n";
 
 /** Respuesta simulada del gateway con el JSON que devolvería el modelo. */
 function stub(payload: unknown, model = "modelo-simulado") {
@@ -49,10 +50,15 @@ describe("extracción de evidencias", () => {
 
     expect(result.evidence).toHaveLength(2);
     expect(result.evidence.every((entry) => entry.quoteVerified)).toBe(true);
-    expect(result.discarded.map((entry) => entry.reason)).toEqual([
+    expect(pickAll(result.discarded.map((entry) => entry.reason), "es")).toEqual([
       "Sin cita literal",
       "Sin localizador en la fuente",
       "La cita no aparece en el texto de origen",
+    ]);
+    expect(pickAll(result.discarded.map((entry) => entry.reason), "en")).toEqual([
+      "No verbatim quote",
+      "No locator in the source",
+      "The quote does not appear in the source text",
     ]);
     expect(result.model).toBe("modelo-simulado");
   });
@@ -109,7 +115,7 @@ describe("propuesta de puntuación de un bloque", () => {
     const result = await proposeAssessmentBlock("market", source, { countryName: "Brasil", invoke });
 
     expect(result.ratings.map((rating) => rating.itemPath)).toEqual(["market.demand.growth", "market.segmentation.distributionAccess"]);
-    expect(result.discarded.map((entry) => entry.reason)).toEqual([
+    expect(pickAll(result.discarded.map((entry) => entry.reason), "es")).toEqual([
       "Ítem ajeno al bloque solicitado",
       "Sin justificación",
       "Sin cita que la sostenga",
@@ -132,7 +138,7 @@ describe("propuesta de puntuación de un bloque", () => {
   it("rechaza un bloque inexistente", async () => {
     await expect(
       proposeAssessmentBlock("inventado" as never, source, { countryName: "Brasil", invoke: stub({ ratings: [], unresolved: [] }) }),
-    ).rejects.toThrow(/desconocido/);
+    ).rejects.toThrow(/Unknown assessment block/);
   });
 });
 
@@ -140,10 +146,10 @@ describe("crítica del análisis", () => {
   it("conserva las objeciones y descarta las que apuntan a ítems inexistentes", async () => {
     const invoke = stub({
       objections: [
-        { itemPath: "market.demand.quality", objection: "Se puntúa alto sin ninguna referencia a segmentos ni disposición a pagar.", severity: "alta" },
-        { itemPath: "no.existe.esto", objection: "Objeción sobre un ítem inventado.", severity: "media" },
+        { itemPath: "market.demand.quality", objection: "Se puntúa alto sin ninguna referencia a segmentos ni disposición a pagar.", severity: "high" },
+        { itemPath: "no.existe.esto", objection: "Objeción sobre un ítem inventado.", severity: "medium" },
         { itemPath: null, objection: "El caso no menciona la competencia local en ningún punto.", severity: "inventada" },
-        { itemPath: null, objection: "   ", severity: "baja" },
+        { itemPath: null, objection: "   ", severity: "low" },
       ],
     });
 
@@ -151,7 +157,7 @@ describe("crítica del análisis", () => {
 
     expect(result.objections).toHaveLength(3);
     expect(result.objections[1].itemPath).toBeNull();
-    // Una severidad que no está en la escala se normaliza a media en lugar de perderse.
-    expect(result.objections[2].severity).toBe("media");
+    // Una severidad que no está en la escala se normaliza a la media en lugar de perderse.
+    expect(result.objections[2].severity).toBe("medium");
   });
 });

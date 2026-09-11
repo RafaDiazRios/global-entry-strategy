@@ -1,3 +1,4 @@
+import { loc, pick, type Localized } from "@shared/i18n";
 import { entryMode, type EconomicModel, type EntryModeKey } from "@shared/domain/entryModes";
 
 export type { EntryModeKey, EconomicModel };
@@ -39,7 +40,7 @@ export type FinancialDataProvenance = {
   sourceYear?: number | null;
   observedAt?: string | null;
   retrievedAt: string;
-  note: string;
+  note: Localized;
 };
 
 export type FinancialAssumptions = {
@@ -134,7 +135,7 @@ export type AnnualProjection = {
 
 export type FinancialModeResult = {
   key: EntryModeKey;
-  mode: string;
+  mode: Localized;
   status: "ok" | "insufficient_data" | "not_meaningful";
   /** Modelo económico aplicado: operador, royalty, canal o solo coste. */
   economicModel: EconomicModel;
@@ -154,7 +155,7 @@ export type FinancialModeResult = {
   terminalValue: number | null;
   presentValueTerminal: number | null;
   annualProjection: AnnualProjection[];
-  missingInputs: string[];
+  missingInputs: Localized[];
 };
 
 export type FinancialCaseResult = {
@@ -179,20 +180,20 @@ export type FinancialCaseResult = {
     somRevenueAtHorizon: number | null;
   };
   alternatives: FinancialModeResult[];
-  missingInputs: string[];
-  methodology: string;
+  missingInputs: Localized[];
+  methodology: Localized;
 };
 
 export type FinancialScenarioResult = {
   key: SensitivityScenarioKey;
-  label: string;
+  label: Localized;
   priceRevenuePct: number | null;
   operatingMarginPctPoints: number | null;
   fxRatePct: number | null;
   status: "ok" | "insufficient_data" | "not_meaningful";
   financial: FinancialCaseResult | null;
-  missingInputs: string[];
-  note: string;
+  missingInputs: Localized[];
+  note: Localized;
 };
 
 export type TornadoLeverKey =
@@ -207,7 +208,7 @@ export type TornadoLeverKey =
 
 export type TornadoEntry = {
   key: TornadoLeverKey;
-  label: string;
+  label: Localized;
   deltaPct: number;
   lowNpv: number | null;
   highNpv: number | null;
@@ -222,14 +223,14 @@ export type FinancialResult = FinancialCaseResult & {
    * Los tres escenarios fijos mueven precio, margen y divisa a la vez y no permiten
    * saber cuál de ellos manda; el tornado sí.
    */
-  tornado: { modeKey: EntryModeKey | null; mode: string | null; baseNpv: number | null; deltaPct: number; levers: TornadoEntry[] };
+  tornado: { modeKey: EntryModeKey | null; mode: Localized | null; baseNpv: number | null; deltaPct: number; levers: TornadoEntry[] };
 };
 
 export type InvestmentRecommendation = {
   action: "advance" | "test" | "discard" | "insufficient_data";
-  label: string;
-  summary: string;
-  selectedMode: string | null;
+  label: Localized;
+  summary: Localized;
+  selectedMode: Localized | null;
   selectedModeKey: EntryModeKey | null;
   evaluatedMetrics: {
     riskAdjusted: number;
@@ -241,10 +242,10 @@ export type InvestmentRecommendation = {
     currency: string | null;
   };
   thresholds: InvestmentThresholds;
-  reasons: string[];
+  reasons: Localized[];
 };
 
-export type ModeForFinance = { key: EntryModeKey; mode: string };
+export type ModeForFinance = { key: EntryModeKey; mode: Localized };
 
 function asNumber(value: number | null | undefined) {
   return value === null || value === undefined || !Number.isFinite(value) ? null : value;
@@ -325,24 +326,24 @@ function resolveCurrencies(assumptions: FinancialAssumptions) {
 }
 
 function missingCoreInputs(assumptions: FinancialAssumptions) {
-  const checks: [keyof FinancialAssumptions, string][] = [
-    ["currency", "moneda local"],
-    ["tamYearOne", "TAM anual del año 1"],
-    ["annualMarketGrowthPct", "crecimiento anual del mercado"],
-    ["samPct", "% de SAM"],
-    ["somPctYearOne", "% de SOM en año 1"],
-    ["somPctHorizon", "% de SOM en horizonte"],
-    ["operatingMarginPct", "margen operativo"],
-    ["taxRatePct", "tasa fiscal"],
-    ["workingCapitalPctRevenue", "% de capital de trabajo"],
-    ["discountRatePct", "tasa de descuento"],
-    ["terminalGrowthPct", "crecimiento terminal"],
+  const checks: [keyof FinancialAssumptions, Localized][] = [
+    ["currency", loc("moneda local", "local currency")],
+    ["tamYearOne", loc("TAM anual del año 1", "year-one annual TAM")],
+    ["annualMarketGrowthPct", loc("crecimiento anual del mercado", "annual market growth")],
+    ["samPct", loc("% de SAM", "SAM %")],
+    ["somPctYearOne", loc("% de SOM en año 1", "year-one SOM %")],
+    ["somPctHorizon", loc("% de SOM en horizonte", "SOM % at horizon")],
+    ["operatingMarginPct", loc("margen operativo", "operating margin")],
+    ["taxRatePct", loc("tasa fiscal", "tax rate")],
+    ["workingCapitalPctRevenue", loc("% de capital de trabajo", "working capital %")],
+    ["discountRatePct", loc("tasa de descuento", "discount rate")],
+    ["terminalGrowthPct", loc("crecimiento terminal", "terminal growth")],
   ];
   const missing = checks
     .filter(([key]) => assumptions[key] === null || assumptions[key] === undefined || assumptions[key] === "")
     .map(([, label]) => label);
   const currencies = resolveCurrencies(assumptions);
-  if (currencies.fxRequired && (currencies.fxRate === null || currencies.fxRate <= 0)) missing.push("tipo de cambio a moneda de reporte");
+  if (currencies.fxRequired && (currencies.fxRate === null || currencies.fxRate <= 0)) missing.push(loc("tipo de cambio a moneda de reporte", "exchange rate to the reporting currency"));
   return missing;
 }
 
@@ -390,21 +391,21 @@ function calculateMode(
    * no tiene ingresos. Pedir los mismos once campos a los siete modos era la razón por la que
    * todos ellos producían el mismo flujo de caja con distinta escala.
    */
-  const missing = [
-    ...(isCostOnly || market ? [] : ["variables de mercado TAM/SAM/SOM"]),
-    ...(investment === null ? ["inversión inicial"] : []),
-    ...(annualCost === null ? ["coste operativo anual"] : []),
-    ...(!isCostOnly && capture === null ? ["captura de ingresos"] : []),
-    ...(isOperator && margin === null ? ["margen operativo"] : []),
-    ...(isRoyalty && royaltyRate === null ? ["tasa de royalty"] : []),
-    ...(isChannel && channelMargin === null ? ["margen de canal"] : []),
-    ...(taxRate === null ? ["tasa fiscal"] : []),
-    ...((isOperator || isChannel) && workingCapitalPctRevenue === null ? ["capital de trabajo"] : []),
-    ...(discount === null ? ["tasa de descuento"] : []),
-    ...(!isCostOnly && terminalGrowth === null ? ["crecimiento terminal"] : []),
-    ...(fxRate === null || fxRate <= 0 ? ["tipo de cambio"] : []),
+  const missing: Localized[] = [
+    ...(isCostOnly || market ? [] : [loc("variables de mercado TAM/SAM/SOM", "TAM/SAM/SOM market variables")]),
+    ...(investment === null ? [loc("inversión inicial", "initial investment")] : []),
+    ...(annualCost === null ? [loc("coste operativo anual", "annual operating cost")] : []),
+    ...(!isCostOnly && capture === null ? [loc("captura de ingresos", "revenue capture")] : []),
+    ...(isOperator && margin === null ? [loc("margen operativo", "operating margin")] : []),
+    ...(isRoyalty && royaltyRate === null ? [loc("tasa de royalty", "royalty rate")] : []),
+    ...(isChannel && channelMargin === null ? [loc("margen de canal", "channel margin")] : []),
+    ...(taxRate === null ? [loc("tasa fiscal", "tax rate")] : []),
+    ...((isOperator || isChannel) && workingCapitalPctRevenue === null ? [loc("capital de trabajo", "working capital")] : []),
+    ...(discount === null ? [loc("tasa de descuento", "discount rate")] : []),
+    ...(!isCostOnly && terminalGrowth === null ? [loc("crecimiento terminal", "terminal growth")] : []),
+    ...(fxRate === null || fxRate <= 0 ? [loc("tipo de cambio", "exchange rate")] : []),
   ];
-  const blank = (status: FinancialModeResult["status"], issues: string[]): FinancialModeResult => ({
+  const blank = (status: FinancialModeResult["status"], issues: Localized[]): FinancialModeResult => ({
     key: mode.key, mode: mode.mode, status, economicModel, roiPct: null, roiIncludingTerminalPct: null, valueMultiple: null,
     npv: null, paybackYear: null, cumulativeOperatingProfit: null,
     cumulativeFreeCashFlow: null, initialInvestment: investment === null || fxRate === null ? investment : round(investment * fxRate),
@@ -413,8 +414,11 @@ function calculateMode(
   });
   if (missing.length) return blank("insufficient_data", missing);
   // Un modelo de operador sin inversión no permite hablar de retorno sobre inversión.
-  if (isOperator && investment! <= 0) return blank("not_meaningful", ["La inversión inicial debe ser positiva para calcular ROI y recuperación."]);
-  if (!isCostOnly && discount! <= terminalGrowth!) return blank("not_meaningful", ["La tasa de descuento debe superar el crecimiento terminal para calcular el valor terminal por perpetuidad."]);
+  if (isOperator && investment! <= 0) return blank("not_meaningful", [loc("La inversión inicial debe ser positiva para calcular ROI y recuperación.", "Initial investment must be positive to compute ROI and payback.")]);
+  if (!isCostOnly && discount! <= terminalGrowth!) return blank("not_meaningful", [loc(
+    "La tasa de descuento debe superar el crecimiento terminal para calcular el valor terminal por perpetuidad.",
+    "The discount rate must exceed terminal growth to compute terminal value as a perpetuity."
+  )]);
 
   const investmentReporting = investment! * fxRate!;
   const annualCostReporting = annualCost! * fxRate!;
@@ -562,14 +566,38 @@ function evaluateFinancialCase(
       : { tamYearOne: asNumber(provided.tamYearOne), tamAtHorizon: null, samAtHorizon: null, somRevenueYearOne: null, somRevenueAtHorizon: null },
     alternatives,
     missingInputs,
-    methodology: "TAM y SAM se proyectan con el crecimiento anual indicado; el SOM sigue la rampa elegida entre año 1 y horizonte (lineal, curva en S o definida año a año). Cada modo usa su propio modelo económico: operador (margen sobre las ventas capturadas), royalty (pago inicial más porcentaje sobre las ventas del licenciatario y margen en componentes, sin capital de trabajo), canal (margen del distribuidor) y solo coste (oficina de representación, sin ingresos ni valor terminal). Los flujos libres se calculan como EBIT menos impuestos menos el incremento de capital de trabajo, reconociendo el arrastre de bases imponibles negativas salvo que se desactive. Los importes se convierten a moneda de reporte usando el tipo indicado. NPV descuenta los flujos libres y el valor terminal por perpetuidad: TV = FCF del año siguiente / (tasa de descuento − crecimiento terminal), incluido el incremento terminal de capital de trabajo. Se publican dos bases de retorno: ROI sobre flujo libre acumulado del horizonte, sin valor terminal, y ROI incluyendo el valor presente del valor terminal; la política de umbrales declara cuál usa. La recuperación se interpola dentro del año en que el flujo acumulado cruza cero.",
+    methodology: loc(
+      "TAM y SAM se proyectan con el crecimiento anual indicado; el SOM sigue la rampa elegida entre año 1 y horizonte (lineal, curva en S o definida año a año). Cada modo usa su propio modelo económico: operador (margen sobre las ventas capturadas), royalty (pago inicial más porcentaje sobre las ventas del licenciatario y margen en componentes, sin capital de trabajo), canal (margen del distribuidor) y solo coste (oficina de representación, sin ingresos ni valor terminal). Los flujos libres se calculan como EBIT menos impuestos menos el incremento de capital de trabajo, reconociendo el arrastre de bases imponibles negativas salvo que se desactive. Los importes se convierten a moneda de reporte usando el tipo indicado. NPV descuenta los flujos libres y el valor terminal por perpetuidad: TV = FCF del año siguiente / (tasa de descuento − crecimiento terminal), incluido el incremento terminal de capital de trabajo. Se publican dos bases de retorno: ROI sobre flujo libre acumulado del horizonte, sin valor terminal, y ROI incluyendo el valor presente del valor terminal; la política de umbrales declara cuál usa. La recuperación se interpola dentro del año en que el flujo acumulado cruza cero.",
+      "TAM and SAM are projected with the annual growth entered; SOM follows the chosen ramp between year 1 and the horizon (linear, S-curve or defined year by year). Each mode uses its own economic model: operator (margin on captured sales), royalty (an up-front fee plus a percentage of the licensee's sales and a component margin, with no working capital), channel (distributor margin) and cost only (representative office, with no revenue and no terminal value). Free cash flow is EBIT less taxes less the increase in working capital, recognising tax-loss carryforward unless it is switched off. Amounts are converted to the reporting currency at the rate entered. NPV discounts free cash flow and the terminal value as a perpetuity: TV = next year's FCF / (discount rate − terminal growth), including the terminal increase in working capital. Two return bases are published: ROI on cumulative free cash flow over the horizon, excluding terminal value, and ROI including the present value of the terminal value; the threshold policy declares which one it uses. Payback is interpolated within the year in which cumulative cash flow crosses zero."
+    ),
   };
 }
 
-const scenarioDefinition: { key: SensitivityScenarioKey; label: string; note: string }[] = [
-  { key: "base", label: "Base", note: "Caso sin variaciones respecto a los supuestos financieros de referencia." },
-  { key: "optimistic", label: "Optimista", note: "Caso hipotético: aplica las mejoras explícitas de precio/ingreso, margen y divisa." },
-  { key: "conservative", label: "Conservador", note: "Caso hipotético: aplica las variaciones adversas explícitas de precio/ingreso, margen y divisa." },
+const scenarioDefinition: { key: SensitivityScenarioKey; label: Localized; note: Localized }[] = [
+  {
+    key: "base",
+    label: loc("Base", "Base"),
+    note: loc(
+      "Caso sin variaciones respecto a los supuestos financieros de referencia.",
+      "The case with no variation against the reference financial assumptions."
+    ),
+  },
+  {
+    key: "optimistic",
+    label: loc("Optimista", "Optimistic"),
+    note: loc(
+      "Caso hipotético: aplica las mejoras explícitas de precio/ingreso, margen y divisa.",
+      "A hypothetical case: it applies the explicit improvements to price/revenue, margin and currency."
+    ),
+  },
+  {
+    key: "conservative",
+    label: loc("Conservador", "Conservative"),
+    note: loc(
+      "Caso hipotético: aplica las variaciones adversas explícitas de precio/ingreso, margen y divisa.",
+      "A hypothetical case: it applies the explicit adverse moves in price/revenue, margin and currency."
+    ),
+  },
 ];
 
 function scenarioStatus(financial: FinancialCaseResult): FinancialScenarioResult["status"] {
@@ -580,7 +608,7 @@ function scenarioStatus(financial: FinancialCaseResult): FinancialScenarioResult
 }
 
 function evaluateSensitivityScenario(
-  definition: { key: SensitivityScenarioKey; label: string; note: string },
+  definition: { key: SensitivityScenarioKey; label: Localized; note: Localized },
   assumptions: FinancialAssumptions | undefined,
   modeOptions: ModeForFinance[],
   horizonYears: number,
@@ -590,12 +618,15 @@ function evaluateSensitivityScenario(
   const priceRevenuePct = definition.key === "base" ? 0 : asNumber(adjustment.priceRevenuePct);
   const operatingMarginPctPoints = definition.key === "base" ? 0 : asNumber(adjustment.operatingMarginPctPoints);
   const fxRatePct = definition.key === "base" ? 0 : asNumber(adjustment.fxRatePct);
-  const missingInputs: string[] = [];
-  if (priceRevenuePct === null) missingInputs.push("variación de precio/ingreso");
-  if (operatingMarginPctPoints === null) missingInputs.push("variación de margen operativo");
-  if (fxRatePct === null) missingInputs.push("variación del tipo de cambio");
+  const missingInputs: Localized[] = [];
+  if (priceRevenuePct === null) missingInputs.push(loc("variación de precio/ingreso", "price/revenue variation"));
+  if (operatingMarginPctPoints === null) missingInputs.push(loc("variación de margen operativo", "operating margin variation"));
+  if (fxRatePct === null) missingInputs.push(loc("variación del tipo de cambio", "exchange rate variation"));
   if (missingInputs.length) {
-    return { key: definition.key, label: definition.label, priceRevenuePct, operatingMarginPctPoints, fxRatePct, status: "insufficient_data", financial: null, missingInputs, note: `${definition.note} Complete las tres sensibilidades para calcular este escenario.` };
+    return { key: definition.key, label: definition.label, priceRevenuePct, operatingMarginPctPoints, fxRatePct, status: "insufficient_data", financial: null, missingInputs, note: loc(
+      `${pick(definition.note, "es")} Complete las tres sensibilidades para calcular este escenario.`,
+      `${pick(definition.note, "en")} Fill in all three sensitivities to compute this scenario.`
+    ) };
   }
   const currencies = resolveCurrencies(provided);
   const baseMargin = asNumber(provided.operatingMarginPct);
@@ -603,10 +634,16 @@ function evaluateSensitivityScenario(
   const scenarioMargin = baseMargin === null ? null : baseMargin + operatingMarginPctPoints!;
   const scenarioFx = baseFx === null ? null : (currencies.fxRequired ? baseFx * (1 + fxRatePct! / 100) : baseFx);
   if (scenarioMargin !== null && (scenarioMargin < -100 || scenarioMargin > 100)) {
-    return { key: definition.key, label: definition.label, priceRevenuePct, operatingMarginPctPoints, fxRatePct, status: "not_meaningful", financial: null, missingInputs: ["El margen operativo resultante debe permanecer entre −100% y 100%."], note: definition.note };
+    return { key: definition.key, label: definition.label, priceRevenuePct, operatingMarginPctPoints, fxRatePct, status: "not_meaningful", financial: null, missingInputs: [loc(
+      "El margen operativo resultante debe permanecer entre −100% y 100%.",
+      "The resulting operating margin must stay between −100% and 100%."
+    )], note: definition.note };
   }
   if (scenarioFx !== null && scenarioFx <= 0) {
-    return { key: definition.key, label: definition.label, priceRevenuePct, operatingMarginPctPoints, fxRatePct, status: "not_meaningful", financial: null, missingInputs: ["El tipo de cambio resultante debe ser positivo."], note: definition.note };
+    return { key: definition.key, label: definition.label, priceRevenuePct, operatingMarginPctPoints, fxRatePct, status: "not_meaningful", financial: null, missingInputs: [loc(
+      "El tipo de cambio resultante debe ser positivo.",
+      "The resulting exchange rate must be positive."
+    )], note: definition.note };
   }
   const financial = evaluateFinancialCase(
     { ...provided, operatingMarginPct: scenarioMargin, fxRateToReportingCurrency: scenarioFx },
@@ -614,24 +651,26 @@ function evaluateSensitivityScenario(
     horizonYears,
     1 + priceRevenuePct! / 100,
   );
-  const noFxNote = !currencies.fxRequired && fxRatePct !== 0 ? " La sensibilidad FX no altera el resultado porque la moneda local y de reporte coinciden." : "";
-  return { key: definition.key, label: definition.label, priceRevenuePct, operatingMarginPctPoints, fxRatePct, status: scenarioStatus(financial), financial, missingInputs: financial.missingInputs, note: `${definition.note}${noFxNote}` };
+  const noFx = !currencies.fxRequired && fxRatePct !== 0;
+  const noFxNoteEs = noFx ? " La sensibilidad FX no altera el resultado porque la moneda local y de reporte coinciden." : "";
+  const noFxNoteEn = noFx ? " The FX sensitivity does not change the result because the local and reporting currencies are the same." : "";
+  return { key: definition.key, label: definition.label, priceRevenuePct, operatingMarginPctPoints, fxRatePct, status: scenarioStatus(financial), financial, missingInputs: financial.missingInputs, note: loc(`${pick(definition.note, "es")}${noFxNoteEs}`, `${pick(definition.note, "en")}${noFxNoteEn}`) };
 }
 
 const tornadoLevers: {
   key: TornadoLeverKey;
-  label: string;
+  label: Localized;
   /** Devuelve los supuestos y el multiplicador de ingreso para un factor dado (1 ± delta). */
   apply: (assumptions: FinancialAssumptions, factor: number, modeKey: EntryModeKey) => { assumptions: FinancialAssumptions; revenueMultiplier: number } | null;
 }[] = [
   {
     key: "priceRevenue",
-    label: "Precio / ingreso realizado",
+    label: loc("Precio / ingreso realizado", "Price / realised revenue"),
     apply: (assumptions, factor) => ({ assumptions, revenueMultiplier: factor }),
   },
   {
     key: "somCapture",
-    label: "Cuota alcanzada (SOM)",
+    label: loc("Cuota alcanzada (SOM)", "Share achieved (SOM)"),
     apply: (assumptions, factor) => ({
       assumptions: {
         ...assumptions,
@@ -644,7 +683,7 @@ const tornadoLevers: {
   },
   {
     key: "operatingMargin",
-    label: "Margen operativo",
+    label: loc("Margen operativo", "Operating margin"),
     apply: (assumptions, factor) => {
       const margin = asNumber(assumptions.operatingMarginPct);
       if (margin === null) return null;
@@ -653,7 +692,7 @@ const tornadoLevers: {
   },
   {
     key: "initialInvestment",
-    label: "Inversión inicial",
+    label: loc("Inversión inicial", "Initial investment"),
     apply: (assumptions, factor, modeKey) => {
       const profile = assumptions.modeProfiles?.[modeKey];
       const investment = asNumber(profile?.initialInvestment);
@@ -666,7 +705,7 @@ const tornadoLevers: {
   },
   {
     key: "annualOperatingCost",
-    label: "Coste operativo anual",
+    label: loc("Coste operativo anual", "Annual operating cost"),
     apply: (assumptions, factor, modeKey) => {
       const profile = assumptions.modeProfiles?.[modeKey];
       const cost = asNumber(profile?.annualOperatingCost);
@@ -679,7 +718,7 @@ const tornadoLevers: {
   },
   {
     key: "discountRate",
-    label: "Tasa de descuento",
+    label: loc("Tasa de descuento", "Discount rate"),
     apply: (assumptions, factor) => {
       const discount = asNumber(assumptions.discountRatePct);
       const terminalGrowth = asNumber(assumptions.terminalGrowthPct);
@@ -692,7 +731,7 @@ const tornadoLevers: {
   },
   {
     key: "fxRate",
-    label: "Tipo de cambio",
+    label: loc("Tipo de cambio", "Exchange rate"),
     apply: (assumptions, factor) => {
       const currencies = resolveCurrencies(assumptions);
       if (!currencies.fxRequired || currencies.fxRate === null) return null;
@@ -701,7 +740,7 @@ const tornadoLevers: {
   },
   {
     key: "taxRate",
-    label: "Tasa fiscal",
+    label: loc("Tasa fiscal", "Tax rate"),
     apply: (assumptions, factor) => {
       const taxRate = asNumber(assumptions.taxRatePct);
       if (taxRate === null) return null;
@@ -767,7 +806,9 @@ export function recommendInvestmentAction(
 ): InvestmentRecommendation {
   const policy: InvestmentThresholds = { ...defaultInvestmentThresholds, ...thresholds };
   const roiBasis: RoiBasis = policy.roiBasis ?? "operating_horizon";
-  const roiBasisLabel = roiBasis === "including_terminal" ? "ROI incluyendo valor terminal" : "ROI sobre flujo del horizonte";
+  const roiBasisLabel = roiBasis === "including_terminal"
+    ? loc("ROI incluyendo valor terminal", "ROI including terminal value")
+    : loc("ROI sobre flujo del horizonte", "ROI on cash flow over the horizon");
   const roiOf = (alternative: FinancialModeResult | null) =>
     alternative === null ? null : roiBasis === "including_terminal" ? alternative.roiIncludingTerminalPct : alternative.roiPct;
   // La oficina de representación no compite por NPV: su valor es la opción que abre, no su flujo.
@@ -790,11 +831,17 @@ export function recommendInvestmentAction(
     thresholds: policy,
   };
 
-  const missing: string[] = [];
+  const missing: Localized[] = [];
   if (financial.status !== "ok") missing.push(...financial.missingInputs);
-  if (!selected) missing.push("una alternativa de entrada con flujo de caja completo y valor terminal válido");
+  if (!selected) missing.push(loc(
+    "una alternativa de entrada con flujo de caja completo y valor terminal válido",
+    "an entry alternative with complete cash flow and a valid terminal value"
+  ));
   const policyCurrency = policy.currency?.trim().toUpperCase();
-  if (policyCurrency && financial.reportingCurrency && policyCurrency !== financial.reportingCurrency) missing.push(`la moneda de umbrales (${policyCurrency}) debe coincidir con la moneda de reporte (${financial.reportingCurrency})`);
+  if (policyCurrency && financial.reportingCurrency && policyCurrency !== financial.reportingCurrency) missing.push(loc(
+    `la moneda de umbrales (${policyCurrency}) debe coincidir con la moneda de reporte (${financial.reportingCurrency})`,
+    `the threshold currency (${policyCurrency}) must match the reporting currency (${financial.reportingCurrency})`
+  ));
   /**
    * Una cobertura de evidencia insuficiente no es un veredicto económico negativo: es la
    * ausencia de base para emitir veredicto. Antes degradaba a «Descartar», lo que hacía
@@ -802,37 +849,108 @@ export function recommendInvestmentAction(
    */
   const minConfidence = policy.minConfidence ?? 60;
   if (confidence < minConfidence) {
-    missing.push(`cobertura de evidencia ${confidence}% frente al mínimo exigido ${minConfidence}%: documente los juicios cualitativos y complete los indicadores públicos antes de decidir`);
+    missing.push(loc(
+      `cobertura de evidencia ${confidence}% frente al mínimo exigido ${minConfidence}%: documente los juicios cualitativos y complete los indicadores públicos antes de decidir`,
+      `evidence coverage of ${confidence}% against the ${minConfidence}% required: document the qualitative judgements and complete the public indicators before deciding`
+    ));
   }
   if (missing.length) {
-    return { ...base, action: "insufficient_data", label: "Completar evidencia", summary: "No se emite una decisión de inversión porque falta evidencia, faltan datos financieros o existe una inconsistencia de moneda.", reasons: missing };
+    return {
+      ...base,
+      action: "insufficient_data",
+      label: loc("Completar evidencia", "Complete the evidence"),
+      summary: loc(
+        "No se emite una decisión de inversión porque falta evidencia, faltan datos financieros o existe una inconsistencia de moneda.",
+        "No investment decision is issued because evidence is missing, financial data is missing or there is a currency inconsistency."
+      ),
+      reasons: missing,
+    };
   }
 
   const metrics = base.evaluatedMetrics;
   const investmentLimitPass = policy.testMaxInitialInvestment === null || policy.testMaxInitialInvestment === undefined || (metrics.initialInvestment ?? Infinity) <= policy.testMaxInitialInvestment;
+  const noInvestmentLimit = policy.testMaxInitialInvestment === null || policy.testMaxInitialInvestment === undefined;
+  const investmentLimitReason = noInvestmentLimit
+    ? loc("No hay límite de inversión para prueba.", "There is no investment limit for the test threshold.")
+    : loc(
+        `Inversión inicial ${metrics.initialInvestment} frente al límite ${policy.testMaxInitialInvestment}.`,
+        `Initial investment of ${metrics.initialInvestment} against the limit of ${policy.testMaxInitialInvestment}.`
+      );
+  const confidenceReason = loc(
+    `Cobertura de evidencia ${confidence}% frente al mínimo ${minConfidence}%.`,
+    `Evidence coverage of ${confidence}% against the ${minConfidence}% minimum.`
+  );
   const advancePasses = [
-    { pass: riskAdjusted >= (policy.advanceMinRiskAdjusted ?? 65), reason: `Puntuación ajustada por riesgo ${riskAdjusted}/100 frente al mínimo de avanzar ${policy.advanceMinRiskAdjusted}/100.` },
-    { pass: confidence >= minConfidence, reason: `Cobertura de evidencia ${confidence}% frente al mínimo ${minConfidence}%.` },
-    { pass: (metrics.npv ?? -Infinity) >= (policy.advanceMinNpv ?? 0), reason: `NPV ${metrics.npv} frente al mínimo de avanzar ${policy.advanceMinNpv}.` },
-    { pass: (metrics.roiPct ?? -Infinity) >= (policy.advanceMinRoiPct ?? 20), reason: `${roiBasisLabel} ${metrics.roiPct}% frente al mínimo de avanzar ${policy.advanceMinRoiPct}%.` },
-    { pass: metrics.paybackYear !== null && metrics.paybackYear <= (policy.advanceMaxPaybackYears ?? 5), reason: `Recuperación ${metrics.paybackYear === null ? "no alcanzada" : `año ${metrics.paybackYear}`} frente al máximo de avanzar año ${policy.advanceMaxPaybackYears}.` },
-    { pass: investmentLimitPass, reason: policy.testMaxInitialInvestment === null || policy.testMaxInitialInvestment === undefined ? "No hay límite de inversión para prueba." : `Inversión inicial ${metrics.initialInvestment} frente al límite ${policy.testMaxInitialInvestment}.` },
+    { pass: riskAdjusted >= (policy.advanceMinRiskAdjusted ?? 65), reason: loc(
+      `Puntuación ajustada por riesgo ${riskAdjusted}/100 frente al mínimo de avanzar ${policy.advanceMinRiskAdjusted}/100.`,
+      `Risk-adjusted score of ${riskAdjusted}/100 against the advance minimum of ${policy.advanceMinRiskAdjusted}/100.`
+    ) },
+    { pass: confidence >= minConfidence, reason: confidenceReason },
+    { pass: (metrics.npv ?? -Infinity) >= (policy.advanceMinNpv ?? 0), reason: loc(
+      `NPV ${metrics.npv} frente al mínimo de avanzar ${policy.advanceMinNpv}.`,
+      `NPV of ${metrics.npv} against the advance minimum of ${policy.advanceMinNpv}.`
+    ) },
+    { pass: (metrics.roiPct ?? -Infinity) >= (policy.advanceMinRoiPct ?? 20), reason: loc(
+      `${pick(roiBasisLabel, "es")} ${metrics.roiPct}% frente al mínimo de avanzar ${policy.advanceMinRoiPct}%.`,
+      `${pick(roiBasisLabel, "en")} of ${metrics.roiPct}% against the advance minimum of ${policy.advanceMinRoiPct}%.`
+    ) },
+    { pass: metrics.paybackYear !== null && metrics.paybackYear <= (policy.advanceMaxPaybackYears ?? 5), reason: loc(
+      `Recuperación ${metrics.paybackYear === null ? "no alcanzada" : `año ${metrics.paybackYear}`} frente al máximo de avanzar año ${policy.advanceMaxPaybackYears}.`,
+      `Payback ${metrics.paybackYear === null ? "not reached" : `in year ${metrics.paybackYear}`} against the advance maximum of year ${policy.advanceMaxPaybackYears}.`
+    ) },
+    { pass: investmentLimitPass, reason: investmentLimitReason },
   ];
   if (advancePasses.every((criterion) => criterion.pass)) {
-    return { ...base, action: "advance", label: "Avanzar", summary: `La alternativa ${selected!.mode} supera todos los umbrales de inversión definidos. Pase a debida diligencia y a aprobación de capital.`, reasons: advancePasses.map((criterion) => criterion.reason) };
+    return {
+      ...base,
+      action: "advance",
+      label: loc("Avanzar", "Advance"),
+      summary: loc(
+        `La alternativa ${pick(selected!.mode, "es")} supera todos los umbrales de inversión definidos. Pase a debida diligencia y a aprobación de capital.`,
+        `The ${pick(selected!.mode, "en")} alternative clears every investment threshold defined. Move to due diligence and capital approval.`
+      ),
+      reasons: advancePasses.map((criterion) => criterion.reason),
+    };
   }
 
   const testPasses = [
-    { pass: riskAdjusted >= (policy.testMinRiskAdjusted ?? 50), reason: `Puntuación ajustada por riesgo ${riskAdjusted}/100 frente al mínimo de prueba ${policy.testMinRiskAdjusted}/100.` },
-    { pass: confidence >= minConfidence, reason: `Cobertura de evidencia ${confidence}% frente al mínimo ${minConfidence}%.` },
-    { pass: (metrics.npv ?? -Infinity) >= (policy.testMinNpv ?? 0), reason: `NPV ${metrics.npv} frente al mínimo de prueba ${policy.testMinNpv}.` },
-    { pass: (metrics.roiPct ?? -Infinity) >= (policy.testMinRoiPct ?? 0), reason: `${roiBasisLabel} ${metrics.roiPct}% frente al mínimo de prueba ${policy.testMinRoiPct}%.` },
-    { pass: investmentLimitPass, reason: policy.testMaxInitialInvestment === null || policy.testMaxInitialInvestment === undefined ? "No hay límite de inversión para prueba." : `Inversión inicial ${metrics.initialInvestment} frente al límite ${policy.testMaxInitialInvestment}.` },
+    { pass: riskAdjusted >= (policy.testMinRiskAdjusted ?? 50), reason: loc(
+      `Puntuación ajustada por riesgo ${riskAdjusted}/100 frente al mínimo de prueba ${policy.testMinRiskAdjusted}/100.`,
+      `Risk-adjusted score of ${riskAdjusted}/100 against the test minimum of ${policy.testMinRiskAdjusted}/100.`
+    ) },
+    { pass: confidence >= minConfidence, reason: confidenceReason },
+    { pass: (metrics.npv ?? -Infinity) >= (policy.testMinNpv ?? 0), reason: loc(
+      `NPV ${metrics.npv} frente al mínimo de prueba ${policy.testMinNpv}.`,
+      `NPV of ${metrics.npv} against the test minimum of ${policy.testMinNpv}.`
+    ) },
+    { pass: (metrics.roiPct ?? -Infinity) >= (policy.testMinRoiPct ?? 0), reason: loc(
+      `${pick(roiBasisLabel, "es")} ${metrics.roiPct}% frente al mínimo de prueba ${policy.testMinRoiPct}%.`,
+      `${pick(roiBasisLabel, "en")} of ${metrics.roiPct}% against the test minimum of ${policy.testMinRoiPct}%.`
+    ) },
+    { pass: investmentLimitPass, reason: investmentLimitReason },
   ];
   if (testPasses.every((criterion) => criterion.pass)) {
-    return { ...base, action: "test", label: "Probar", summary: `La alternativa ${selected!.mode} cumple el umbral de prueba, pero no todos los criterios de avance. Diseñe una entrada reversible con hitos de aprendizaje.`, reasons: testPasses.map((criterion) => criterion.reason) };
+    return {
+      ...base,
+      action: "test",
+      label: loc("Probar", "Test"),
+      summary: loc(
+        `La alternativa ${pick(selected!.mode, "es")} cumple el umbral de prueba, pero no todos los criterios de avance. Diseñe una entrada reversible con hitos de aprendizaje.`,
+        `The ${pick(selected!.mode, "en")} alternative meets the test threshold but not every advance criterion. Design a reversible entry with learning milestones.`
+      ),
+      reasons: testPasses.map((criterion) => criterion.reason),
+    };
   }
 
   const failed = testPasses.filter((criterion) => !criterion.pass).map((criterion) => criterion.reason);
-  return { ...base, action: "discard", label: "Descartar", summary: "La evidencia disponible no supera el umbral mínimo de prueba. No asigne inversión material; reabra el mercado únicamente si cambian los datos o supuestos clave.", reasons: failed };
+  return {
+    ...base,
+    action: "discard",
+    label: loc("Descartar", "Discard"),
+    summary: loc(
+      "La evidencia disponible no supera el umbral mínimo de prueba. No asigne inversión material; reabra el mercado únicamente si cambian los datos o supuestos clave.",
+      "The available evidence does not clear the minimum test threshold. Do not commit material investment; reopen the market only if the key data or assumptions change."
+    ),
+    reasons: failed,
+  };
 }

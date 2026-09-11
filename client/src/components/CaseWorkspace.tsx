@@ -8,6 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { trpc } from "@/lib/trpc";
+import { useLanguage } from "@/i18n";
+import { readLocalizedError } from "@shared/localizedError";
 
 /**
  * Espacio de trabajo del caso: documentos y libro de evidencias.
@@ -30,6 +32,7 @@ type Props = {
 };
 
 export function CaseWorkspace({ caseId, onCaseSelected, decisionContext, defaults, activeDocumentId, onActiveDocumentChange }: Props) {
+  const { lang, t, ui } = useLanguage();
   const [title, setTitle] = useState("");
   const [pastedText, setPastedText] = useState("");
   const [pastedName, setPastedName] = useState("");
@@ -59,7 +62,7 @@ export function CaseWorkspace({ caseId, onCaseSelected, decisionContext, default
 
   async function handleCreateCase() {
     if (title.trim().length < 2) {
-      toast.error("Ponga un título al caso.");
+      toast.error(ui("cwNeedTitle"));
       return;
     }
     try {
@@ -75,14 +78,14 @@ export function CaseWorkspace({ caseId, onCaseSelected, decisionContext, default
       onCaseSelected(created.id);
       toast.success("Caso creado.");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "No se pudo crear el caso.");
+      toast.error(t(readLocalizedError(error)) || ui("cwCreateFailed"));
     }
   }
 
   async function handleAddText() {
     if (!caseId) return;
     if (pastedText.trim().length < 50) {
-      toast.error("Pegue al menos un párrafo del caso.");
+      toast.error(ui("cwNeedParagraph"));
       return;
     }
     try {
@@ -95,16 +98,16 @@ export function CaseWorkspace({ caseId, onCaseSelected, decisionContext, default
       setPastedName("");
       setActiveDocumentId(created.id);
       refresh();
-      toast.success("Texto añadido. Con texto se pueden verificar las citas contra el original.");
+      toast.success(ui("cwTextAdded"));
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "No se pudo añadir el texto.");
+      toast.error(t(readLocalizedError(error)) || ui("cwTextFailed"));
     }
   }
 
   async function handleUpload(file: File) {
     if (!caseId) return;
     if (file.size > MAX_UPLOAD_BYTES) {
-      toast.error("El fichero supera los 20 MB. Pegue el texto o divídalo.");
+      toast.error(ui("cwTooLarge"));
       return;
     }
     try {
@@ -127,10 +130,10 @@ export function CaseWorkspace({ caseId, onCaseSelected, decisionContext, default
       if (created.textExtracted) {
         toast.success(`Documento subido y texto extraído${created.pages ? ` (${created.pages} páginas)` : ""}. Las citas se podrán verificar.`);
       } else {
-        toast.warning(created.note ?? "Documento subido, pero sin texto extraíble: las citas no se podrán verificar contra el original.");
+        toast.warning(t(created.note) || ui("cwNoExtractableText"));
       }
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "No se pudo subir el documento.");
+      toast.error(t(readLocalizedError(error)) || ui("cwUploadFailed"));
     }
   }
 
@@ -140,7 +143,7 @@ export function CaseWorkspace({ caseId, onCaseSelected, decisionContext, default
       return;
     }
     try {
-      const result = await extract.mutateAsync({ caseId, documentId: activeDocumentId, context: decisionContext || undefined });
+      const result = await extract.mutateAsync({ caseId, documentId: activeDocumentId, context: decisionContext || undefined, lang });
       refresh();
       const discarded = result.discarded.length;
       toast.success(
@@ -148,7 +151,7 @@ export function CaseWorkspace({ caseId, onCaseSelected, decisionContext, default
           (discarded ? ` ${discarded} descartadas por no citar o no verificar.` : ""),
       );
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "No se pudo extraer del documento.");
+      toast.error(t(readLocalizedError(error)) || ui("cwExtractFailed"));
     }
   }
 
@@ -157,7 +160,7 @@ export function CaseWorkspace({ caseId, onCaseSelected, decisionContext, default
       await setStatus.mutateAsync({ evidenceId, status });
       void evidenceQuery.refetch();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "No se pudo actualizar la evidencia.");
+      toast.error(t(readLocalizedError(error)) || ui("cwEvidenceFailed"));
     }
   }
 
@@ -165,19 +168,17 @@ export function CaseWorkspace({ caseId, onCaseSelected, decisionContext, default
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Caso de estudio</CardTitle>
-          <CardDescription>
-            El caso es la materia prima. Todo lo que se afirme después debe poder rastrearse hasta una cita de estos documentos.
-          </CardDescription>
+          <CardTitle>{ui("cwTitle")}</CardTitle>
+          <CardDescription>{ui("cwDesc")}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex flex-wrap items-end gap-3">
             <div className="min-w-[240px] flex-1 space-y-2">
-              <Label htmlFor="case-title">Nuevo caso</Label>
-              <Input id="case-title" value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Ej. Chandra Components entra en Brasil" />
+              <Label htmlFor="case-title">{ui("cwNewCase")}</Label>
+              <Input id="case-title" value={title} onChange={(event) => setTitle(event.target.value)} placeholder={ui("cwTitlePlaceholder")} />
             </div>
             <Button onClick={handleCreateCase} disabled={createCase.isPending}>
-              {createCase.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null} Crear caso
+              {createCase.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null} {ui("cwCreateCase")}
             </Button>
           </div>
 
@@ -200,30 +201,26 @@ export function CaseWorkspace({ caseId, onCaseSelected, decisionContext, default
 
       {caseId === null ? (
         <Card>
-          <CardContent className="py-10 text-center text-sm text-muted-foreground">
-            Cree o seleccione un caso para añadir documentos y construir el libro de evidencias.
-          </CardContent>
+          <CardContent className="py-10 text-center text-sm text-muted-foreground">{ui("cwPickCase")}</CardContent>
         </Card>
       ) : (
         <>
           <Card>
             <CardHeader>
-              <CardTitle>Documentos</CardTitle>
-              <CardDescription>
-                El texto pegado es preferible al PDF: permite comprobar que cada cita aparece de verdad en el original.
-              </CardDescription>
+              <CardTitle>{ui("cwDocuments")}</CardTitle>
+              <CardDescription>{ui("cwDocumentsDesc")}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid gap-3 md:grid-cols-[1fr_auto]">
                 <div className="space-y-2">
-                  <Label htmlFor="paste-name">Nombre de la fuente</Label>
-                  <Input id="paste-name" value={pastedName} onChange={(event) => setPastedName(event.target.value)} placeholder="Ej. Caso HBS 9-712-402" />
-                  <Label htmlFor="paste-text">Texto del caso</Label>
-                  <Textarea id="paste-text" rows={6} value={pastedText} onChange={(event) => setPastedText(event.target.value)} placeholder="Pegue aquí el texto del caso o de un anexo." />
+                  <Label htmlFor="paste-name">{ui("cwSourceName")}</Label>
+                  <Input id="paste-name" value={pastedName} onChange={(event) => setPastedName(event.target.value)} placeholder={ui("cwSourcePlaceholder")} />
+                  <Label htmlFor="paste-text">{ui("cwCaseText")}</Label>
+                  <Textarea id="paste-text" rows={6} value={pastedText} onChange={(event) => setPastedText(event.target.value)} placeholder={ui("cwPastePlaceholder")} />
                 </div>
                 <div className="flex flex-col justify-end gap-2">
                   <Button onClick={handleAddText} disabled={addText.isPending}>
-                    {addText.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileText className="mr-2 h-4 w-4" />} Añadir texto
+                    {addText.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileText className="mr-2 h-4 w-4" />} {ui("cwAddText")}
                   </Button>
                   <input
                     ref={fileInput}
@@ -238,7 +235,7 @@ export function CaseWorkspace({ caseId, onCaseSelected, decisionContext, default
                     }}
                   />
                   <Button variant="outline" onClick={() => fileInput.current?.click()} disabled={uploadDocument.isPending}>
-                    {uploadDocument.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />} Subir PDF
+                    {uploadDocument.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />} {ui("cwUploadPdf")}
                   </Button>
                 </div>
               </div>
@@ -254,7 +251,7 @@ export function CaseWorkspace({ caseId, onCaseSelected, decisionContext, default
                     >
                       <FileText className="h-4 w-4" />
                       <span className="flex-1 text-left">{document.filename}</span>
-                      <Badge variant="outline">{document.storageKey ? "PDF" : "Texto"}</Badge>
+                      <Badge variant="outline">{document.storageKey ? "PDF" : ui("cwText")}</Badge>
                     </button>
                   ))}
                 </div>
@@ -262,11 +259,9 @@ export function CaseWorkspace({ caseId, onCaseSelected, decisionContext, default
 
               <div className="flex flex-wrap items-center gap-3">
                 <Button onClick={handleExtract} disabled={extract.isPending || !activeDocumentId}>
-                  {extract.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />} Extraer evidencias del documento
+                  {extract.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />} {ui("cwExtract")}
                 </Button>
-                <span className="text-xs text-muted-foreground">
-                  Cada afirmación sin cita literal o sin localizador se descarta en el servidor antes de llegar aquí.
-                </span>
+                <span className="text-xs text-muted-foreground">{ui("cwExtractHint")}</span>
               </div>
             </CardContent>
           </Card>
@@ -275,13 +270,13 @@ export function CaseWorkspace({ caseId, onCaseSelected, decisionContext, default
             <CardHeader>
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
-                  <CardTitle>Libro de evidencias</CardTitle>
-                  <CardDescription>{accepted.length} aceptadas · {suggested.length} pendientes de revisión</CardDescription>
+                  <CardTitle>{ui("cwEvidenceBook")}</CardTitle>
+                  <CardDescription>{accepted.length} {ui("cwAcceptedCount")} · {suggested.length} {ui("cwPendingCount")}</CardDescription>
                 </div>
               </div>
             </CardHeader>
             <CardContent className="space-y-3">
-              {evidence.length === 0 && <p className="text-sm text-muted-foreground">Todavía no hay evidencias. Extraiga del documento o añádalas a mano.</p>}
+              {evidence.length === 0 && <p className="text-sm text-muted-foreground">{ui("cwNoEvidence")}</p>}
               {evidence.map((entry) => (
                 <article key={entry.id} className={`evidence-row status-${entry.status}`}>
                   <div className="evidence-head">
@@ -289,13 +284,13 @@ export function CaseWorkspace({ caseId, onCaseSelected, decisionContext, default
                     <div className="evidence-actions">
                       {entry.status === "suggested" && (
                         <>
-                          <Button size="sm" onClick={() => updateStatus(entry.id, "accepted")}>Aceptar</Button>
-                          <Button size="sm" variant="outline" onClick={() => updateStatus(entry.id, "rejected")}>Rechazar</Button>
+                          <Button size="sm" onClick={() => updateStatus(entry.id, "accepted")}>{ui("cwAccept")}</Button>
+                          <Button size="sm" variant="outline" onClick={() => updateStatus(entry.id, "rejected")}>{ui("cwReject")}</Button>
                         </>
                       )}
-                      {entry.status === "rejected" && <Badge variant="outline">Rechazada</Badge>}
-                      {entry.status === "accepted" && <Badge>Aceptada</Badge>}
-                      <Button size="sm" variant="ghost" onClick={() => removeEvidence.mutateAsync({ evidenceId: entry.id }).then(() => evidenceQuery.refetch())} aria-label="Eliminar evidencia">
+                      {entry.status === "rejected" && <Badge variant="outline">{ui("cwRejected")}</Badge>}
+                      {entry.status === "accepted" && <Badge>{ui("cwAccepted")}</Badge>}
+                      <Button size="sm" variant="ghost" onClick={() => removeEvidence.mutateAsync({ evidenceId: entry.id }).then(() => evidenceQuery.refetch())} aria-label={ui("cwDeleteEvidence")}>
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>
                     </div>
@@ -310,10 +305,10 @@ export function CaseWorkspace({ caseId, onCaseSelected, decisionContext, default
                     <span>{entry.sourceLabel}</span>
                     {entry.locator && <span>· {entry.locator}</span>}
                     {entry.targetPath && <span>· {entry.targetPath}</span>}
-                    <span>· fiabilidad {entry.reliability}/5</span>
-                    {entry.createdBy === "ai" && <span>· propuesta por IA</span>}
+                    <span>· {ui("cwReliability")} {entry.reliability}/5</span>
+                    {entry.createdBy === "ai" && <span>· {ui("cwAiProposed")}</span>}
                     {entry.quote && !entry.quoteVerified && (
-                      <span className="evidence-warning"><AlertTriangle className="h-3 w-3" /> cita no verificada contra el original</span>
+                      <span className="evidence-warning"><AlertTriangle className="h-3 w-3" /> {ui("cwQuoteUnverified")}</span>
                     )}
                   </div>
                 </article>

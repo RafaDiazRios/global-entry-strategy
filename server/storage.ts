@@ -1,6 +1,7 @@
 import { GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { ENV } from "./_core/env";
+import { localizedError } from "@shared/localizedError";
 
 /**
  * Almacenamiento de ficheros en S3 o en cualquier servicio compatible, como Cloudflare R2.
@@ -14,7 +15,7 @@ let client: S3Client | null = null;
 
 function getClient() {
   if (!ENV.s3Bucket || !ENV.s3AccessKeyId || !ENV.s3SecretAccessKey) {
-    throw new Error("Falta configurar S3_BUCKET, S3_ACCESS_KEY_ID y S3_SECRET_ACCESS_KEY.");
+    throw localizedError("Falta configurar S3_BUCKET, S3_ACCESS_KEY_ID y S3_SECRET_ACCESS_KEY.", "S3_BUCKET, S3_ACCESS_KEY_ID and S3_SECRET_ACCESS_KEY are not configured.");
   }
   if (!client) {
     client = new S3Client({

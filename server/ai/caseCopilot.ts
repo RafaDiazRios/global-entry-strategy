@@ -1,13 +1,13 @@
-import { pick, type Localized } from "@shared/i18n";
+import { DEFAULT_LANG, loc, pick, type Lang, type Localized } from "@shared/i18n";
 import { invokeLLM, type InvokeParams, type InvokeResult, type MessageContent } from "../_core/llm";
 import { assessmentBlockByKey, assessmentScaleMax, itemPath, itemsOf, type AssessmentBlockKey } from "@shared/domain/countryAssessment";
 
 /**
- * El copiloto todavía trabaja en español: las etiquetas del marco se resuelven a ese idioma
- * antes de entrar en el prompt. Cuando el copiloto pase a ser bilingüe, esto tomará el
- * idioma de la petición en lugar de fijarlo.
+ * El copiloto trabaja en el idioma de la petición: las etiquetas del marco se resuelven a
+ * ese idioma antes de entrar en el prompt, y el prompt pide la respuesta en ese idioma. Los
+ * identificadores que viajan en el JSON (`itemPath`, `severity`) son neutros y no cambian.
  */
-const es = (value: Localized | string) => pick(value, "es");
+const label = (value: Localized | string, lang: Lang) => pick(value, lang);
 
 /**
  * Copiloto de caso.
@@ -48,7 +48,7 @@ export type ExtractedEvidence = {
 export type ExtractionResult = {
   evidence: ExtractedEvidence[];
   /** Motivo por el que se descartó cada propuesta rechazada. */
-  discarded: { reason: string; claim: string }[];
+  discarded: { reason: Localized; claim: string }[];
   model: string | null;
 };
 
@@ -62,7 +62,7 @@ export type ProposedRating = {
 export type ProposalResult = {
   blockKey: AssessmentBlockKey;
   ratings: ProposedRating[];
-  discarded: { reason: string; itemPath: string }[];
+  discarded: { reason: Localized; itemPath: string }[];
   unresolved: string[];
   model: string | null;
 };
@@ -70,7 +70,8 @@ export type ProposalResult = {
 export type Objection = {
   itemPath: string | null;
   objection: string;
-  severity: "alta" | "media" | "baja";
+  /** Identificador neutro: la etiqueta que se muestra la pone el cliente. */
+  severity: "high" | "medium" | "low";
 };
 
 const MAX_TEXT_CHARS = 120_000;
@@ -142,12 +143,12 @@ const extractionSchema = {
           additionalProperties: false,
           required: ["claim", "quote", "locator", "targetPath", "reliability", "countryCode"],
           properties: {
-            claim: { type: "string", description: "La afirmación en una frase, en español." },
-            quote: { type: "string", description: "Cita literal del documento, copiada carácter a carácter." },
-            locator: { type: "string", description: "Página, sección o párrafo donde aparece la cita." },
-            targetPath: { type: ["string", "null"], description: "Ítem del marco al que da soporte, con la forma bloque.grupo.item, o null." },
+            claim: { type: "string", description: "The claim in a single sentence, in the language requested in the system prompt." },
+            quote: { type: "string", description: "Verbatim quote from the document, copied character by character." },
+            locator: { type: "string", description: "Page, section or paragraph where the quote appears." },
+            targetPath: { type: ["string", "null"], description: "Framework item it supports, shaped block.group.item, or null." },
             reliability: { type: "integer", minimum: 1, maximum: 5, description: "5 dato oficial verificable, 1 supuesto no contrastado." },
-            countryCode: { type: ["string", "null"], description: "Código ISO alfa-2 del país al que se refiere, o null si es general." },
+            countryCode: { type: ["string", "null"], description: "ISO alpha-2 code of the country it refers to, or null if general." },
           },
         },
       },
@@ -155,7 +156,8 @@ const extractionSchema = {
   },
 } as const;
 
-const extractionSystemPrompt = `Eres un analista de estrategia internacional preparando un caso.
+const extractionSystemPrompt: Record<Lang, string> = {
+  es: `Eres un analista de estrategia internacional preparando un caso.
 
 Tu tarea es extraer del documento las afirmaciones que sirvan para evaluar la entrada en un
 mercado, y solo esas. Reglas:
@@ -169,33 +171,52 @@ mercado, y solo esas. Reglas:
 - Distingue hecho de opinión del autor del caso: una opinión atribuida se extrae como tal,
   con menor fiabilidad.
 - Escribe "claim" en español, aunque el documento esté en otro idioma. "quote" va siempre en
-  el idioma original.`;
+  el idioma original.`,
+  en: `You are an international strategy analyst preparing a case.
 
-function frameworkCatalogue() {
+Your task is to extract from the document the claims that help assess entry into a market,
+and only those. Rules:
+
+- Every claim must rest on a VERBATIM QUOTE from the document, copied exactly as it appears.
+  Do not paraphrase inside "quote".
+- Always say where the quote appears, in "locator" (page, section or paragraph).
+- If you cannot quote verbatim, leave the claim out.
+- Do not infer, do not fill gaps with outside knowledge and do not compute anything. If the
+  document does not say it, it does not exist.
+- Separate fact from the case author's opinion: an attributed opinion is extracted as such,
+  with lower reliability.
+- Write "claim" in English, even if the document is in another language. "quote" always stays
+  in the original language.`,
+};
+
+function frameworkCatalogue(lang: Lang) {
   const blocks: string[] = [];
   for (const key of ["market", "resources", "industry", "cage", "risk"] as AssessmentBlockKey[]) {
     const block = assessmentBlockByKey.get(key);
     if (!block) continue;
-    const items = itemsOf(block).map((item) => `${itemPath(key, item.groupKey, item.key)} — ${es(item.label)}`);
-    blocks.push(`${es(block.label)}:\n${items.join("\n")}`);
+    const items = itemsOf(block).map((item) => `${itemPath(key, item.groupKey, item.key)} — ${label(item.label, lang)}`);
+    blocks.push(`${label(block.label, lang)}:\n${items.join("\n")}`);
   }
   return blocks.join("\n\n");
 }
 
 export async function extractCaseEvidence(
   source: CaseSource,
-  options: { context?: string; invoke?: Invoker } = {},
+  options: { context?: string; invoke?: Invoker; lang?: Lang } = {},
 ): Promise<ExtractionResult> {
   const invoke = options.invoke ?? invokeLLM;
+  const lang = options.lang ?? DEFAULT_LANG;
   const result = await invoke({
     messages: [
-      { role: "system", content: extractionSystemPrompt },
+      { role: "system", content: extractionSystemPrompt[lang] },
       {
         role: "user",
         content: [
           {
             type: "text",
-            text: `${options.context ? `Contexto de la decisión: ${options.context}\n\n` : ""}Cuando una afirmación encaje con uno de estos ítems del marco de análisis, indícalo en "targetPath". Si no encaja con ninguno, deja targetPath en null.\n\n${frameworkCatalogue()}`,
+            text: lang === "es"
+              ? `${options.context ? `Contexto de la decisión: ${options.context}\n\n` : ""}Cuando una afirmación encaje con uno de estos ítems del marco de análisis, indícalo en "targetPath". Si no encaja con ninguno, deja targetPath en null.\n\n${frameworkCatalogue(lang)}`
+              : `${options.context ? `Decision context: ${options.context}\n\n` : ""}When a claim matches one of these framework items, say so in "targetPath". If it matches none, leave targetPath null.\n\n${frameworkCatalogue(lang)}`,
           },
           ...sourceParts(source),
         ],
@@ -222,17 +243,17 @@ export async function extractCaseEvidence(
     if (!claim) continue;
     // Regla 1: sin cita ni localizador, la afirmación no llega al cliente.
     if (!quote) {
-      discarded.push({ reason: "Sin cita literal", claim });
+      discarded.push({ reason: loc("Sin cita literal", "No verbatim quote"), claim });
       continue;
     }
     if (!locator) {
-      discarded.push({ reason: "Sin localizador en la fuente", claim });
+      discarded.push({ reason: loc("Sin localizador en la fuente", "No locator in the source"), claim });
       continue;
     }
     // Regla 2: si tenemos el texto, la cita tiene que estar en él.
     const verified = verifyQuote(quote, source.text);
     if (verified === false) {
-      discarded.push({ reason: "La cita no aparece en el texto de origen", claim });
+      discarded.push({ reason: loc("La cita no aparece en el texto de origen", "The quote does not appear in the source text"), claim });
       continue;
     }
     const targetPath = candidate.targetPath && knownPaths.has(candidate.targetPath) ? candidate.targetPath : null;
@@ -252,7 +273,8 @@ export async function extractCaseEvidence(
   return { evidence, discarded, model: result.model ?? null };
 }
 
-const proposalSystemPrompt = `Eres un analista de estrategia internacional puntuando un país
+const proposalSystemPrompt: Record<Lang, string> = {
+  es: `Eres un analista de estrategia internacional puntuando un país
 con el marco del capítulo 6 de Lasserre y Monteiro.
 
 Reglas:
@@ -261,7 +283,18 @@ Reglas:
   enuméralos en "unresolved": no evaluado y cero no son lo mismo.
 - Cada puntuación necesita un "rationale" de una o dos frases y al menos una cita literal
   del material en "evidenceQuotes".
-- No inventes cifras ni completes con conocimiento externo.`;
+- No inventes cifras ni completes con conocimiento externo.`,
+  en: `You are an international strategy analyst scoring a country with the chapter 6
+framework from Lasserre and Monteiro.
+
+Rules:
+- Score from 0 to ${assessmentScaleMax} using the anchors given for each item.
+- Score ONLY the items the material gives a basis for. Leave the rest out and list them in
+  "unresolved": not assessed and zero are not the same thing.
+- Every score needs a one- or two-sentence "rationale" and at least one verbatim quote from
+  the material in "evidenceQuotes".
+- Do not invent figures and do not fill gaps with outside knowledge.`,
+};
 
 const proposalSchema = {
   name: "assessment_proposal",
@@ -288,7 +321,7 @@ const proposalSchema = {
       unresolved: {
         type: "array",
         items: { type: "string" },
-        description: "Ítems que el material no permite puntuar.",
+        description: "Items the material does not allow you to score.",
       },
     },
   },
@@ -297,30 +330,33 @@ const proposalSchema = {
 export async function proposeAssessmentBlock(
   blockKey: AssessmentBlockKey,
   source: CaseSource,
-  options: { countryName: string; context?: string; invoke?: Invoker } = { countryName: "el país" },
+  options: { countryName: string; context?: string; invoke?: Invoker; lang?: Lang } = { countryName: "—" },
 ): Promise<ProposalResult> {
   const invoke = options.invoke ?? invokeLLM;
+  const lang = options.lang ?? DEFAULT_LANG;
   const block = assessmentBlockByKey.get(blockKey);
-  if (!block) throw new Error(`Bloque de evaluación desconocido: ${blockKey}`);
+  if (!block) throw new Error(`Unknown assessment block: ${blockKey}`);
 
   const itemBrief = block.groups
     .map((group) => {
       const items = group.items
-        .map((item) => `- ${itemPath(blockKey, group.key, item.key)} · ${es(item.label)}. ${es(item.help)}\n  0 = ${es(item.anchorLow)} | ${assessmentScaleMax} = ${es(item.anchorHigh)}`)
+        .map((item) => `- ${itemPath(blockKey, group.key, item.key)} · ${label(item.label, lang)}. ${label(item.help, lang)}\n  0 = ${label(item.anchorLow, lang)} | ${assessmentScaleMax} = ${label(item.anchorHigh, lang)}`)
         .join("\n");
-      return `${es(group.label)} (${es(group.intro)})\n${items}`;
+      return `${label(group.label, lang)} (${label(group.intro, lang)})\n${items}`;
     })
     .join("\n\n");
 
   const result = await invoke({
     messages: [
-      { role: "system", content: proposalSystemPrompt },
+      { role: "system", content: proposalSystemPrompt[lang] },
       {
         role: "user",
         content: [
           {
             type: "text",
-            text: `País evaluado: ${options.countryName}.\n${options.context ? `Contexto de la decisión: ${options.context}\n` : ""}\nBloque: ${es(block.label)}. ${es(block.intro)}\nOrientación de la escala: ${block.direction === "adverse" ? `${assessmentScaleMax} es desfavorable` : `${assessmentScaleMax} es favorable`}.\n\nÍtems:\n${itemBrief}`,
+            text: lang === "es"
+              ? `País evaluado: ${options.countryName}.\n${options.context ? `Contexto de la decisión: ${options.context}\n` : ""}\nBloque: ${label(block.label, lang)}. ${label(block.intro, lang)}\nOrientación de la escala: ${block.direction === "adverse" ? `${assessmentScaleMax} es desfavorable` : `${assessmentScaleMax} es favorable`}.\n\nÍtems:\n${itemBrief}`
+              : `Country assessed: ${options.countryName}.\n${options.context ? `Decision context: ${options.context}\n` : ""}\nBlock: ${label(block.label, lang)}. ${label(block.intro, lang)}\nScale direction: ${block.direction === "adverse" ? `${assessmentScaleMax} is unfavourable` : `${assessmentScaleMax} is favourable`}.\n\nItems:\n${itemBrief}`,
           },
           ...sourceParts(source),
         ],
@@ -338,27 +374,27 @@ export async function proposeAssessmentBlock(
   for (const candidate of parsed?.ratings ?? []) {
     const path = candidate.itemPath?.trim() ?? "";
     if (!validPaths.has(path)) {
-      discarded.push({ reason: "Ítem ajeno al bloque solicitado", itemPath: path || "(vacío)" });
+      discarded.push({ reason: loc("Ítem ajeno al bloque solicitado", "Item outside the block requested"), itemPath: path || "—" });
       continue;
     }
     const rationale = candidate.rationale?.trim() ?? "";
     if (!rationale) {
-      discarded.push({ reason: "Sin justificación", itemPath: path });
+      discarded.push({ reason: loc("Sin justificación", "No rationale"), itemPath: path });
       continue;
     }
     const quotes = (candidate.evidenceQuotes ?? []).map((quote) => quote.trim()).filter(Boolean);
     if (!quotes.length) {
-      discarded.push({ reason: "Sin cita que la sostenga", itemPath: path });
+      discarded.push({ reason: loc("Sin cita que la sostenga", "No quote to support it"), itemPath: path });
       continue;
     }
     // Si tenemos el texto, al menos una de las citas tiene que aparecer en él.
     if (source.text && !quotes.some((quote) => verifyQuote(quote, source.text) === true)) {
-      discarded.push({ reason: "Ninguna cita aparece en el texto de origen", itemPath: path });
+      discarded.push({ reason: loc("Ninguna cita aparece en el texto de origen", "No quote appears in the source text"), itemPath: path });
       continue;
     }
     const value = Math.min(assessmentScaleMax, Math.max(0, Math.round(Number(candidate.value))));
     if (!Number.isFinite(value)) {
-      discarded.push({ reason: "Valor no numérico", itemPath: path });
+      discarded.push({ reason: loc("Valor no numérico", "Non-numeric value"), itemPath: path });
       continue;
     }
     ratings.push({ itemPath: path, value, rationale, evidenceQuotes: quotes });
@@ -387,7 +423,7 @@ const critiqueSchema = {
           properties: {
             itemPath: { type: ["string", "null"] },
             objection: { type: "string" },
-            severity: { type: "string", enum: ["alta", "media", "baja"] },
+            severity: { type: "string", enum: ["high", "medium", "low"] },
           },
         },
       },
@@ -395,36 +431,53 @@ const critiqueSchema = {
   },
 } as const;
 
-const critiqueSystemPrompt = `Eres un revisor crítico de un análisis de entrada a mercado.
+const critiqueSystemPrompt: Record<Lang, string> = {
+  es: `Eres un revisor crítico de un análisis de entrada a mercado.
 
 No propones puntuaciones: señalas problemas. Busca contradicciones entre lo que dice el
 material y lo que se ha puntuado, juicios sin base, optimismo no justificado y omisiones
 relevantes. Sé concreto y cita el material cuando puedas. Si el análisis está bien
-sostenido, devuelve una lista vacía en lugar de inventar objeciones.`;
+sostenido, devuelve una lista vacía en lugar de inventar objeciones.
+
+Escribe "objection" en español. "severity" toma uno de estos valores fijos, en inglés:
+high, medium, low.`,
+  en: `You are a critical reviewer of a market entry analysis.
+
+You do not propose scores: you point at problems. Look for contradictions between what the
+material says and what has been scored, judgements with no basis, unjustified optimism and
+relevant omissions. Be concrete and quote the material when you can. If the analysis is well
+supported, return an empty list rather than inventing objections.
+
+Write "objection" in English. "severity" takes one of these fixed values: high, medium, low.`,
+};
 
 export async function critiqueAssessment(
   blockKey: AssessmentBlockKey,
   ratings: { itemPath: string; value: number; rationale?: string | null }[],
   source: CaseSource,
-  options: { countryName?: string; invoke?: Invoker } = {},
+  options: { countryName?: string; invoke?: Invoker; lang?: Lang } = {},
 ): Promise<{ objections: Objection[]; model: string | null }> {
   const invoke = options.invoke ?? invokeLLM;
+  const lang = options.lang ?? DEFAULT_LANG;
   const block = assessmentBlockByKey.get(blockKey);
-  if (!block) throw new Error(`Bloque de evaluación desconocido: ${blockKey}`);
+  if (!block) throw new Error(`Unknown assessment block: ${blockKey}`);
 
+  const noRationale = lang === "es" ? " · sin justificación" : " · no rationale";
   const summary = ratings
-    .map((rating) => `- ${rating.itemPath} = ${rating.value}/${assessmentScaleMax}${rating.rationale ? ` · ${rating.rationale}` : " · sin justificación"}`)
+    .map((rating) => `- ${rating.itemPath} = ${rating.value}/${assessmentScaleMax}${rating.rationale ? ` · ${rating.rationale}` : noRationale}`)
     .join("\n");
 
   const result = await invoke({
     messages: [
-      { role: "system", content: critiqueSystemPrompt },
+      { role: "system", content: critiqueSystemPrompt[lang] },
       {
         role: "user",
         content: [
           {
             type: "text",
-            text: `País: ${options.countryName ?? "el país evaluado"}.\nBloque: ${es(block.label)}. Orientación: ${block.direction === "adverse" ? `${assessmentScaleMax} es desfavorable` : `${assessmentScaleMax} es favorable`}.\n\nPuntuaciones a revisar:\n${summary || "(ninguna)"}`,
+            text: lang === "es"
+              ? `País: ${options.countryName ?? "—"}.\nBloque: ${label(block.label, lang)}. Orientación: ${block.direction === "adverse" ? `${assessmentScaleMax} es desfavorable` : `${assessmentScaleMax} es favorable`}.\n\nPuntuaciones a revisar:\n${summary || "(ninguna)"}`
+              : `Country: ${options.countryName ?? "—"}.\nBlock: ${label(block.label, lang)}. Direction: ${block.direction === "adverse" ? `${assessmentScaleMax} is unfavourable` : `${assessmentScaleMax} is favourable`}.\n\nScores to review:\n${summary || "(none)"}`,
           },
           ...sourceParts(source),
         ],
@@ -441,7 +494,7 @@ export async function critiqueAssessment(
     const objection = candidate.objection?.trim();
     if (!objection) continue;
     const path = candidate.itemPath && validPaths.has(candidate.itemPath) ? candidate.itemPath : null;
-    const severity = candidate.severity === "alta" || candidate.severity === "baja" ? candidate.severity : "media";
+    const severity = candidate.severity === "high" || candidate.severity === "low" ? candidate.severity : "medium";
     objections.push({ itemPath: path, objection, severity });
   }
   return { objections, model: result.model ?? null };

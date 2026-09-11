@@ -13,6 +13,7 @@ describe("buildStrategyPdf", () => {
       objectiveLabel: "Desarrollo de mercado",
       horizonYears: "3",
       generatedAt: "2026-09-09T18:00:00.000Z",
+      lang: "es",
       portfolio: { leadingCountry: "Mercado A", recommendation: "Mercado A lidera.", caveats: ["Validar la regulación local."] },
       thresholds: { advanceMinRiskAdjusted: 65, testMinRiskAdjusted: 50, minConfidence: 60, advanceMinNpv: 0 },
       countries: [{

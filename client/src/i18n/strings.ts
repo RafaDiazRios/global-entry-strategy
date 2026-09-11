@@ -506,6 +506,699 @@ export const UI_STRINGS = {
   abNotTested: loc("Sin probar", "Not tested"),
 
   // Idioma
+
+  // Archivo de escenarios
+  saCoordination: loc("Coordinación", "Coordination"),
+  saArchive: loc("ARCHIVO", "ARCHIVE"),
+  saTitle: loc("Escenarios guardados", "Saved scenarios"),
+  saSearchPh: loc("Buscar por nombre, empresa o industria", "Search by name, company or industry"),
+  saSearchLabel: loc("Buscar escenarios", "Search scenarios"),
+  saSignIn: loc("Inicie sesión para conservar análisis.", "Sign in to keep your analyses."),
+  saRenameLabel: loc("Nuevo nombre del escenario", "New scenario name"),
+  saSave: loc("Guardar", "Save"),
+  saCancel: loc("Cancelar", "Cancel"),
+  saOpenTag: loc("abierto", "open"),
+  saCase: loc("caso", "case"),
+  saOpen: loc("Abrir", "Open"),
+  saRename: loc("Renombrar", "Rename"),
+  saDuplicate: loc("Duplicar", "Duplicate"),
+  saDelete: loc("Borrar", "Delete"),
+  saFootnote: loc(
+    "Abrir un escenario reemplaza lo que haya en el formulario. Los filtros de cribado no se restauran: se dejan abiertos para no ocultar países que el análisis guardado sí incluía.",
+    "Opening a scenario replaces whatever is in the form. The screening filters are not restored: they are left open so as not to hide countries the saved analysis did include."
+  ),
+  saGone: loc("El escenario ya no existe.", "That scenario no longer exists."),
+  saOpened: loc("abierto con sus supuestos y su resultado guardados.", "opened with its saved assumptions and result."),
+  saNameTooShort: loc("El nombre necesita al menos dos caracteres.", "The name needs at least two characters."),
+  saCopySuffix: loc("copia", "copy"),
+  saConfirmDeletePre: loc("Borrar", "Delete"),
+  saConfirmDeleteTail: loc(
+    "y sus puertas de decisión. Esta acción no se puede deshacer.",
+    "and its decision gates. This cannot be undone."
+  ),
+  saDeletedWithGates: loc("puerta(s) de decisión.", "decision gate(s)."),
+  saDeletedWithGatesPre: loc("Escenario borrado junto con", "Scenario deleted, along with"),
+  saDeleted: loc("Escenario borrado.", "Scenario deleted."),
+  saDeleteFailed: loc("No se pudo borrar.", "It could not be deleted."),
+  saDuplicated: loc(
+    "Copia creada. Las puertas de decisión no se heredan: se aprobaron sobre los supuestos del original.",
+    "Copy created. Decision gates are not inherited: they were approved against the original's assumptions."
+  ),
+  saNoMatch: loc("Ningún escenario coincide con la búsqueda.", "No scenario matches the search."),
+  saEmpty: loc("Los análisis guardados aparecerán aquí.", "Saved analyses will appear here."),
+  saOpenFailed: loc("No se pudo abrir el escenario.", "The scenario could not be opened."),
+  saRenameFailed: loc("No se pudo renombrar.", "It could not be renamed."),
+  saDuplicateFailed: loc("No se pudo duplicar.", "It could not be duplicated."),
+
+  // Marco de la aplicación
+  dlNoteFramework: loc("Marco capítulos 5–8", "Chapters 5–8 framework"),
+  dlNoteSources: loc("Fuentes públicas trazables", "Traceable public sources"),
+  dlNoteJudgement: loc("Juicio humano obligatorio", "Human judgement required"),
+  dlWorkspace: loc("Espacio de estrategia", "Strategy workspace"),
+  dlSignInTitle: loc("Acceso al espacio de estrategia", "Access to the strategy workspace"),
+  dlSignInDesc: loc(
+    "Inicie sesión para crear análisis de entrada, actualizar datos públicos y conservar sus escenarios.",
+    "Sign in to build entry analyses, refresh public data and keep your scenarios."
+  ),
+  dlSignIn: loc("Iniciar sesión", "Sign in"),
+  dlSignOut: loc("Cerrar sesión", "Sign out"),
+  dlToggleNav: loc("Alternar navegación", "Toggle navigation"),
+  dlPrinciples: loc("Principios", "Principles"),
+  dlUser: loc("Usuario", "User"),
+  dlPersonalAnalysis: loc("Análisis personal", "Personal analysis"),
+
+  // Caso
+  cwNeedTitle: loc("Ponga un título al caso.", "Give the case a title."),
+  cwCreateFailed: loc("No se pudo crear el caso.", "The case could not be created."),
+  cwNeedParagraph: loc("Pegue al menos un párrafo del caso.", "Paste at least one paragraph of the case."),
+  cwTextAdded: loc(
+    "Texto añadido. Con texto se pueden verificar las citas contra el original.",
+    "Text added. With text, quotes can be verified against the original."
+  ),
+  cwTextFailed: loc("No se pudo añadir el texto.", "The text could not be added."),
+  cwTooLarge: loc("El fichero supera los 20 MB. Pegue el texto o divídalo.", "The file is over 20 MB. Paste the text or split it."),
+  cwNoExtractableText: loc(
+    "Documento subido, pero sin texto extraíble: las citas no se podrán verificar contra el original.",
+    "Document uploaded, but with no extractable text: quotes cannot be verified against the original."
+  ),
+  cwUploadFailed: loc("No se pudo subir el documento.", "The document could not be uploaded."),
+  cwExtractFailed: loc("No se pudo extraer del documento.", "Nothing could be extracted from the document."),
+  cwEvidenceFailed: loc("No se pudo actualizar la evidencia.", "The evidence could not be updated."),
+  cwPastePlaceholder: loc("Pegue aquí el texto del caso o de un anexo.", "Paste the case text or an annex here."),
+  cwTitle: loc("Caso de estudio", "Case study"),
+  cwDesc: loc(
+    "El caso es la materia prima. Todo lo que se afirme después debe poder rastrearse hasta una cita de estos documentos.",
+    "The case is the raw material. Everything claimed afterwards must trace back to a quote from these documents."
+  ),
+  cwNewCase: loc("Nuevo caso", "New case"),
+  cwTitlePlaceholder: loc("Ej. Chandra Components entra en Brasil", "E.g. Chandra Components enters Brazil"),
+  cwCreateCase: loc("Crear caso", "Create case"),
+  cwPickCase: loc(
+    "Cree o seleccione un caso para añadir documentos y construir el libro de evidencias.",
+    "Create or select a case to add documents and build the evidence book."
+  ),
+  cwDocuments: loc("Documentos", "Documents"),
+  cwDocumentsDesc: loc(
+    "El texto pegado es preferible al PDF: permite comprobar que cada cita aparece de verdad en el original.",
+    "Pasted text beats a PDF: it lets each quote be checked against the original."
+  ),
+  cwSourceName: loc("Nombre de la fuente", "Source name"),
+  cwSourcePlaceholder: loc("Ej. Caso HBS 9-712-402", "E.g. HBS case 9-712-402"),
+  cwCaseText: loc("Texto del caso", "Case text"),
+  cwAddText: loc("Añadir texto", "Add text"),
+  cwUploadPdf: loc("Subir PDF", "Upload PDF"),
+  cwText: loc("Texto", "Text"),
+  cwExtract: loc("Extraer evidencias del documento", "Extract evidence from the document"),
+  cwExtractHint: loc(
+    "Cada afirmación sin cita literal o sin localizador se descarta en el servidor antes de llegar aquí.",
+    "Any claim without a verbatim quote or a locator is discarded on the server before it reaches here."
+  ),
+  cwEvidenceBook: loc("Libro de evidencias", "Evidence book"),
+  cwAcceptedCount: loc("aceptadas", "accepted"),
+  cwPendingCount: loc("pendientes de revisión", "pending review"),
+  cwNoEvidence: loc(
+    "Todavía no hay evidencias. Extraiga del documento o añádalas a mano.",
+    "No evidence yet. Extract it from the document or add it by hand."
+  ),
+  cwAccept: loc("Aceptar", "Accept"),
+  cwReject: loc("Rechazar", "Reject"),
+  cwRejected: loc("Rechazada", "Rejected"),
+  cwAccepted: loc("Aceptada", "Accepted"),
+  cwDeleteEvidence: loc("Eliminar evidencia", "Delete evidence"),
+  cwReliability: loc("fiabilidad", "reliability"),
+  cwAiProposed: loc("propuesta por IA", "proposed by AI"),
+  cwQuoteUnverified: loc("cita no verificada contra el original", "quote not verified against the original"),
+
+  // Guía de primera evaluación
+  ogEyebrow: loc("guía de primera evaluación", "first-assessment guide"),
+  ogReopen: loc("Ver guía de uso", "Show the guide"),
+  ogTitle: loc("Cómo funciona el flujo", "How the flow works"),
+  ogIntroPre: loc("Los campos se incorporan al borrador en cuanto los edita.", "Fields go into the draft as soon as you edit them."),
+  ogIntroBold: loc("No pulse Enter para confirmar:", "Do not press Enter to confirm:"),
+  ogIntroTail: loc(
+    "use los botones indicados para actualizar fuentes, generar el análisis, guardar el escenario o crear un gate.",
+    "use the buttons shown to refresh sources, generate the analysis, save the scenario or open a gate."
+  ),
+  ogHide: loc("Ocultar guía", "Hide the guide"),
+  ogStep1Title: loc("Defina el mandato", "Define the mandate"),
+  ogStep1Text: loc("Empresa, país base, industria y modelo de negocio.", "Company, home country, industry and business model."),
+  ogStep2Title: loc("Añada y actualice mercados", "Add and refresh markets"),
+  ogStep2Empty: loc("Seleccione países; los datos se cargarán automáticamente.", "Select countries; the data loads on its own."),
+  ogStep2Added: loc("candidatos añadidos; los datos cargan automáticamente.", "candidates added; the data loads on its own."),
+  ogStep2AddedOne: loc("candidato añadido; los datos cargan automáticamente.", "candidate added; the data loads on its own."),
+  ogStep3Title: loc("Calibre factores locales", "Calibrate local factors"),
+  ogStep3Text: loc(
+    "Ajuste oportunidad, distancia, riesgo y capacidades de ejecución.",
+    "Adjust opportunity, distance, risk and execution capabilities."
+  ),
+  ogStep4Title: loc("Complete economía y escenarios", "Complete the economics and the scenarios"),
+  ogStep4Text: loc(
+    "Introduzca TAM/SAM/SOM, costes y sensibilidades antes de comparar retornos.",
+    "Enter TAM/SAM/SOM, costs and sensitivities before comparing returns."
+  ),
+  ogStep5Title: loc("Genere la evaluación", "Generate the assessment"),
+  ogStep5Text: loc(
+    "Revise umbrales, alternativas y alertas; guarde el escenario para activar gates.",
+    "Review thresholds, alternatives and alerts; save the scenario to enable gates."
+  ),
+  ogSequenceBold: loc("Secuencia recomendada:", "Recommended sequence:"),
+  ogSequenceText: loc(
+    "la herramienta no calcula ni guarda automáticamente. Puede volver a cualquier fase y recalcular cuando cambie un supuesto.",
+    "the tool does not calculate or save on its own. You can return to any phase and recalculate when an assumption changes."
+  ),
+  ogMissingBadge: loc("Datos incompletos se muestran como “—”", "Missing data is shown as “—”"),
+
+  // Gates
+  apMsPending: loc("Pendiente", "Pending"),
+  apMsInProgress: loc("En curso", "In progress"),
+  apMsBlocked: loc("Bloqueado", "Blocked"),
+  apMsComplete: loc("Completado", "Complete"),
+  apMsNotApplicable: loc("No aplica", "Not applicable"),
+  apNoDate: loc("Sin fecha", "No date"),
+  apNeedResponsible: loc("Indique el responsable del gate.", "Name the owner of the gate."),
+  apStatusNotStarted: loc("No iniciado", "Not started"),
+  apStatusInReview: loc("En revisión", "In review"),
+  apStatusApproved: loc("Aprobado", "Approved"),
+  apStatusChanges: loc("Cambios solicitados", "Changes requested"),
+  apStatusOnHold: loc("En pausa", "On hold"),
+  apStatusClosed: loc("Cerrado", "Closed"),
+  apSaveFirst: loc("Guarde el escenario antes de crear un gate de decisión.", "Save the scenario before opening a decision gate."),
+  apOnlyEligible: loc(
+    "Solo se pueden abrir gates para mercados con recomendación Probar o Avanzar.",
+    "Gates can only be opened for markets recommended as Test or Advance."
+  ),
+  apCreated: loc("Gate creado con cuatro hitos y una revisión programada.", "Gate created with four milestones and a scheduled review."),
+  apCreateFailed: loc("No se pudo crear el gate.", "The gate could not be created."),
+  apEyebrow: loc("gobierno de ejecución", "execution governance"),
+  apTitle: loc("Convierta “Probar” o “Avanzar” en un gate de trabajo.", "Turn “Test” or “Advance” into a working gate."),
+  apDesc: loc(
+    "El gate documenta responsables, hitos y una fecha de revisión. No autoriza gasto ni una operación financiera: la decisión formal debe seguir las políticas corporativas aplicables.",
+    "The gate documents owners, milestones and a review date. It authorises no spending and no financial transaction: the formal decision must follow the applicable corporate policies."
+  ),
+  apSavedBadge: loc("Escenario guardado", "Scenario saved"),
+  apSaveFirstTitle: loc("Primero guarde el escenario actual", "Save the current scenario first"),
+  apSaveFirstDescPre: loc("Pulse", "Press"),
+  apSaveFirstDescTail: loc(
+    "en la cabecera después de generar la evaluación. El historial persistente permitirá asociar los gates a esta versión del análisis.",
+    "in the header after generating the assessment. The persistent history then ties gates to this version of the analysis."
+  ),
+  apSave: loc("Guardar", "Save"),
+  apNoneTitle: loc("No hay gates accionables todavía", "No actionable gates yet"),
+  apNoneDescPre: loc("La herramienta abre gates únicamente para una recomendación de", "The tool opens gates only for a recommendation of"),
+  apNoneDescTail: loc(
+    "Complete la economía, escenarios y umbrales y vuelva a generar la evaluación.",
+    "Complete the economics, the scenarios and the thresholds, then generate the assessment again."
+  ),
+  apTest: loc("Probar", "Test"),
+  apAdvance: loc("Avanzar", "Advance"),
+  apNewGate: loc("NUEVO GATE", "NEW GATE"),
+  apAssignTitle: loc("Asigne una revisión responsable", "Assign an accountable review"),
+  apAssignDesc: loc(
+    "Se crearán cuatro hitos editables con fechas previas a la revisión. Si ya existe un gate para este mercado y escenario, se recuperará el existente para evitar duplicados.",
+    "Four editable milestones will be created, dated ahead of the review. If a gate already exists for this market and scenario, the existing one is reused rather than duplicated."
+  ),
+  apMarket: loc("Mercado", "Market"),
+  apSelect: loc("Seleccione", "Select"),
+  apResponsible: loc("Responsable", "Owner"),
+  apNameOrRole: loc("Nombre o cargo", "Name or role"),
+  apReviewer: loc("Revisor", "Reviewer"),
+  apOptional: loc("Opcional", "Optional"),
+  apReviewDate: loc("Fecha de revisión", "Review date"),
+  apScope: loc("Alcance o condiciones del gate", "Gate scope or conditions"),
+  apScopePlaceholder: loc(
+    "Ej. validación fiscal local, prueba de precio, partner shortlist y límite de inversión de prueba.",
+    "E.g. local tax validation, price test, partner shortlist and a test investment cap."
+  ),
+  apModePending: loc("Modo pendiente", "Mode pending"),
+  apCreateGate: loc("Crear gate", "Open gate"),
+  apActiveGates: loc("GATES ACTIVOS", "ACTIVE GATES"),
+  apTracking: loc("Seguimiento de decisiones", "Decision tracking"),
+  apGateAdvance: loc("Gate para avanzar", "Advance gate"),
+  apGateTest: loc("Gate de prueba", "Test gate"),
+  apOwnerPrefix: loc("Responsable", "Owner"),
+  apStatusFailed: loc("No se pudo actualizar el estado del gate.", "The gate status could not be updated."),
+  apMilestoneFailed: loc("No se pudo actualizar el hito.", "The milestone could not be updated."),
+  apReviewerPrefix: loc("Revisor", "Reviewer"),
+  apUnassigned: loc("No asignado", "Unassigned"),
+  apGatePrefix: loc("Gate", "Gate"),
+  apChangeStatus: loc("Cambiar estado", "Change status"),
+  apChangeStatusOf: loc("Cambiar estado de", "Change the status of"),
+  apNoGatesTitle: loc("Aún no hay gates para este escenario", "No gates for this scenario yet"),
+  apNoGatesDesc: loc(
+    "Asigne un responsable y una fecha para crear el primer flujo de revisión.",
+    "Assign an owner and a date to create the first review flow."
+  ),
+
+  // Severidad de las objeciones del copiloto
+  sevHigh: loc("alta", "high"),
+  sevMedium: loc("media", "medium"),
+  sevLow: loc("baja", "low"),
+
+  // Pantalla principal
+  hmTitle: loc("Global Entry Strategy Studio", "Global Entry Strategy Studio"),
+  hmTagline: loc("Diseñe antes de entrar.", "Design before you enter."),
+  hmSubtitle: loc(
+    "Un instrumento de juicio estratégico. No un ranking universal de países.",
+    "An instrument for strategic judgement. Not a universal country ranking."
+  ),
+  hmScenario: loc("Escenario", "Scenario"),
+  hmPrincipleBold: loc("Principio de uso:", "How to use it:"),
+  hmPrincipleText: loc(
+    "el modelo estructura evidencia y supuestos; no sustituye el caso financiero, la investigación de mercado ni la debida diligencia.",
+    "the model structures evidence and assumptions; it replaces neither the financial case, nor market research, nor due diligence."
+  ),
+  hmPart2Ch5: loc("PARTE II · CAPÍTULO 5", "PART II · CHAPTER 5"),
+  hmBriefTitle: loc("Defina el mandato antes de puntuar países", "Define the mandate before scoring countries"),
+  hmBriefDesc: loc(
+    "El resultado depende de la ambición, la propuesta de valor y las capacidades de la empresa, no solo de la macroeconomía.",
+    "The result depends on the ambition, the value proposition and the company's capabilities, not on macroeconomics alone."
+  ),
+  hmCompany: loc("Empresa o proyecto", "Company or project"),
+  hmCompanyPh: loc("Nombre o identificador del caso", "Name or identifier of the case"),
+  hmHomeCountry: loc("País base", "Home country"),
+  hmHomeCountryPh: loc("País desde el que se expande", "The country it expands from"),
+  hmIndustry: loc("Industria / subindustria", "Industry / sub-industry"),
+  hmIndustryPh: loc("Ej. software B2B, equipamiento médico", "E.g. B2B software, medical equipment"),
+  hmBusinessModel: loc("Modelo de negocio", "Business model"),
+  hmBusinessModelPh: loc("Ej. B2B, B2C, SaaS, franquicia", "E.g. B2B, B2C, SaaS, franchise"),
+  hmValueProp: loc("Propuesta de valor y ventaja relevante", "Value proposition and the advantage that matters"),
+  hmValuePropPh: loc(
+    "¿Qué necesidad resuelve y qué activo, capacidad o posición hace defendible la oferta?",
+    "What need does it solve, and what asset, capability or position makes the offer defensible?"
+  ),
+  hmObjective: loc("Objetivo principal de entrada", "Main entry objective"),
+  hmHorizon: loc("Horizonte (años)", "Horizon (years)"),
+  hmFrameworkTag: loc("MARCO DE DECISIÓN", "DECISION FRAMEWORK"),
+  hmFrameworkTitle: loc("Cuatro decisiones conectadas", "Four connected decisions"),
+  hmChosenObjective: loc("Objetivo elegido", "Objective chosen"),
+  hmStep1: loc("Ambición", "Ambition"),
+  hmStep1Text: loc(
+    "Definir el papel que debe jugar la geografía en la estrategia global.",
+    "Define the role geography should play in the global strategy."
+  ),
+  hmStep2: loc("Atractividad", "Attractiveness"),
+  hmStep2Text: loc(
+    "Evaluar mercado, recursos, competencia, distancia, riesgo e incentivos.",
+    "Assess market, resources, competition, distance, risk and incentives."
+  ),
+  hmStep3: loc("Entrada", "Entry"),
+  hmStep3Text: loc(
+    "Decidir momento, secuencia, control, compromiso y modo de entrada.",
+    "Decide timing, sequence, control, commitment and entry mode."
+  ),
+  hmStep4: loc("Ejecución", "Execution"),
+  hmStep4Text: loc(
+    "Asegurar encaje, viabilidad financiera y gobernanza de la alternativa.",
+    "Secure the fit, the financial viability and the governance of the alternative."
+  ),
+  hmPart2Ch6: loc("PARTE II · CAPÍTULO 6", "PART II · CHAPTER 6"),
+  hmUniverseTitle: loc("Construya un universo defendible", "Build a defensible universe"),
+  hmUniverseDesc: loc(
+    "Añada los países que quiere explorar. Después aplique filtros transparentes y exclusiones explícitas; el sistema no presupone mercados candidatos.",
+    "Add the countries you want to explore. Then apply transparent filters and explicit exclusions; the system presumes no candidate markets."
+  ),
+  hmAdd: loc("Añadir", "Add"),
+  hmPickCountry: loc("Seleccionar país del catálogo", "Pick a country from the catalogue"),
+  hmNoCandidates: loc("Aún no hay mercados candidatos", "No candidate markets yet"),
+  hmNoCandidatesDesc: loc(
+    "Añada un país del catálogo para comenzar. Puede comparar hasta 12 en cada escenario.",
+    "Add a country from the catalogue to start. You can compare up to 12 in a scenario."
+  ),
+  hmScreenRules: loc("Reglas de preselección", "Screening rules"),
+  hmScreenRulesDesc: loc(
+    "Se aplican tras actualizar datos. Un candidato que no pasa la regla se excluye de la evaluación, pero permanece visible para revisión.",
+    "They apply after the data is refreshed. A candidate that fails a rule is excluded from the assessment but stays visible for review."
+  ),
+  hmMinPopulation: loc("Población mínima (M)", "Minimum population (M)"),
+  hmMinGdp: loc("PIB mínimo (US$ B)", "Minimum GDP (US$ B)"),
+  hmMinGrowth: loc("Crecimiento mínimo (%)", "Minimum growth (%)"),
+  hmNoFilter: loc("Sin filtro", "No filter"),
+  hmExcludeIso: loc("Excluir por código ISO (opcional)", "Exclude by ISO code (optional)"),
+  hmExcludeIsoPh: loc("Ej. BR, IN", "E.g. BR, IN"),
+  hmCandidates: loc("Candidatos", "Candidates"),
+  hmPassFilter: loc("Pasan filtro", "Pass the filter"),
+  hmExternalData: loc("DATOS EXTERNOS", "EXTERNAL DATA"),
+  hmFactualBase: loc("Base factual", "Factual base"),
+  hmFactualBaseDesc: loc(
+    "Los indicadores macroeconómicos, fiscales y de divisa se actualizan desde fuentes públicas. Los factores estratégicos se califican separadamente para no fingir una precisión inexistente.",
+    "Macroeconomic, tax and currency indicators are refreshed from public sources. Strategic factors are scored separately, so as not to feign a precision that does not exist."
+  ),
+  hmContextTag: loc("CONTEXTUALICE LA EVIDENCIA", "PUT THE EVIDENCE IN CONTEXT"),
+  hmCalibrateTitle: loc("Calibre los factores no reducibles a macrodatos", "Calibrate what macro data cannot capture"),
+  hmCalibrateDesc: loc(
+    "Use una escala de 0 a 100. Los factores de riesgo y distancia se leen como exposición: 100 equivale a la exposición más alta.",
+    "Use a 0 to 100 scale. Risk and distance factors read as exposure: 100 is the highest exposure."
+  ),
+  hmDefineMarketsFirst: loc("Primero defina los mercados", "Define the markets first"),
+  hmDefineMarketsFirstDesc: loc(
+    "Añada candidatos en la fase 2 para poder calibrar su atractivo estratégico.",
+    "Add candidates in phase 2 to be able to calibrate their strategic attractiveness."
+  ),
+  hmDisciplineBold: loc("Disciplina analítica:", "Analytical discipline:"),
+  hmDisciplineText: loc(
+    "cada puntuación debe poder justificarse con una fuente, entrevista, prueba de mercado, asesor local o supuesto explícito.",
+    "every score must be justifiable with a source, an interview, a market test, a local adviser or an explicit assumption."
+  ),
+  hmActiveCountry: loc("PAÍS ACTIVO", "ACTIVE COUNTRY"),
+  hmRationalePh: loc("Fuente u observación que sostiene este juicio", "Source or observation that holds this judgement up"),
+  hmNoActiveCountry: loc("Sin país activo", "No active country"),
+  hmNoActiveCountryDesc: loc(
+    "Seleccione un mercado candidato para asignar los supuestos específicos del caso.",
+    "Select a candidate market to set the assumptions specific to the case."
+  ),
+  hmWeightingTag: loc("LÓGICA DE PONDERACIÓN", "WEIGHTING LOGIC"),
+  hmWeightingTitle: loc("Exprese las prioridades del mandato", "State the mandate's priorities"),
+  hmWeightingDesc: loc(
+    "Los pesos no son “verdad”; hacen visibles los trade-offs. El motor normaliza los pesos automáticamente.",
+    "Weights are not “truth”; they make the trade-offs visible. The engine normalises them automatically."
+  ),
+  hmFinanceEyebrow: loc("caso económico y sensibilidad", "economic case and sensitivity"),
+  hmFinanceTitle: loc("Modele el flujo de caja y sométalo a presión.", "Model the cash flow and put it under pressure."),
+  hmFinanceDesc: loc(
+    "La actualización pública completa moneda, tipo de cambio e impuesto corporativo; los tres continúan siendo editables. Los escenarios alteran precio/ingreso, margen operativo y FX sin cambiar la tesis base.",
+    "The public refresh fills in currency, exchange rate and corporate tax; all three stay editable. The scenarios move price/revenue, operating margin and FX without changing the base thesis."
+  ),
+  hmActiveMarket: loc("MERCADO ACTIVO", "ACTIVE MARKET"),
+  hmPerCountryPre: loc("Los supuestos se registran por país. Pulse", "Assumptions are recorded per country. Press"),
+  hmRefreshMarketTax: loc("Actualizar mercado y fiscal", "Refresh market and tax data"),
+  hmPerCountryTail: loc(
+    "en la fase 2 para cargar fuentes públicas; no requiere Enter.",
+    "in phase 2 to load the public sources; no Enter needed."
+  ),
+  hmAddMarketsFirst: loc("Primero añada mercados", "Add markets first"),
+  hmAddMarketsFirstDesc: loc(
+    "La estimación TAM/SAM/SOM se configura de forma separada para cada país candidato.",
+    "The TAM/SAM/SOM estimate is configured separately for each candidate country."
+  ),
+  hmEntryCashFlow: loc("Flujo de caja de entrada", "Entry cash flow"),
+  hmEntryCashFlowPre: loc(
+    "El valor terminal se calcula por perpetuidad y exige que la tasa de descuento supere el crecimiento terminal. La edición de impuesto o FX cambia su estado a",
+    "Terminal value is computed as a perpetuity and requires the discount rate to exceed terminal growth. Editing the tax rate or FX changes its status to"
+  ),
+  hmManual: loc("manual", "manual"),
+  hmEntryCashFlowTail: loc("; actualizar vuelve a cargar la referencia pública.", "; refreshing loads the public reference again."),
+  hmCurrencyConvention: loc("Mercado y convención monetaria", "Market and currency convention"),
+  hmLocalCurrency: loc("Moneda local", "Local currency"),
+  hmReportingCurrency: loc("Moneda de reporte", "Reporting currency"),
+  hmFxReportLocal: loc("FX reporte / local", "FX reporting / local"),
+  hmFromSource: loc("Se actualiza desde fuente", "Refreshed from a source"),
+  hmExchangeRate: loc("Tipo de cambio", "Exchange rate"),
+  hmMarketSizeTitle: loc("Tamaño de mercado y flujo libre", "Market size and free cash flow"),
+  hmTamYearOne: loc("TAM año 1", "TAM year 1"),
+  hmAnnualGrowth: loc("Crecimiento anual (%)", "Annual growth (%)"),
+  hmSamPct: loc("SAM (% TAM)", "SAM (% of TAM)"),
+  hmSomYearOne: loc("SOM año 1 (% SAM)", "SOM year 1 (% of SAM)"),
+  hmOperatingMargin: loc("Margen operativo (%)", "Operating margin (%)"),
+  hmTaxRate: loc("Tasa fiscal (%)", "Tax rate (%)"),
+  hmWorkingCapital: loc("Capital de trabajo (% ingresos)", "Working capital (% of revenue)"),
+  hmDiscountRate: loc("Tasa de descuento (%)", "Discount rate (%)"),
+  hmTerminalGrowth: loc("Crecimiento terminal (%)", "Terminal growth (%)"),
+  hmCorporateTax: loc("Impuesto corporativo", "Corporate tax"),
+  hmScenarioSensitivity: loc("Sensibilidad por escenarios", "Scenario sensitivity"),
+  hmScenarioSensitivityDesc: loc(
+    "Base mantiene sus supuestos actuales. En los escenarios optimista y conservador, exprese precio/ingreso y FX como variación porcentual; el margen es una variación en puntos porcentuales.",
+    "Base keeps your current assumptions. In the optimistic and conservative scenarios, express price/revenue and FX as a percentage change; margin is a change in percentage points."
+  ),
+  hmHypothetical: loc("Hipotético", "Hypothetical"),
+  hmScenarioBase: loc("Base", "Base"),
+  hmScenarioOptimistic: loc("Optimista", "Optimistic"),
+  hmScenarioConservative: loc("Conservador", "Conservative"),
+  hmPerModeEconomics: loc("Economía por alternativa de entrada", "Economics by entry alternative"),
+  hmPerModeEconomicsDesc: loc(
+    "La inversión inicial se registra en t=0. El coste anual, la captura de ingresos y el capital de trabajo alimentan los flujos libres después de impuestos.",
+    "The initial investment is booked at t=0. Annual cost, revenue capture and working capital feed the after-tax free cash flows."
+  ),
+  hmMode: loc("Modo", "Mode"),
+  hmCommitment: loc("Compromiso", "Commitment"),
+  hmInitialInvestment: loc("Inversión inicial", "Initial investment"),
+  hmAnnualCost: loc("Coste anual", "Annual cost"),
+  hmRevenueCapture: loc("Captura de ingresos (%)", "Revenue capture (%)"),
+  hmConventionBold: loc("Convención:", "Convention:"),
+  hmConventionText: loc(
+    "ROI = (flujo libre acumulado − inversión inicial) / inversión inicial y excluye el valor terminal. NPV incluye flujos libres descontados y valor terminal. No se incorporan financiación, depreciación, amortización, retenciones ni cambios fiscales futuros; añádalos en un modelo corporativo si son materiales.",
+    "ROI = (cumulative free cash flow − initial investment) / initial investment, and it excludes terminal value. NPV includes discounted free cash flows and terminal value. Financing, depreciation, amortisation, withholding taxes and future tax changes are not included; add them in a corporate model if they are material."
+  ),
+  hmPickMarketLeft: loc(
+    "Seleccione un mercado en la columna izquierda para introducir el caso económico.",
+    "Select a market in the left-hand column to enter the economic case."
+  ),
+  hmGovernanceTag: loc("GOBIERNO DE INVERSIÓN", "INVESTMENT GOVERNANCE"),
+  hmThresholdsTitle: loc("Umbrales de decisión", "Decision thresholds"),
+  hmThresholdsPre: loc(
+    "Estas reglas determinan si una alternativa se clasifica como",
+    "These rules determine whether an alternative is classified as"
+  ),
+  hmAdvance: loc("Avanzar", "Advance"),
+  hmTest: loc("Probar", "Test"),
+  hmDiscard: loc("Descartar", "Discard"),
+  hmOr: loc("o", "or"),
+  hmThresholdsTail: loc(
+    ". Una recomendación solo se genera con evidencia financiera completa y moneda consistente.",
+    ". A recommendation is issued only with complete financial evidence and a consistent currency."
+  ),
+  hmRuleBold: loc("Regla:", "Rule:"),
+  hmRuleText: loc(
+    "“Avanzar” requiere superar todos los umbrales de avance. “Probar” exige superar los mínimos de prueba y permite una entrada reversible. “Descartar” significa no asignar inversión material con la evidencia actual. El límite de inversión para prueba es opcional.",
+    "“Advance” requires clearing every advance threshold. “Test” requires clearing the test minimums and allows a reversible entry. “Discard” means committing no material investment on the current evidence. The test investment cap is optional."
+  ),
+  hmThresholdCurrency: loc("Moneda de umbrales", "Threshold currency"),
+  hmSameAsReporting: loc("Igual a moneda de reporte", "Same as the reporting currency"),
+  hmRiskAdjAdvance: loc("Riesgo ajustado · avanzar", "Risk-adjusted · advance"),
+  hmRiskAdjTest: loc("Riesgo ajustado · probar", "Risk-adjusted · test"),
+  hmMinConfidence: loc("Confianza mínima (%)", "Minimum confidence (%)"),
+  hmMinNpvAdvance: loc("NPV mínimo · avanzar", "Minimum NPV · advance"),
+  hmMinNpvTest: loc("NPV mínimo · probar", "Minimum NPV · test"),
+  hmMinRoiAdvance: loc("ROI mínimo · avanzar (%)", "Minimum ROI · advance (%)"),
+  hmMinRoiTest: loc("ROI mínimo · probar (%)", "Minimum ROI · test (%)"),
+  hmMaxPayback: loc("Recuperación máx. · avanzar (años)", "Maximum payback · advance (years)"),
+  hmMaxInvestment: loc("Inversión máx. · prueba", "Maximum investment · test"),
+  hmNoLimit: loc("Sin límite", "No limit"),
+  hmCompareEyebrow: loc("comparación de predecisión", "pre-decision comparison"),
+  hmCompareTitle: loc("Vea los mercados bajo la misma lente.", "See the markets through one lens."),
+  hmCompareDesc: loc(
+    "Seleccione hasta cuatro países. La vista compara evidencia, supuestos y resultados, sin ocultar los datos ausentes.",
+    "Select up to four countries. The view compares evidence, assumptions and results, without hiding what is missing."
+  ),
+  hmGoToDecision: loc("Ir a decisión", "Go to the decision"),
+  hmPickToCompare: loc("Seleccione mercados para comparar", "Select markets to compare"),
+  hmPickToCompareDesc: loc(
+    "Elija entre dos y cuatro países para crear una vista lado a lado antes de avanzar a la decisión.",
+    "Pick two to four countries to build a side-by-side view before moving to the decision."
+  ),
+  hmDecisionTitle: loc("La decisión debe seguir a la evidencia.", "The decision must follow the evidence."),
+  hmDecisionDesc: loc(
+    "Cuando haya completado el mandato, los mercados y la calibración, genere una lectura comparativa de atractivo, riesgo, timing y modos de entrada.",
+    "Once the mandate, the markets and the calibration are complete, generate a comparative reading of attractiveness, risk, timing and entry modes."
+  ),
+  hmDecisionEyebrow: loc("lectura ajustada por riesgo", "risk-adjusted reading"),
+  hmLeadingScore: loc("Puntuación líder", "Leading score"),
+  hmRecalculate: loc("Recalcular", "Recalculate"),
+  hmMarketPriority: loc("Prioridad de mercado", "Market priority"),
+  hmMarketPriorityDesc: loc(
+    "Orden basada en la combinación explícita de atractividad y seguridad. La confianza muestra cuánta información está disponible, no la probabilidad de éxito.",
+    "Ordered by the explicit combination of attractiveness and safety. Confidence shows how much information is available, not the probability of success."
+  ),
+  hmHowToRead: loc("Cómo leer el resultado", "How to read the result"),
+  hmAttractivenessHelp: loc(
+    "Mercado, recursos, competencia, gobierno y encaje CAGE.",
+    "Market, resources, competition, government and CAGE fit."
+  ),
+  hmSafety: loc("Seguridad", "Safety"),
+  hmSafetyHelp: loc(
+    "Inverso de la exposición política, económica, competitiva y operativa.",
+    "The inverse of political, economic, competitive and operational exposure."
+  ),
+  hmConfidence: loc("Confianza", "Confidence"),
+  hmConfidenceHelp: loc(
+    "Cobertura de datos públicos y explicitud de los supuestos introducidos.",
+    "Coverage of public data, and how explicit the assumptions entered are."
+  ),
+  hmRouteTitle: loc("Ruta recomendada por mercado", "Recommended route by market"),
+  hmRouteDesc: loc(
+    "El modo no se determina solo por puntuación. Cruza atractivo, riesgo, capacidades internas, urgencia, control, IP y apertura regulatoria.",
+    "The mode is not decided by score alone. It crosses attractiveness, risk, internal capabilities, urgency, control, IP and regulatory openness."
+  ),
+  hmDetailedPdf: loc("PDF detallado", "Detailed PDF"),
+  hmThresholdDecision: loc("Decisión por umbrales", "Threshold decision"),
+  hmEconomicViability: loc("Viabilidad económica", "Economic viability"),
+  hmFullCashFlow: loc("Flujo de caja completo", "Full cash flow"),
+  hmPendingAssumptions: loc("Supuestos pendientes", "Assumptions still open"),
+  hmTamHorizon: loc("TAM horizonte", "TAM at horizon"),
+  hmSomRevenue: loc("SOM ingresos", "SOM revenue"),
+  hmPayback: loc("Recup.", "Payback"),
+  hmYear: loc("Año", "Year"),
+  hmYears: loc("años", "years"),
+  hmEvidenceConfidence: loc("Confianza de evidencia", "Evidence confidence"),
+  hmDecisionCondition: loc("Condición de decisión", "Decision condition"),
+  hmGenerateAssessment: loc("Generar evaluación", "Generate the assessment"),
+  hmMarketsReady: loc("mercados listos para analizar", "markets ready to analyse"),
+  hmMissingMandate: loc(
+    "Faltan datos del mandato o mercados que pasen el filtro",
+    "The mandate is incomplete, or no market passes the filter"
+  ),
+  hmComparisonDone: loc("Comparación completada", "Comparison complete"),
+  hmMissingColon: loc("Faltan", "Missing"),
+  hmPending: loc("Pendiente", "Pending"),
+  hmEg: loc("Ej.", "E.g."),
+  hmFcfFormula: loc("FCF = EBIT − impuestos − Δ capital de trabajo", "FCF = EBIT − taxes − Δ working capital"),
+  hmClose: loc("Cerrar", "Close"),
+  hmManualAdjustment: loc("ajuste manual", "manual adjustment"),
+  hmManualAdjustments: loc("ajustes manuales", "manual adjustments"),
+  hmAssumptionsTag: loc("SUPUESTOS", "ASSUMPTIONS"),
+  hmSomAtYear: loc("SOM año", "SOM year"),
+  hmOfSam: loc("(% SAM)", "(% of SAM)"),
+  hmIndicatorsVisible: loc("Indicadores visibles", "Indicators available"),
+  hmIndicatorsMacro: loc("macro", "macro"),
+  hmIndicatorsTaxes: loc("impuestos", "tax"),
+  hmIndicatorsWgiBackground: loc("WGI sigue cargando en segundo plano.", "WGI is still loading in the background."),
+  hmWgiRefreshed: loc("Indicadores WGI actualizados para este mercado.", "WGI indicators refreshed for this market."),
+  hmWgiUnreachable: loc("No se pudo contactar con la fuente WGI.", "The WGI source could not be reached."),
+  hmWgiRetryFailed: loc("No se pudo reintentar WGI para este mercado.", "WGI could not be retried for this market."),
+  hmScenarioUpdated: loc(
+    "Escenario actualizado y reevaluado con los supuestos de ahora.",
+    "Scenario updated and re-evaluated with the current assumptions."
+  ),
+  hmScenarioUpdateFailed: loc("No se pudo actualizar el escenario.", "The scenario could not be updated."),
+  hmNothingToSave: loc("No hay un escenario completo que guardar.", "There is no complete scenario to save."),
+  hmScenarioSaved: loc("Escenario guardado en el historial personal.", "Scenario saved to your personal history."),
+  hmCopilotFailed: loc("El copiloto no pudo proponer puntuaciones.", "The copilot could not propose scores."),
+  hmReviewerFailed: loc("El revisor no pudo ejecutarse.", "The reviewer could not run."),
+  hmRationaleFor: loc("Justificación de", "Rationale for"),
+  hmPickACountry: loc("Seleccione un país", "Select a country"),
+  hmJustified: loc("justificados", "with a rationale"),
+  hmAssessed: loc("evaluado", "assessed"),
+  hmNewAnalysis: loc("Nuevo análisis", "New analysis"),
+  hmUntitledAnalysis: loc("Análisis sin título", "Untitled analysis"),
+  hmAlreadyAdded: loc("El país ya está en la comparación.", "That country is already in the comparison."),
+  hmMaxTwelve: loc("El análisis admite hasta 12 países por escenario.", "The analysis takes up to 12 countries per scenario."),
+  hmMaxFourCompare: loc("La vista lado a lado admite hasta cuatro países.", "The side-by-side view takes up to four countries."),
+  hmWgiNoData: loc("La fuente WGI no devolvió datos para este país.", "The WGI source returned no data for this country."),
+  hmWgiPartial: loc(
+    "Los indicadores macro y financieros se actualizaron; WGI no respondió y se puede intentar de nuevo.",
+    "The macro and financial indicators were refreshed; WGI did not answer and can be retried."
+  ),
+  hmWgiKeepOthers: loc(
+    "WGI no devolvió datos; puede conservar los demás indicadores o intentarlo más tarde.",
+    "WGI returned no data; you can keep the other indicators or try again later."
+  ),
+  hmSourceUnavailable: loc(
+    "La fuente pública no está disponible temporalmente. El país se mantiene añadido; vuelva a actualizarlo en unos instantes.",
+    "The public source is temporarily unavailable. The country stays added; refresh it again in a moment."
+  ),
+  hmRefreshFailed: loc(
+    "No se pudieron actualizar los datos públicos. Revise la conexión e inténtelo de nuevo.",
+    "The public data could not be refreshed. Check the connection and try again."
+  ),
+  hmAddCountryFirst: loc("Añada primero al menos un país candidato.", "Add at least one candidate country first."),
+  hmIncompleteProfile: loc(
+    "Complete el perfil de empresa y mantenga al menos un país tras el filtro.",
+    "Complete the company profile and keep at least one country past the filter."
+  ),
+  hmEvaluationDone: loc(
+    "Análisis estratégico generado. Revise supuestos y alertas antes de decidir.",
+    "Strategic analysis generated. Review the assumptions and the alerts before deciding."
+  ),
+  hmEvaluationFailed: loc("No se pudo generar la evaluación.", "The assessment could not be generated."),
+  hmNewCaseCleared: loc(
+    "Caso nuevo: el formulario se ha vaciado para no arrastrar el análisis anterior.",
+    "New case: the form was cleared so the previous analysis is not carried over."
+  ),
+  hmIncompleteScenario: loc(
+    "El escenario está incompleto: complete el perfil y deje al menos un país tras el filtro.",
+    "The scenario is incomplete: complete the profile and leave at least one country past the filter."
+  ),
+  hmGenerateFirstShort: loc("Genere evaluación", "Generate the assessment"),
+  hmCompleteAlternative: loc(
+    "Complete los supuestos financieros de una alternativa.",
+    "Complete the financial assumptions of one alternative."
+  ),
+  hmDecisionConditionTail: loc(
+    "Antes de invertir, convierta la alternativa preferida en un caso financiero con escenarios, sensibilidad, ROI/NPV y una revisión legal, regulatoria y de socios.",
+    "Before investing, turn the preferred alternative into a financial case with scenarios, sensitivity, ROI/NPV and a legal, regulatory and partner review."
+  ),
+  hmIndicatorsTitle: loc("Indicadores actualizados y estimaciones", "Refreshed indicators and estimates"),
+  hmIndicatorsPre: loc(
+    "PIB, IED, impuesto corporativo y FX se descargan al añadir el país. WGI se completa después. Use",
+    "GDP, FDI, corporate tax and FX download when the country is added. WGI fills in afterwards. Use"
+  ),
+  hmEdit: loc("Editar", "Edit"),
+  hmIndicatorsTail: loc(
+    "para sustituir cifras por sus fuentes; la etiqueta Manual evita confundirlas con datos públicos.",
+    "to replace figures with your own sources; the Manual tag keeps them from being mistaken for public data."
+  ),
+  hmLastUpdateBold: loc("Última actualización:", "Last refresh:"),
+  hmLastUpdateText: loc("fecha de la última carga pública por país.", "the date of the last public load for that country."),
+  hmRetryWgiBold: loc("Reintentar WGI:", "Retry WGI:"),
+  hmRetryWgiText: loc("no vuelve a consultar los demás indicadores.", "it does not re-query the other indicators."),
+  hmRestoreBold: loc("Restaurar:", "Restore:"),
+  hmRestoreText: loc("repone solo el campo público modificado.", "it puts back only the public field you changed."),
+  hmColMarket: loc("Mercado", "Market"),
+  hmColStatus: loc("Estado", "Status"),
+  hmColGdp: loc("PIB (US$)", "GDP (US$)"),
+  hmColGdpPc: loc("PIB / hab. (US$)", "GDP per capita (US$)"),
+  hmColRealGdp: loc("PIB real", "Real GDP"),
+  hmColFdi: loc("IED neta (US$)", "Net FDI (US$)"),
+  hmColFdiGdp: loc("IED / PIB", "FDI / GDP"),
+  hmColCorpTax: loc("Imp. corp.", "Corp. tax"),
+  hmColFx: loc("FX USD / local", "FX USD / local"),
+  hmColLastUpdate: loc("Últ. actualización", "Last refresh"),
+  hmUpdating: loc("Actualizando", "Refreshing"),
+  hmLoading: loc("Cargando", "Loading"),
+  hmRetryWgi: loc("Reintentar WGI", "Retry WGI"),
+  hmManualTag: loc("Manual", "Manual"),
+  hmPublicSource: loc("Fuente pública", "Public source"),
+  hmPublicTag: loc("Público", "Public"),
+  hmRestorePublic: loc("Restaurar dato público", "Restore the public figure"),
+  hmGdpHelp: loc("PIB corriente en US$", "Current GDP in US$"),
+  hmGdpPcHelp: loc("PIB corriente por habitante en US$", "Current GDP per capita in US$"),
+  hmGdpGrowthHelp: loc("Crecimiento anual del PIB real, en porcentaje", "Annual real GDP growth, in per cent"),
+  hmFdiHelp: loc("Flujos netos de IED en US$", "Net FDI flows in US$"),
+  hmFdiGdpHelp: loc("IED neta como porcentaje del PIB", "Net FDI as a percentage of GDP"),
+  hmTaxHelp: loc("Tasa corporativa estatutaria en porcentaje", "Statutory corporate rate, in per cent"),
+  hmFxHelp: loc(
+    "Unidades de moneda de reporte por una unidad de moneda local",
+    "Units of reporting currency per one unit of local currency"
+  ),
+  hmLeadingAlternative: loc("Alternativa económica líder", "Leading economic alternative"),
+  hmGdp: loc("PIB", "GDP"),
+  hmGdpGrowth: loc("Crecimiento PIB", "GDP growth"),
+  hmFdiUnctad: loc("IED neta (UNCTAD)", "Net FDI (UNCTAD)"),
+  hmGovernanceWgi: loc("Gobernanza WGI", "WGI governance"),
+  hmDecision: loc("Decisión", "Decision"),
+  hmAttractiveness: loc("Atractividad", "Attractiveness"),
+  hmTamAtHorizon: loc("TAM en horizonte", "TAM at horizon"),
+  hmSomAtHorizon: loc("SOM · ingresos horizonte", "SOM · revenue at horizon"),
+  hmThreeScenarios: loc("Base / optimista / conservador", "Base / optimistic / conservative"),
+  hmOppRiskMatrix: loc("Matriz oportunidades x riesgos", "Opportunity × risk matrix"),
+  hmOpportunity: loc("Oportunidad", "Opportunity"),
+  hmRisk: loc("Riesgo", "Risk"),
+  hmProfile: loc("Perfil", "Profile"),
+  hmGrowthVolatility: loc("Volatilidad del crecimiento", "Growth volatility"),
+  hmChapter6Assessment: loc("Evaluación cap. 6", "Chapter 6 assessment"),
+  hmNoSource: loc("Sin fuente", "No source"),
+  hmNoSourcePre: loc("pulse", "press"),
+  hmSensitivity: loc("Sensibilidad", "Sensitivity"),
+  hmSensitivitySelected: loc("Sensibilidad de la alternativa seleccionada", "Sensitivity of the selected alternative"),
+  hmCompleteSensitivities: loc("Complete sensibilidades", "Fill in the sensitivities"),
+  hmNotMeaningful: loc("No significativo", "Not meaningful"),
+  hmStatusComplete: loc("Completo", "Complete"),
+  hmStatusPartial: loc("Parcial", "Partial"),
+  hmStatusEmpty: loc("Sin datos", "No data"),
+  hmUnavailable: loc("No disponible", "Unavailable"),
+  hmObserved: loc("observado", "observed"),
+  hmNoVariation: loc("Sin variación", "No variation"),
+  hmHypotheticalUp: loc("Mejora hipotética", "A hypothetical improvement"),
+  hmHypotheticalDown: loc("Tensión hipotética", "A hypothetical strain"),
+  hmEnterValue: loc("Introduzca", "Enter"),
+  hmPriceRevenue: loc("Precio / ingreso", "Price / revenue"),
+  hmMarginShort: loc("Margen operativo", "Operating margin"),
+  hmPercentagePoints: loc("p.p.", "pp"),
+  hmNoSourceTail: loc("en la fase 2 o introduzca un valor manual.", "in phase 2, or enter a value by hand."),
+  hmSaveFirstLogin: loc("Inicie sesión para guardar el escenario.", "Sign in to save the scenario."),
+  hmGenerateFirst: loc("Genere primero una evaluación para exportarla.", "Generate an assessment first, so there is something to export."),
+  hmPdfDone: loc("Informe PDF detallado generado.", "Detailed PDF report generated."),
+  hmPdfFailed: loc("No se pudo crear el informe PDF.", "The PDF report could not be created."),
+
   language: loc("Idioma", "Language"),
 } as const;
 

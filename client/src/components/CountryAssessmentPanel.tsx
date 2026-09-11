@@ -64,11 +64,13 @@ const scaleValues = Array.from({ length: assessmentScaleMax + 1 }, (_, index) =>
 
 export type BlockProposal = {
   ratings: { itemPath: string; value: number; rationale: string; evidenceQuotes: string[] }[];
-  discarded: { reason: string; itemPath: string }[];
+  discarded: { reason: Localized; itemPath: string }[];
   unresolved: string[];
 };
 
-export type BlockObjection = { itemPath: string | null; objection: string; severity: string };
+export type BlockObjection = { itemPath: string | null; objection: string; severity: "high" | "medium" | "low" };
+
+const SEVERITY_LABELS = { high: "sevHigh", medium: "sevMedium", low: "sevLow" } as const;
 
 type Props = {
   countryName: Localized | string;
@@ -276,7 +278,7 @@ export function CountryAssessmentPanel({ countryName, assessment, onChange, onSu
                       <ul className="mt-3 space-y-1">
                         {objections[block.key]!.map((objection, index) => (
                           <li key={index} className="assessment-objection">
-                            <Badge variant="outline">{objection.severity}</Badge>
+                            <Badge variant="outline">{ui(SEVERITY_LABELS[objection.severity])}</Badge>
                             <span>{objection.itemPath ? `${objection.itemPath}: ` : ""}{objection.objection}</span>
                           </li>
                         ))}
