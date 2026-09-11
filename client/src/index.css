@@ -525,3 +525,21 @@ button:active:not(:disabled) { transform: scale(.98); }
 @media (max-width: 900px) {
   .stack-driver-row, .stack-line-head, .stack-item-row { grid-template-columns: 1fr 1fr; }
 }
+
+/* Mapa de competidores ------------------------------------------------------------- */
+.competitor-map-card { border: 1px solid #dce8e1; }
+.competitor-row { display: grid; gap: 6px; grid-template-columns: minmax(150px, 1.4fr) minmax(90px, .6fr) minmax(220px, 2.4fr) auto; align-items: center; }
+.landscape-reading { padding-top: 10px; border-top: 1px solid #e4ece7; }
+.landscape-metrics { margin-top: 10px; display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+.landscape-metrics > div { padding: 8px 10px; border: 1px solid #e4ece7; border-radius: 8px; background: #fafcfb; }
+.landscape-metrics span { display: block; font-size: 11px; color: #64796e; }
+.landscape-metrics strong { display: block; margin-top: 2px; font-size: 14px; color: #1d4735; }
+.landscape-findings { margin-top: 10px; padding-left: 0; list-style: none; font-size: 12px; color: #7d5c22; }
+.landscape-findings li { padding: 3px 0 3px 14px; position: relative; }
+.landscape-findings li::before { content: "·"; position: absolute; left: 4px; }
+.landscape-findings-title { font-weight: 600; color: #5d4a18; }
+.landscape-findings-title::before { content: none !important; }
+
+@media (max-width: 900px) {
+  .competitor-row { grid-template-columns: 1fr 1fr; }
+}

@@ -1281,6 +1281,48 @@ export const UI_STRINGS = {
     "You have declared that the economic case holds and the model says otherwise. One of the two has to be corrected before the committee."
   ),
 
+  // Mapa de competidores
+  clTitle: loc("Mapa de competidores", "Competitor map"),
+  clDesc: loc(
+    "La puntuación de rivalidad del capítulo 6 sirve para comparar países. Esto sirve para defender la tesis: nombres, cuotas y la razón por la que retienen a sus clientes.",
+    "The chapter 6 rivalry score is for comparing countries. This is for defending the thesis: names, shares and the reason they hold their customers."
+  ),
+  clMarketUnits: loc("Tamaño del mercado (unidades)", "Market size (units)"),
+  clMarketUnitsHelp: loc(
+    "En clientes, tarjetas, cuentas u hogares, no en dinero. Las unidades se discuten mejor.",
+    "In customers, cards, accounts or households, not in money. Units are easier to argue about."
+  ),
+  clUnitLabel: loc("Nombre de la unidad", "Name of the unit"),
+  clUnitPlaceholder: loc("Ej. tarjetas activas", "E.g. active cards"),
+  clDriver: loc("Driver de la pila que cuenta lo mismo", "Stack driver that counts the same thing"),
+  clDriverNone: loc("Sin correspondencia", "No correspondence"),
+  clDriverHelp: loc(
+    "Sin esta correspondencia no se puede saber qué cuota implica el plan.",
+    "Without this correspondence, the share the plan implies cannot be known."
+  ),
+  clAcquisitionCost: loc("Coste de captar un cliente", "Cost to acquire one customer"),
+  clCompetitors: loc("Competidores", "Competitors"),
+  clAddCompetitor: loc("Añadir competidor", "Add competitor"),
+  clName: loc("Nombre", "Name"),
+  clShare: loc("Cuota (%)", "Share (%)"),
+  clHoldReason: loc("Por qué retiene a sus clientes", "Why it holds its customers"),
+  clHoldReasonPlaceholder: loc(
+    "Ej. es la cuenta principal y el débito por defecto",
+    "E.g. it is the main account and the default debit card"
+  ),
+  clRemove: loc("Quitar", "Remove"),
+  clDeclaredShare: loc("Cuota declarada", "Share declared"),
+  clUnattributed: loc("Sin atribuir", "Unattributed"),
+  clConcentration: loc("Concentración", "Concentration"),
+  clImpliedShare: loc("Cuota que implica el plan", "Share the plan implies"),
+  clAcquisitionSpend: loc("Coste de captarla", "Cost of winning it"),
+  clReadingTitle: loc("Lo que sale de la última evaluación", "What the last assessment produced"),
+  clReadingPending: loc(
+    "Genere la evaluación para ver qué cuota implica el plan y de quién tiene que salir.",
+    "Generate the assessment to see what share the plan implies and who it has to come from."
+  ),
+  clFindings: loc("Lo que hay que explicar", "What needs explaining"),
+
   language: loc("Idioma", "Language"),
 } as const;
 

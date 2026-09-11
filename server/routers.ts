@@ -97,6 +97,23 @@ const countryAssessmentSchema = z.object({
   profileOverride: z.enum(["hub", "emergingGiant", "fastIndustrializing", "developing", "oecd", "resourceRich"]).nullable().optional(),
 });
 
+const competitorSchema = z.object({
+  id: z.string().min(1).max(60),
+  name: z.string().max(120),
+  sharePct: z.number().min(0).max(100).nullable(),
+  holdReason: z.string().max(400).nullable(),
+  note: z.string().max(400).nullable(),
+});
+
+const competitiveLandscapeSchema = z.object({
+  marketUnits: z.number().nonnegative().nullable(),
+  unitLabel: z.string().max(60).nullable(),
+  driverId: z.string().max(60).nullable(),
+  acquisitionCost: z.number().nullable(),
+  competitors: z.array(competitorSchema).max(20),
+  note: z.string().max(600).nullable(),
+});
+
 const countrySchema = z.object({
   code: z.string().min(2).max(3),
   name: z.string().min(2).max(100).optional(),
@@ -104,6 +121,7 @@ const countrySchema = z.object({
   calibrationNotes: calibrationNotesSchema.optional(),
   assessment: countryAssessmentSchema.optional(),
   knockOuts: knockOutPolicySchema.optional(),
+  competitiveLandscape: competitiveLandscapeSchema.nullable().optional(),
 });
 
 const governanceSchema = z.object({

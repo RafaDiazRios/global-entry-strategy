@@ -2,6 +2,8 @@ import DashboardLayout from "@/components/DashboardLayout";
 import ApprovalWorkspace from "@/components/ApprovalWorkspace";
 import OnboardingGuide from "@/components/OnboardingGuide";
 import { RevenueStackPanel, type ComputedPlausibility, type ComputedStack } from "@/components/RevenueStackPanel";
+import { CompetitorMapPanel, type ComputedLandscape } from "@/components/CompetitorMapPanel";
+import type { CompetitiveLandscape } from "@shared/domain/competitiveLandscape";
 import type { RevenueStack } from "@shared/domain/revenueStack";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -84,7 +86,7 @@ type CalibrationNotes = Partial<Record<keyof Calibration, { rationale?: string }
  * al idioma activo justo antes de mandarlo al servidor. Un escenario guardado conserva la
  * cadena con la que se guardó, que es lo que debe ocurrir con una instantánea.
  */
-type Candidate = { code: string; name: Localized | string; region: CountryRegion; calibration: Calibration; notes: CalibrationNotes; assessment: CountryAssessmentState };
+type Candidate = { code: string; name: Localized | string; region: CountryRegion; calibration: Calibration; notes: CalibrationNotes; assessment: CountryAssessmentState; landscape?: CompetitiveLandscape | null };
 type ModeKey = "greenfield" | "acquisition" | "alliance" | "licensing" | "distributor" | "office" | "digital";
 type FinancialProfile = { initialInvestment?: number | null; annualOperatingCost?: number | null; revenueCapturePct?: number | null };
 type Provenance = { sourceStatus: Status; sourceName: string; sourceUrl: string; sourceYear?: number | null; observedAt?: string | null; retrievedAt: string; note: Localized };
@@ -108,6 +110,7 @@ type CountryResult = {
     growthVariability: { mean: number | null; coefficientOfVariation: number | null; observations: number };
   };
   entryModes: { mode: Localized; score: number; rationale: Localized; commitment: CommitmentLevel }[];
+  landscape: ComputedLandscape;
   financial: FinancialCase & { scenarios: FinancialScenario[] };
   investmentRecommendation: { action: "advance" | "test" | "discard" | "insufficient_data"; label: Localized; summary: Localized; selectedMode: Localized | null; selectedModeKey: ModeKey | null; reasons: Localized[]; evaluatedMetrics: { npv: number | null; roiPct: number | null } };
   timing: { label: Localized; description: Localized };
@@ -528,7 +531,7 @@ export default function Home() {
   function buildInput() {
     return {
       companyName: companyName.trim(), homeCountry: homeCountry.trim(), industry: industry.trim(), businessModel: businessModel.trim(), valueProposition: valueProposition.trim(), objective, horizonYears: Number(horizonYears) || 3,
-      countryInputs: screenedCandidates.map(({ code, name, calibration, notes, assessment }) => ({ code, name: pick(name, lang), calibration, calibrationNotes: notes, assessment })),
+      countryInputs: screenedCandidates.map(({ code, name, calibration, notes, assessment, landscape }) => ({ code, name: pick(name, lang), calibration, calibrationNotes: notes, assessment, competitiveLandscape: landscape ?? null })),
       marketData: Object.fromEntries(screenedCandidates.map((candidate) => [candidate.code, marketData[candidate.code] ?? blankData()])),
       financialByCountry: Object.fromEntries(screenedCandidates.map((candidate) => [candidate.code, financialByCountry[candidate.code] ?? {}])),
       investmentThresholds,
@@ -618,6 +621,7 @@ export default function Home() {
       calibration: country.calibration,
       notes: country.calibrationNotes ?? {},
       assessment: country.assessment ?? { ...emptyAssessment },
+      landscape: country.competitiveLandscape ?? null,
     }));
     setCandidates(restored);
     setActiveCountry(restored[0]?.code);
@@ -860,7 +864,14 @@ export default function Home() {
               <Card className="strategic-card"><CardHeader><div className="step-tag">{ui("hmContextTag")}</div><CardTitle>{ui("hmCalibrateTitle")}</CardTitle><CardDescription>{ui("hmCalibrateDesc")}</CardDescription></CardHeader><CardContent>{candidates.length ? <div className="space-y-3">{candidates.map((candidate) => <button key={candidate.code} onClick={() => setActiveCountry(candidate.code)} className={`country-selector ${activeCandidate?.code === candidate.code ? "selected" : ""}`}><span className="country-code">{candidate.code}</span><span><strong>{t(candidate.name)}</strong><small>{t(regionLabel(candidate.region))}</small></span><ChevronRight className="ml-auto h-4 w-4" /></button>)}</div> : <EmptyState icon={Globe2} title={ui("hmDefineMarketsFirst")} text={ui("hmDefineMarketsFirstDesc")} />}
                 <div className="method-box"><FileCheck2 className="h-5 w-5" /><p><strong>{ui("hmDisciplineBold")}</strong> {ui("hmDisciplineText")}</p></div>
               </CardContent></Card>
-              <Card className="calibration-card"><CardHeader><div className="flex items-center justify-between"><div><div className="step-tag">{ui("hmActiveCountry")}</div><CardTitle>{activeCandidate ? t(activeCandidate.name) : ui("hmPickACountry")}</CardTitle></div>{activeCandidate && <div className="flex items-center gap-2"><Badge variant="outline">{documentedCount(activeCandidate)}/{calibrationFields.length} {ui("hmJustified")} · {assessmentProgress(activeCandidate.assessment).pct}% {ui("hmAssessed")}</Badge><Badge className="country-badge">{activeCandidate.code}</Badge></div>}</div></CardHeader><CardContent>{activeCandidate ? <div className="space-y-8">{CALIBRATION_GROUPS.map((group) => <section key={group.id}><h3 className="calibration-group">{t(group.label)}</h3><div className="space-y-5">{calibrationFields.filter((field) => field.group === group.id).map((field) => <div key={field.key} className="slider-row"><div className="slider-meta"><div><strong>{t(field.label)}</strong><span>{t(field.help)}</span></div><output className={field.reverse ? "risk-output" : ""}>{activeCandidate.calibration[field.key]}</output></div><Slider min={0} max={100} step={5} value={[activeCandidate.calibration[field.key]]} onValueChange={([value]) => updateCalibration(field.key, value)} /><Input className="calibration-rationale" value={activeCandidate.notes[field.key]?.rationale ?? ""} onChange={(event) => updateCalibrationNote(field.key, event.target.value)} placeholder={ui("hmRationalePh")} aria-label={`${ui("hmRationaleFor")} ${t(field.label)}`} /></div>)}</div></section>)}</div> : <EmptyState icon={SlidersHorizontal} title={ui("hmNoActiveCountry")} text={ui("hmNoActiveCountryDesc")} />}</CardContent></Card>{activeCandidate && <Card className="assessment-card"><CardContent className="pt-6"><CountryAssessmentPanel
+              <Card className="calibration-card"><CardHeader><div className="flex items-center justify-between"><div><div className="step-tag">{ui("hmActiveCountry")}</div><CardTitle>{activeCandidate ? t(activeCandidate.name) : ui("hmPickACountry")}</CardTitle></div>{activeCandidate && <div className="flex items-center gap-2"><Badge variant="outline">{documentedCount(activeCandidate)}/{calibrationFields.length} {ui("hmJustified")} · {assessmentProgress(activeCandidate.assessment).pct}% {ui("hmAssessed")}</Badge><Badge className="country-badge">{activeCandidate.code}</Badge></div>}</div></CardHeader><CardContent>{activeCandidate ? <div className="space-y-8">{CALIBRATION_GROUPS.map((group) => <section key={group.id}><h3 className="calibration-group">{t(group.label)}</h3><div className="space-y-5">{calibrationFields.filter((field) => field.group === group.id).map((field) => <div key={field.key} className="slider-row"><div className="slider-meta"><div><strong>{t(field.label)}</strong><span>{t(field.help)}</span></div><output className={field.reverse ? "risk-output" : ""}>{activeCandidate.calibration[field.key]}</output></div><Slider min={0} max={100} step={5} value={[activeCandidate.calibration[field.key]]} onValueChange={([value]) => updateCalibration(field.key, value)} /><Input className="calibration-rationale" value={activeCandidate.notes[field.key]?.rationale ?? ""} onChange={(event) => updateCalibrationNote(field.key, event.target.value)} placeholder={ui("hmRationalePh")} aria-label={`${ui("hmRationaleFor")} ${t(field.label)}`} /></div>)}</div></section>)}</div> : <EmptyState icon={SlidersHorizontal} title={ui("hmNoActiveCountry")} text={ui("hmNoActiveCountryDesc")} />}</CardContent></Card>{activeCandidate && <CompetitorMapPanel
+                landscape={activeCandidate.landscape}
+                onChange={(next) => setCandidates((current) => current.map((entry) => (entry.code === activeCandidate.code ? { ...entry, landscape: next } : entry)))}
+                stack={financialByCountry[activeCandidate.code]?.revenueStack}
+                currency={financialByCountry[activeCandidate.code]?.currency ?? null}
+                computed={result?.countries.find((entry) => entry.code === activeCandidate.code)?.landscape ?? null}
+              />}
+              {activeCandidate && <Card className="assessment-card"><CardContent className="pt-6"><CountryAssessmentPanel
                 countryName={activeCandidate.name}
                 assessment={activeCandidate.assessment}
                 onChange={updateAssessment}

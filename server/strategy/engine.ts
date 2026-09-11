@@ -18,6 +18,8 @@ import {
 import { itemPath } from "@shared/domain/countryAssessment";
 import type { EntryDeliveryModel } from "@shared/domain/entryModes";
 import type { GovernanceData } from "./wgi";
+import type { CompetitiveLandscape } from "@shared/domain/competitiveLandscape";
+import { evaluateLandscape, type LandscapeResult } from "./competitiveLandscape";
 
 export type EntryObjective = "market" | "resources" | "learning" | "coordination";
 
@@ -127,6 +129,11 @@ export type CountryInput = {
   assessment?: CountryAssessment;
   /** Criterios eliminatorios específicos de este país; si falta, se aplica la política general. */
   knockOuts?: KnockOutPolicy;
+  /**
+   * Competidores con nombre y cuota. No sustituye a la puntuación de rivalidad del capítulo
+   * 6: aquella entra en el índice comparable, esta entra en el argumento.
+   */
+  competitiveLandscape?: CompetitiveLandscape | null;
 };
 
 export type EvaluationInput = {
@@ -202,6 +209,8 @@ export type CountryResult = {
   eligibility: CountryEligibility;
   entryModes: EntryModeRecommendation[];
   financial: FinancialResult;
+  /** Lectura del mapa de competidores y su cruce con la pila. */
+  landscape: LandscapeResult;
   investmentRecommendation: InvestmentRecommendation;
   timing: TimingRecommendation;
   flags: Localized[];
@@ -584,6 +593,17 @@ export function evaluateStrategy(input: EvaluationInput): EvaluationResult {
       { tornadoDeltaPct: input.tornadoDeltaPct },
     );
     /**
+     * El mapa de competidores cruzado con la pila. Lo que sale de aquí no puntúa nada: dice
+     * qué cuota implica el plan, de quién tiene que salir y qué cuesta captarla.
+     */
+    const landscape = evaluateLandscape(
+      country.competitiveLandscape,
+      input.financialByCountry?.[country.code]?.revenueStack,
+      input.horizonYears,
+    );
+    flags.push(...landscape.findings);
+
+    /**
      * El contraste de la pila contra el mercado sube a bandera. Es la única comprobación
      * externa que tiene un caso construido de abajo arriba: los drivers los escribe quien
      * defiende la tesis, y sin nada contra lo que medirlos no hay forma de discutirlos.
@@ -645,6 +665,7 @@ export function evaluateStrategy(input: EvaluationInput): EvaluationResult {
       eligibility,
       entryModes,
       financial,
+      landscape,
       investmentRecommendation,
       timing: recommendTiming(attractiveness, safety, calibration),
       flags,
