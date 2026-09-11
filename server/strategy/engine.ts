@@ -583,6 +583,16 @@ export function evaluateStrategy(input: EvaluationInput): EvaluationResult {
       input.horizonYears,
       { tornadoDeltaPct: input.tornadoDeltaPct },
     );
+    /**
+     * El contraste de la pila contra el mercado sube a bandera. Es la única comprobación
+     * externa que tiene un caso construido de abajo arriba: los drivers los escribe quien
+     * defiende la tesis, y sin nada contra lo que medirlos no hay forma de discutirlos.
+     */
+    if (financial.plausibility.status === "above_som" || financial.plausibility.status === "far_below_som") {
+      flags.push(financial.plausibility.note);
+    }
+    flags.push(...financial.stack.warnings);
+
     const evaluatedRecommendation = recommendInvestmentAction(financial, riskAdjusted, confidence, input.investmentThresholds);
     // Un criterio eliminatorio no se pondera con el resto: cierra el mercado.
     const investmentRecommendation: InvestmentRecommendation = eligibility.eligible

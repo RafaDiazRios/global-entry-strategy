@@ -21,8 +21,10 @@ import * as countries from "@shared/domain/countries";
 import * as thesis from "@shared/domain/thesis";
 import * as approvalChain from "@shared/domain/approvalChain";
 import * as industries from "@shared/domain/industries";
+import * as revenueStack from "@shared/domain/revenueStack";
 import * as assumptionMap from "@shared/domain/assumptionMap";
 import { UI_STRINGS } from "../../client/src/i18n/strings";
+import { STACK_TEMPLATES } from "@shared/domain/industries";
 
 /**
  * Cobertura bilingüe de las tablas del libro.
@@ -45,6 +47,7 @@ const MODULES: Record<string, Record<string, unknown>> = {
   thesis: thesis,
   approvalChain: approvalChain,
   industries: industries,
+  revenueStack: revenueStack,
   assumptionMap: assumptionMap,
 };
 
@@ -279,5 +282,44 @@ describe("los errores bilingües sobreviven al viaje", () => {
   it("un error que no viene de aquí se muestra tal cual", () => {
     expect(readLocalizedError(new Error("ECONNRESET"))).toBe("ECONNRESET");
     expect(readLocalizedError(null)).toBe("");
+  });
+});
+
+/**
+ * Las plantillas de cuenta de resultados son un caso aparte.
+ *
+ * El texto del marco está en los dos idiomas, pero lo que la plantilla produce es dato del
+ * usuario —lo va a renombrar— y sale ya resuelto a un idioma. El recorrido genérico no las
+ * ve, porque las etiquetas viven dentro del cierre de `build`. Así que se instancian en los
+ * dos idiomas y se comprueba que de verdad difieren.
+ */
+describe("las plantillas de cuenta de resultados siembran en los dos idiomas", () => {
+  it("cada plantilla produce etiquetas distintas en español y en inglés", () => {
+    expect(STACK_TEMPLATES.length).toBeGreaterThan(3);
+    for (const template of STACK_TEMPLATES) {
+      const es = template.build("es");
+      const en = template.build("en");
+
+      expect(es.drivers.map((driver) => driver.id)).toEqual(en.drivers.map((driver) => driver.id));
+      expect(es.lines.map((line) => line.id)).toEqual(en.lines.map((line) => line.id));
+
+      const spanish = [...es.drivers.map((d) => d.label), ...es.lines.flatMap((l) => [l.label, ...l.items.map((i) => i.label)])];
+      const english = [...en.drivers.map((d) => d.label), ...en.lines.flatMap((l) => [l.label, ...l.items.map((i) => i.label)])];
+      for (const label of [...spanish, ...english]) expect(label.trim()).not.toBe("");
+      // No todas cambian —«Interchange» es la misma palabra— pero la mayoría sí.
+      const changed = spanish.filter((label, index) => label !== english[index]).length;
+      expect(changed, `${template.id}: ${spanish.length - changed} etiquetas iguales`).toBeGreaterThan(spanish.length / 2);
+    }
+  });
+
+  it("ninguna partida se presenta como si viniera del libro", () => {
+    for (const template of STACK_TEMPLATES) {
+      expect(template.origin).toBe("sector");
+      const items = template.build("es").lines.flatMap((line) => line.items);
+      expect(items.every((item) => item.origin === "sector")).toBe(true);
+      for (const lang of LANGUAGES) {
+        for (const item of items) expect(pick(item.provenance, lang)).not.toContain("Lasserre");
+      }
+    }
   });
 });

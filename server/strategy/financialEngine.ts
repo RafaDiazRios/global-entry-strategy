@@ -1,5 +1,7 @@
 import { loc, pick, type Localized } from "@shared/i18n";
 import { entryMode, type EconomicModel, type EntryModeKey } from "@shared/domain/entryModes";
+import { stackIsDeclared, type RevenueStack } from "@shared/domain/revenueStack";
+import { checkPlausibility, evaluateRevenueStack, type StackPlausibility, type StackResult } from "./revenueStack";
 
 export type { EntryModeKey, EconomicModel };
 
@@ -80,6 +82,20 @@ export type FinancialAssumptions = {
   fxReference?: FinancialDataProvenance | null;
   sensitivityScenarios?: Partial<Record<Exclude<SensitivityScenarioKey, "base">, SensitivityScenario>>;
   modeProfiles?: Partial<Record<EntryModeKey, ModeFinancialProfile>>;
+  /**
+   * Cuenta de resultados por líneas. Cuando está declarada sustituye al par
+   * captura-más-margen: el ingreso y el coste directo salen de sus partidas, y TAM/SAM/SOM
+   * pasa de ser el origen del número a ser el contraste contra el que se comprueba.
+   */
+  revenueStack?: RevenueStack | null;
+  /**
+   * Variación del margen en puntos porcentuales, para los escenarios de sensibilidad.
+   *
+   * Sin pila, el escenario mueve `operatingMarginPct` y con eso basta. Con pila no hay un
+   * margen único que mover —hay seis partidas sobre tres drivers—, así que la variación se
+   * aplica como puntos sobre el ingreso, que es exactamente lo que significaba antes.
+   */
+  stackMarginPctPoints?: number | null;
 };
 
 export type RoiBasis = "operating_horizon" | "including_terminal";
@@ -182,6 +198,10 @@ export type FinancialCaseResult = {
   alternatives: FinancialModeResult[];
   missingInputs: Localized[];
   methodology: Localized;
+  /** Cuenta de resultados por líneas, cuando se ha declarado. */
+  stack: StackResult;
+  /** La pila contra el SOM declarado. La única comprobación externa que tiene el caso. */
+  plausibility: StackPlausibility;
 };
 
 export type FinancialScenarioResult = {
@@ -326,6 +346,12 @@ function resolveCurrencies(assumptions: FinancialAssumptions) {
 }
 
 function missingCoreInputs(assumptions: FinancialAssumptions) {
+  /**
+   * Con una pila declarada, el margen operativo deja de ser obligatorio: el resultado sale
+   * de las partidas. El mercado sigue pidiéndose, pero como contraste, no como origen del
+   * ingreso; por eso se sigue exigiendo y no se relaja.
+   */
+  const hasStack = stackIsDeclared(assumptions.revenueStack);
   const checks: [keyof FinancialAssumptions, Localized][] = [
     ["currency", loc("moneda local", "local currency")],
     ["tamYearOne", loc("TAM anual del año 1", "year-one annual TAM")],
@@ -333,7 +359,7 @@ function missingCoreInputs(assumptions: FinancialAssumptions) {
     ["samPct", loc("% de SAM", "SAM %")],
     ["somPctYearOne", loc("% de SOM en año 1", "year-one SOM %")],
     ["somPctHorizon", loc("% de SOM en horizonte", "SOM % at horizon")],
-    ["operatingMarginPct", loc("margen operativo", "operating margin")],
+    ...(hasStack ? [] : [["operatingMarginPct", loc("margen operativo", "operating margin")] as [keyof FinancialAssumptions, Localized]]),
     ["taxRatePct", loc("tasa fiscal", "tax rate")],
     ["workingCapitalPctRevenue", loc("% de capital de trabajo", "working capital %")],
     ["discountRatePct", loc("tasa de descuento", "discount rate")],
@@ -362,9 +388,17 @@ function calculateMode(
   horizonYears: number,
   mode: ModeForFinance,
   revenueMultiplier = 1,
+  stack: StackResult | null = null,
 ): FinancialModeResult {
   const profile = assumptions.modeProfiles?.[mode.key] ?? {};
   const economicModel = resolveEconomicModel(mode, profile);
+  /**
+   * La pila describe el negocio, no la alternativa de entrada. Un modo que solo cuesta —la
+   * oficina de representación— no tiene cuenta de resultados que valga, y uno que cobra un
+   * royalty cobra sobre las ventas del licenciatario, no sobre las propias: en los dos casos
+   * la pila no aplica y el modo sigue con su modelo.
+   */
+  const usesStack = stack !== null && stack.status !== "not_declared" && (economicModel === "operator" || economicModel === "channel");
   const isOperator = economicModel === "operator";
   const isRoyalty = economicModel === "royalty";
   const isChannel = economicModel === "channel";
@@ -393,10 +427,11 @@ function calculateMode(
    */
   const missing: Localized[] = [
     ...(isCostOnly || market ? [] : [loc("variables de mercado TAM/SAM/SOM", "TAM/SAM/SOM market variables")]),
+    ...(usesStack ? stack!.missingInputs : []),
     ...(investment === null ? [loc("inversión inicial", "initial investment")] : []),
     ...(annualCost === null ? [loc("coste operativo anual", "annual operating cost")] : []),
-    ...(!isCostOnly && capture === null ? [loc("captura de ingresos", "revenue capture")] : []),
-    ...(isOperator && margin === null ? [loc("margen operativo", "operating margin")] : []),
+    ...(!isCostOnly && !usesStack && capture === null ? [loc("captura de ingresos", "revenue capture")] : []),
+    ...(isOperator && !usesStack && margin === null ? [loc("margen operativo", "operating margin")] : []),
     ...(isRoyalty && royaltyRate === null ? [loc("tasa de royalty", "royalty rate")] : []),
     ...(isChannel && channelMargin === null ? [loc("margen de canal", "channel margin")] : []),
     ...(taxRate === null ? [loc("tasa fiscal", "tax rate")] : []),
@@ -423,6 +458,7 @@ function calculateMode(
   const investmentReporting = investment! * fxRate!;
   const annualCostReporting = annualCost! * fxRate!;
   const workingCapitalRate = isOperator || isChannel ? workingCapitalPctRevenue! / 100 : 0;
+  const marginPoints = asNumber(assumptions.stackMarginPctPoints) ?? 0;
 
   /** Ingreso que retiene la empresa en cada modelo, a partir de las ventas del mercado. */
   const incomeFor = (localSomRevenue: number, year: number) => {
@@ -451,9 +487,28 @@ function calculateMode(
     ? Array.from({ length: horizonYears }, () => 0)
     : market!.annualRevenue;
 
+  /**
+   * Con pila, el ingreso y el resultado salen de las partidas. El coste fijo ya viene
+   * repartido dentro del resultado de la pila, así que no se vuelve a restar: restarlo dos
+   * veces era el error fácil de cometer aquí.
+   *
+   * La sensibilidad de precio multiplica el ingreso y deja los costes donde están, que es lo
+   * que significa «el precio realizado cae un 10%». La de margen se aplica como puntos sobre
+   * el ingreso, igual que hacía antes al mover el margen operativo.
+   */
+  const fromStack = (index: number) => {
+    const year = stack!.years[index];
+    if (!year) return { revenue: 0, operatingProfit: -annualCostReporting };
+    const revenueLocal = year.revenue * revenueMultiplier;
+    const profitLocal = revenueLocal - year.directCost - year.allocatedFixedCost + revenueLocal * (marginPoints / 100);
+    return { revenue: revenueLocal * fxRate!, operatingProfit: profitLocal * fxRate! };
+  };
+
   const annualProjection = revenueSeries.map((localSomRevenue, index) => {
-    const revenue = incomeFor(localSomRevenue, index + 1);
-    const operatingProfit = operatingProfitFor(revenue);
+    const fromModel = { revenue: incomeFor(localSomRevenue, index + 1), operatingProfit: 0 };
+    const computed = usesStack ? fromStack(index) : { ...fromModel, operatingProfit: operatingProfitFor(fromModel.revenue) };
+    const revenue = computed.revenue;
+    const operatingProfit = computed.operatingProfit;
     // Escudo fiscal: las pérdidas de los primeros años compensan bases positivas posteriores.
     const taxableProfit = carryforwardEnabled
       ? Math.max(0, operatingProfit - lossCarryforward)
@@ -500,7 +555,16 @@ function calculateMode(
     // El pago inicial de una licencia no se perpetúa: el valor terminal solo recoge el flujo recurrente.
     const recurringFinalRevenue = isRoyalty && horizonYears === 1 ? finalRevenue - upfrontFee * fxRate! : finalRevenue;
     const terminalRevenue = recurringFinalRevenue * (1 + terminalGrowth! / 100);
-    const terminalOperatingProfit = operatingProfitFor(terminalRevenue);
+    /**
+     * Con pila no hay margen con el que convertir el ingreso terminal en resultado: hay seis
+     * partidas sobre tres drivers. La perpetuidad hace crecer la cuenta entera al mismo
+     * ritmo, así que el resultado terminal es el del último año crecido, y no un margen
+     * aplicado a un ingreso. Aplicar el margen aquí, con la pila puesta, daba un margen de
+     * cero y un valor terminal negativo que se comía el caso sin decir por qué.
+     */
+    const terminalOperatingProfit = usesStack
+      ? (annualProjection.at(-1)?.operatingProfit ?? 0) * (1 + terminalGrowth! / 100)
+      : operatingProfitFor(terminalRevenue);
     const terminalTaxable = carryforwardEnabled
       ? Math.max(0, terminalOperatingProfit - lossCarryforward)
       : Math.max(0, terminalOperatingProfit);
@@ -547,7 +611,19 @@ function evaluateFinancialCase(
   const missingInputs = missingCoreInputs(provided);
   const market = missingInputs.length ? null : calculateMarket(provided, horizonYears);
   const currencies = resolveCurrencies(provided);
-  const alternatives = modeOptions.map((mode) => calculateMode(provided, market, horizonYears, mode, revenueMultiplier));
+  /**
+   * El coste fijo que reparte la pila es el del modo con más peso. Los modos comparten la
+   * cuenta de resultados del negocio —es el mismo negocio— y solo se diferencian en lo que
+   * cuesta montarlo, así que la pila se calcula una vez con el coste fijo de cada modo
+   * dentro de `calculateMode`, y aquí solo se resuelve la parte que no depende del modo.
+   */
+  const stack = evaluateRevenueStack(provided.revenueStack, horizonYears, 0);
+  const plausibility = checkPlausibility(stack, market?.somRevenueAtHorizon ?? null);
+  const alternatives = modeOptions.map((mode) => {
+    const annualCost = asNumber(provided.modeProfiles?.[mode.key]?.annualOperatingCost);
+    const perMode = evaluateRevenueStack(provided.revenueStack, horizonYears, annualCost);
+    return calculateMode(provided, market, horizonYears, mode, revenueMultiplier, perMode);
+  });
   return {
     status: market ? "ok" : "insufficient_data",
     currency: currencies.reportingCurrency,
@@ -566,6 +642,8 @@ function evaluateFinancialCase(
       : { tamYearOne: asNumber(provided.tamYearOne), tamAtHorizon: null, samAtHorizon: null, somRevenueYearOne: null, somRevenueAtHorizon: null },
     alternatives,
     missingInputs,
+    stack,
+    plausibility,
     methodology: loc(
       "TAM y SAM se proyectan con el crecimiento anual indicado; el SOM sigue la rampa elegida entre año 1 y horizonte (lineal, curva en S o definida año a año). Cada modo usa su propio modelo económico: operador (margen sobre las ventas capturadas), royalty (pago inicial más porcentaje sobre las ventas del licenciatario y margen en componentes, sin capital de trabajo), canal (margen del distribuidor) y solo coste (oficina de representación, sin ingresos ni valor terminal). Los flujos libres se calculan como EBIT menos impuestos menos el incremento de capital de trabajo, reconociendo el arrastre de bases imponibles negativas salvo que se desactive. Los importes se convierten a moneda de reporte usando el tipo indicado. NPV descuenta los flujos libres y el valor terminal por perpetuidad: TV = FCF del año siguiente / (tasa de descuento − crecimiento terminal), incluido el incremento terminal de capital de trabajo. Se publican dos bases de retorno: ROI sobre flujo libre acumulado del horizonte, sin valor terminal, y ROI incluyendo el valor presente del valor terminal; la política de umbrales declara cuál usa. La recuperación se interpola dentro del año en que el flujo acumulado cruza cero.",
       "TAM and SAM are projected with the annual growth entered; SOM follows the chosen ramp between year 1 and the horizon (linear, S-curve or defined year by year). Each mode uses its own economic model: operator (margin on captured sales), royalty (an up-front fee plus a percentage of the licensee's sales and a component margin, with no working capital), channel (distributor margin) and cost only (representative office, with no revenue and no terminal value). Free cash flow is EBIT less taxes less the increase in working capital, recognising tax-loss carryforward unless it is switched off. Amounts are converted to the reporting currency at the rate entered. NPV discounts free cash flow and the terminal value as a perpetuity: TV = next year's FCF / (discount rate − terminal growth), including the terminal increase in working capital. Two return bases are published: ROI on cumulative free cash flow over the horizon, excluding terminal value, and ROI including the present value of the terminal value; the threshold policy declares which one it uses. Payback is interpolated within the year in which cumulative cash flow crosses zero."
@@ -646,7 +724,13 @@ function evaluateSensitivityScenario(
     )], note: definition.note };
   }
   const financial = evaluateFinancialCase(
-    { ...provided, operatingMarginPct: scenarioMargin, fxRateToReportingCurrency: scenarioFx },
+    {
+      ...provided,
+      operatingMarginPct: scenarioMargin,
+      // Con pila no hay margen único que mover: la variación viaja como puntos sobre el ingreso.
+      stackMarginPctPoints: operatingMarginPctPoints,
+      fxRateToReportingCurrency: scenarioFx,
+    },
     modeOptions,
     horizonYears,
     1 + priceRevenuePct! / 100,

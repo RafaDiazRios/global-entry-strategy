@@ -15,15 +15,17 @@
  * una sucursal bancaria. Lo que cambia es cómo se llama cada casilla. Por eso los ejes se
  * quedan en el núcleo y la lista de modos es superposición.
  *
- * La pila de ingresos todavía no está aquí: hasta que exista, el veto de finanzas se contesta
- * a mano. Está en el mapa, no en esta entrega.
+ * La pila de ingresos es la tercera. Cada industria trae su plantilla: las partidas de la
+ * cuenta de resultados con su nombre y su driver, sin cifras. Se ofrece, no se impone, y
+ * sale marcada como convención del sector porque no viene del libro.
  */
 
-import { loc, type Localized } from "../i18n";
+import { loc, pick, type Localized } from "../i18n";
 import type { EconomicModel } from "./entryModes";
 import type { Approver } from "./approvalChain";
 import { BASE_CHAIN } from "./approvalChain";
 import type { ProvenanceOrigin } from "./thesis";
+import { templateDriver, templateItem, type RevenueStack, type StackTemplate } from "./revenueStack";
 
 export type IndustryId = "generic" | "financial_services" | "retail_consumer";
 
@@ -49,9 +51,212 @@ export type Industry = {
   /** Aprobadores que este sector añade a la cadena base. */
   extraApprovers: Approver[];
   modes: SectorEntryMode[];
+  /** Plantillas de cuenta de resultados que este sector ofrece. */
+  stackTemplates: StackTemplate[];
 };
 
 const FROM_BOOK: Localized = loc("Fig. 7.1, p. 263 y Tabla 7.4, p. 271", "Fig. 7.1, p. 263 and Table 7.4, p. 271");
+
+const GENERIC_ACCOUNTING: Localized = loc(
+  "Convención contable corriente; no procede del libro.",
+  "Ordinary accounting practice; it does not come from the book."
+);
+const FS_ACCOUNTING: Localized = loc(
+  "Estructura habitual de la cuenta de resultados en banca minorista; no procede del libro.",
+  "The usual shape of a retail banking P&L; it does not come from the book."
+);
+const RETAIL_ACCOUNTING: Localized = loc(
+  "Estructura habitual de la cuenta de resultados en distribución y consumo; no procede del libro.",
+  "The usual shape of a P&L in retail and consumer goods; it does not come from the book."
+);
+
+/* ------------------------------------------------------------------------------------ */
+/* Plantillas de cuenta de resultados                                                    */
+/* ------------------------------------------------------------------------------------ */
+
+/**
+ * La genérica es el puente con lo que ya había: una línea, el ingreso como importe sobre el
+ * volumen de mercado capturado y el coste como porcentaje de ese ingreso. Quien no necesite
+ * más que eso no tiene que aprender nada nuevo.
+ */
+const genericStack: StackTemplate = {
+  id: "generic_single_line",
+  label: loc("Una sola línea de negocio", "A single business line"),
+  description: loc(
+    "El caso clásico: un producto, un ingreso, un coste directo. Equivale al modelo de captura y margen, escrito como partidas.",
+    "The classic case: one product, one revenue, one direct cost. It matches the capture-and-margin model, written out as line items."
+  ),
+  origin: "sector",
+  provenance: loc(
+    "Convención contable corriente; no procede del libro.",
+    "Ordinary accounting practice; it does not come from the book."
+  ),
+  build: (lang): RevenueStack => ({
+    templateId: "generic_single_line",
+    drivers: [templateDriver("sales", loc("Ventas capturadas", "Captured sales"), "amount", lang)],
+    lines: [{
+      id: "core",
+      label: pick(loc("Negocio principal", "Core business"), lang),
+      fixedCostSharePct: 100,
+      note: null,
+      items: [
+        templateItem("net_sales", loc("Ventas netas", "Net sales"), "revenue", "sales", "pct_of_driver", GENERIC_ACCOUNTING, lang),
+        templateItem("cogs", loc("Coste de lo vendido", "Cost of goods sold"), "direct_cost", "sales", "pct_of_driver", GENERIC_ACCOUNTING, lang),
+      ],
+    }],
+  }),
+};
+
+/**
+ * La de tarjetas es la que prueba que el mecanismo sirve de algo. Tres ingresos sobre tres
+ * drivers distintos y, enfrente, un coste de riesgo sobre el saldo que es la partida que
+ * decide el caso. Ningún modelo de «margen operativo sobre la captura» puede representarla:
+ * el coste de riesgo no es proporcional al ingreso, es proporcional al saldo, y por eso una
+ * cartera puede crecer en ingresos y hundirse en resultado al mismo tiempo.
+ */
+const cardsStack: StackTemplate = {
+  id: "fs_credit_cards",
+  label: loc("Tarjetas de crédito", "Credit cards"),
+  description: loc(
+    "Interchange, margen de intereses y cuotas frente a coste de riesgo, coste de fondos y servicio.",
+    "Interchange, net interest income and fees against cost of risk, cost of funds and servicing."
+  ),
+  origin: "sector",
+  provenance: FS_ACCOUNTING,
+  build: (lang): RevenueStack => ({
+    templateId: "fs_credit_cards",
+    drivers: [
+      templateDriver("active_cards", loc("Tarjetas activas", "Active cards"), "count", lang),
+      templateDriver("purchase_volume", loc("Volumen de compra anual", "Annual purchase volume"), "amount", lang),
+      templateDriver("revolving_balance", loc("Saldo medio dispuesto", "Average revolving balance"), "amount", lang),
+    ],
+    lines: [{
+      id: "cards",
+      label: pick(loc("Cartera de tarjetas", "Card portfolio"), lang),
+      fixedCostSharePct: 100,
+      note: null,
+      items: [
+        templateItem("interchange", loc("Interchange", "Interchange"), "revenue", "purchase_volume", "pct_of_driver", FS_ACCOUNTING, lang),
+        templateItem("nii", loc("Margen de intereses", "Net interest income"), "revenue", "revolving_balance", "pct_of_driver", FS_ACCOUNTING, lang),
+        templateItem("annual_fee", loc("Cuota anual", "Annual fee"), "revenue", "active_cards", "amount_per_unit", FS_ACCOUNTING, lang),
+        templateItem("cost_of_risk", loc("Coste de riesgo", "Cost of risk"), "direct_cost", "revolving_balance", "pct_of_driver", FS_ACCOUNTING, lang),
+        templateItem("cost_of_funds", loc("Coste de fondos", "Cost of funds"), "direct_cost", "revolving_balance", "pct_of_driver", FS_ACCOUNTING, lang),
+        templateItem("servicing", loc("Coste de servicio", "Servicing cost"), "direct_cost", "active_cards", "amount_per_unit", FS_ACCOUNTING, lang),
+      ],
+    }],
+  }),
+};
+
+const depositsStack: StackTemplate = {
+  id: "fs_retail_banking",
+  label: loc("Banca minorista de depósito y préstamo", "Retail deposit and lending bank"),
+  description: loc(
+    "Margen sobre el crédito y sobre el depósito, comisiones de servicio y coste de riesgo.",
+    "Margin on lending and on deposits, service fees and cost of risk."
+  ),
+  origin: "sector",
+  provenance: FS_ACCOUNTING,
+  build: (lang): RevenueStack => ({
+    templateId: "fs_retail_banking",
+    drivers: [
+      templateDriver("customers", loc("Clientes activos", "Active customers"), "count", lang),
+      templateDriver("loan_book", loc("Cartera crediticia media", "Average loan book"), "amount", lang),
+      templateDriver("deposit_book", loc("Saldo medio de depósitos", "Average deposit balance"), "amount", lang),
+    ],
+    lines: [
+      {
+        id: "lending",
+        label: pick(loc("Crédito", "Lending"), lang),
+        fixedCostSharePct: 60,
+        note: null,
+        items: [
+          templateItem("lending_nii", loc("Margen de intereses del crédito", "Net interest income on lending"), "revenue", "loan_book", "pct_of_driver", FS_ACCOUNTING, lang),
+          templateItem("lending_risk", loc("Coste de riesgo", "Cost of risk"), "direct_cost", "loan_book", "pct_of_driver", FS_ACCOUNTING, lang),
+        ],
+      },
+      {
+        id: "deposits",
+        label: pick(loc("Depósitos y servicio", "Deposits and service"), lang),
+        fixedCostSharePct: 40,
+        note: null,
+        items: [
+          templateItem("deposit_nii", loc("Margen de depósitos", "Deposit margin"), "revenue", "deposit_book", "pct_of_driver", FS_ACCOUNTING, lang),
+          templateItem("service_fees", loc("Comisiones de servicio", "Service fees"), "revenue", "customers", "amount_per_unit", FS_ACCOUNTING, lang),
+          templateItem("deposit_servicing", loc("Coste de servicio", "Servicing cost"), "direct_cost", "customers", "amount_per_unit", FS_ACCOUNTING, lang),
+        ],
+      },
+    ],
+  }),
+};
+
+const retailStack: StackTemplate = {
+  id: "retail_own_stores",
+  label: loc("Tienda propia y canal digital", "Own stores and digital channel"),
+  description: loc(
+    "Unidades por precio en dos canales, con su coste de mercancía, su logística y su ocupación.",
+    "Units times price across two channels, with cost of goods, logistics and occupancy."
+  ),
+  origin: "sector",
+  provenance: RETAIL_ACCOUNTING,
+  build: (lang): RevenueStack => ({
+    templateId: "retail_own_stores",
+    drivers: [
+      templateDriver("store_units", loc("Unidades vendidas en tienda", "Units sold in store"), "count", lang),
+      templateDriver("online_units", loc("Unidades vendidas online", "Units sold online"), "count", lang),
+      templateDriver("stores", loc("Tiendas abiertas", "Stores open"), "count", lang),
+    ],
+    lines: [
+      {
+        id: "stores",
+        label: pick(loc("Tienda propia", "Own stores"), lang),
+        fixedCostSharePct: 70,
+        note: null,
+        items: [
+          templateItem("store_sales", loc("Ventas en tienda", "In-store sales"), "revenue", "store_units", "amount_per_unit", RETAIL_ACCOUNTING, lang),
+          templateItem("store_cogs", loc("Coste de la mercancía", "Cost of goods"), "direct_cost", "store_units", "amount_per_unit", RETAIL_ACCOUNTING, lang),
+          templateItem("occupancy", loc("Ocupación y personal de tienda", "Occupancy and store staff"), "direct_cost", "stores", "amount_per_unit", RETAIL_ACCOUNTING, lang),
+        ],
+      },
+      {
+        id: "online",
+        label: pick(loc("Canal digital", "Digital channel"), lang),
+        fixedCostSharePct: 30,
+        note: null,
+        items: [
+          templateItem("online_sales", loc("Ventas online", "Online sales"), "revenue", "online_units", "amount_per_unit", RETAIL_ACCOUNTING, lang),
+          templateItem("online_cogs", loc("Coste de la mercancía", "Cost of goods"), "direct_cost", "online_units", "amount_per_unit", RETAIL_ACCOUNTING, lang),
+          templateItem("fulfilment", loc("Preparación y última milla", "Fulfilment and last mile"), "direct_cost", "online_units", "amount_per_unit", RETAIL_ACCOUNTING, lang),
+        ],
+      },
+    ],
+  }),
+};
+
+const wholesaleStack: StackTemplate = {
+  id: "retail_wholesale",
+  label: loc("Venta a distribuidor", "Sales through a distributor"),
+  description: loc(
+    "Precio mayorista por unidad, con el coste de mercancía y el apoyo comercial al canal.",
+    "Wholesale price per unit, with cost of goods and trade support to the channel."
+  ),
+  origin: "sector",
+  provenance: RETAIL_ACCOUNTING,
+  build: (lang): RevenueStack => ({
+    templateId: "retail_wholesale",
+    drivers: [templateDriver("wholesale_units", loc("Unidades vendidas al canal", "Units sold to the channel"), "count", lang)],
+    lines: [{
+      id: "wholesale",
+      label: pick(loc("Canal mayorista", "Wholesale channel"), lang),
+      fixedCostSharePct: 100,
+      note: null,
+      items: [
+        templateItem("wholesale_sales", loc("Ventas mayoristas", "Wholesale sales"), "revenue", "wholesale_units", "amount_per_unit", RETAIL_ACCOUNTING, lang),
+        templateItem("wholesale_cogs", loc("Coste de la mercancía", "Cost of goods"), "direct_cost", "wholesale_units", "amount_per_unit", RETAIL_ACCOUNTING, lang),
+        templateItem("trade_support", loc("Apoyo comercial al canal", "Trade support to the channel"), "direct_cost", "wholesale_units", "amount_per_unit", RETAIL_ACCOUNTING, lang),
+      ],
+    }],
+  }),
+};
 
 /* ------------------------------------------------------------------------------------ */
 /* Genérica — los modos del libro                                                        */
@@ -142,6 +347,7 @@ const financialServices: Industry = {
     { key: "bank_jv", label: loc("Empresa conjunta con entidad local", "Joint venture with a local institution"), control: "weak", intensity: "high", economicModel: "operator", requiresPartner: true, requiresLicence: true, origin: "sector", provenance: FS_PRACTICE },
     { key: "white_label", label: loc("Marca blanca para un tercero", "White label for a third party"), control: "weak", intensity: "low", economicModel: "royalty", requiresPartner: true, requiresLicence: true, origin: "sector", provenance: FS_PRACTICE },
   ],
+  stackTemplates: [cardsStack, depositsStack, genericStack],
 };
 
 /* ------------------------------------------------------------------------------------ */
@@ -228,7 +434,9 @@ const retailConsumer: Industry = {
     { key: "chain_acquisition", label: loc("Compra de una cadena local", "Acquisition of a local chain"), control: "strong", intensity: "high", economicModel: "operator", requiresPartner: false, requiresLicence: false, origin: "sector", provenance: RETAIL_PRACTICE },
     { key: "retail_jv", label: loc("Empresa conjunta con operador local", "Joint venture with a local operator"), control: "weak", intensity: "high", economicModel: "operator", requiresPartner: true, requiresLicence: false, origin: "sector", provenance: RETAIL_PRACTICE },
   ],
+  stackTemplates: [retailStack, wholesaleStack, genericStack],
 };
+
 
 /* ------------------------------------------------------------------------------------ */
 /* Registro                                                                              */
@@ -244,6 +452,7 @@ export const INDUSTRIES: Industry[] = [
     ),
     extraApprovers: [],
     modes: genericModes,
+    stackTemplates: [genericStack],
   },
   financialServices,
   retailConsumer,
@@ -264,4 +473,13 @@ export function resolveChain(id: IndustryId | null): Approver[] {
 export function sectorMode(id: IndustryId | null, key: string | null): SectorEntryMode | null {
   if (!key) return null;
   return industry(id).modes.find((mode) => mode.key === key) ?? null;
+}
+
+/** Todas las plantillas conocidas, para poder resolver una pila guardada sin saber su sector. */
+export const STACK_TEMPLATES: StackTemplate[] = INDUSTRIES.flatMap((entry) => entry.stackTemplates)
+  .filter((template, index, all) => all.findIndex((other) => other.id === template.id) === index);
+
+export function stackTemplate(id: string | null): StackTemplate | null {
+  if (!id) return null;
+  return STACK_TEMPLATES.find((template) => template.id === id) ?? null;
 }
