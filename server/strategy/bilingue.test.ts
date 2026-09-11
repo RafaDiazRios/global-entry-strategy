@@ -90,6 +90,7 @@ const SAME_IN_BOTH = new Set([
   "Cultural", "Hub", "Veto", "Supervisor", "Sector", "No",
   // Nombre del producto, siglas y palabras que se escriben igual en los dos idiomas.
   "Global Entry Strategy Studio", "Gate", "manual", "Manual", "Base", "macro", "FX USD / local",
+  "Drivers", "Driver", "Total",
 ]);
 
 /** Las citas del libro se escriben igual en los dos idiomas salvo la palabra «Tabla». */

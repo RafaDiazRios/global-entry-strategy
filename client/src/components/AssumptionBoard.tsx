@@ -8,6 +8,20 @@ import { Label } from "@/components/ui/label";
 import { trpc, type RouterOutputs } from "@/lib/trpc";
 import { useLanguage } from "@/i18n";
 import type { AssumptionAnswer, Belief } from "@shared/domain/assumptionMap";
+import { readEconomics } from "@shared/domain/economicsReading";
+
+/**
+ * Lo que el tablero necesita saber del caso económico para poder enseñar la lectura del
+ * modelo junto al supuesto. Llega como función y no como dato porque quién es el país lo
+ * decide la tesis, y la tesis la conoce este componente, no el que lo monta.
+ */
+export type EconomicsLookup = (countryCode: string | null) => {
+  npv: number | null;
+  roiPct: number | null;
+  currency: string | null;
+  action: "advance" | "test" | "discard" | "insufficient_data";
+  stackDeclared: boolean;
+} | null;
 
 /**
  * El tablero de supuestos: la superficie de trabajo del modo trabajo.
@@ -26,7 +40,7 @@ const select =
 type Analysis = RouterOutputs["globalStrategy"]["getThesis"];
 type Resolved = Analysis["verdict"]["critical"][number];
 
-export function AssumptionBoard({ caseId, onGoToThesis }: { caseId: number; onGoToThesis?: () => void }) {
+export function AssumptionBoard({ caseId, onGoToThesis, economicsFor }: { caseId: number; onGoToThesis?: () => void; economicsFor?: EconomicsLookup }) {
   const { t, ui } = useLanguage();
   const utils = trpc.useUtils();
   const query = trpc.globalStrategy.getThesis.useQuery({ caseId });
@@ -50,6 +64,9 @@ export function AssumptionBoard({ caseId, onGoToThesis }: { caseId: number; onGo
 
   if (query.isLoading || !query.data) return null;
   const { verdict, blindSpots, chain, thesis } = query.data;
+  const economics: EconomicsContext | null = economicsFor
+    ? { figures: economicsFor(thesis.countryCode), returnThresholdPct: thesis.groupConstraint.returnThresholdPct }
+    : null;
 
   // Sin tesis enunciada el tablero no tiene nada que decir: manda la ruta guiada.
   if (verdict.status === "not_stated") return null;
@@ -115,6 +132,7 @@ export function AssumptionBoard({ caseId, onGoToThesis }: { caseId: number; onGo
             chain={chain}
             onPatch={patch}
             answers={answers}
+            economics={economics}
           />
 
           {verdict.shaping.length > 0 && (
@@ -124,7 +142,7 @@ export function AssumptionBoard({ caseId, onGoToThesis }: { caseId: number; onGo
               </Button>
               {showShaping && (
                 <div className="mt-3">
-                  <AssumptionList title="" assumptions={verdict.shaping} chain={chain} onPatch={patch} answers={answers} />
+                  <AssumptionList title="" assumptions={verdict.shaping} chain={chain} onPatch={patch} answers={answers} economics={economics} />
                 </div>
               )}
             </div>
@@ -200,17 +218,24 @@ export function AssumptionBoard({ caseId, onGoToThesis }: { caseId: number; onGo
   );
 }
 
+type EconomicsContext = {
+  figures: ReturnType<EconomicsLookup>;
+  returnThresholdPct: number | null;
+};
+
 function AssumptionList({
   title,
   assumptions,
   chain,
   answers,
   onPatch,
+  economics,
 }: {
   title: string;
   assumptions: Resolved[];
   chain: Analysis["chain"];
   answers: AssumptionAnswer[];
+  economics: EconomicsContext | null;
   onPatch: (slotId: string, change: Partial<AssumptionAnswer>) => void;
 }) {
   const { t, ui } = useLanguage();
@@ -286,6 +311,32 @@ function AssumptionList({
               />
               {missingFalsifier && <p className="mt-1 text-xs text-amber-600">{ui("abFalsifierMissing")}</p>}
             </div>
+
+            {/* La lectura del modelo solo existe para el supuesto que el modelo sabe calcular. */}
+            {entry.slot.id === "economics_holds" && economics?.figures && (() => {
+              const reading = readEconomics({
+                npv: economics.figures.npv,
+                roiPct: economics.figures.roiPct,
+                currency: economics.figures.currency,
+                returnThresholdPct: economics.returnThresholdPct,
+                action: economics.figures.action,
+                stackDeclared: economics.figures.stackDeclared,
+                belief: answer.belief,
+              });
+              const tone =
+                reading.verdict === "contradicts" ? "text-rose-700" : reading.verdict === "supports" ? "text-emerald-700" : "text-muted-foreground";
+              return (
+                <div className="mt-3 rounded-md bg-muted/40 p-2">
+                  <p className={`text-xs font-medium ${tone}`}>
+                    {ui("erTitle")} · {ui(reading.verdict === "contradicts" ? "erContradicts" : reading.verdict === "supports" ? "erSupports" : "erSilent")}
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">{t(reading.note)}</p>
+                  {reading.conflictsWithBelief && (
+                    <p className="mt-1 text-xs font-medium text-rose-700">{ui("erConflict")}</p>
+                  )}
+                </div>
+              );
+            })()}
           </div>
         );
       })}

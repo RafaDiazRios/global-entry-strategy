@@ -177,6 +177,48 @@ const sensitivityScenarioSchema = z.object({
   fxRatePct: z.number().min(-100).max(500).nullable().optional(),
 });
 
+/**
+ * La pila viaja dentro de los supuestos financieros del país, que es donde vive el resto del
+ * caso económico. No es un módulo aparte porque no se puede razonar sobre ella sin el
+ * horizonte, la moneda y el coste fijo del modo, y separarla obligaría a mantener dos
+ * verdades sobre el mismo negocio.
+ */
+const revenueDriverSchema = z.object({
+  id: z.string().min(1).max(60),
+  label: z.string().min(1).max(120),
+  unit: z.enum(["count", "amount"]),
+  valueYearOne: z.number().nullable(),
+  valueAtHorizon: z.number().nullable(),
+  ramp: z.enum(["linear", "s_curve", "manual"]),
+  valuesByYear: z.array(z.number().nullable()).max(25).nullable().optional(),
+  note: z.string().max(400).nullable(),
+});
+
+const stackItemSchema = z.object({
+  id: z.string().min(1).max(60),
+  label: z.string().min(1).max(120),
+  kind: z.enum(["revenue", "direct_cost"]),
+  driverId: z.string().max(60).nullable(),
+  rateKind: z.enum(["pct_of_driver", "amount_per_unit", "fixed_amount"]),
+  rate: z.number().nullable(),
+  origin: z.enum(["book", "sector", "user"]),
+  provenance: localizedSchema(600).nullable(),
+});
+
+const stackLineSchema = z.object({
+  id: z.string().min(1).max(60),
+  label: z.string().min(1).max(120),
+  items: z.array(stackItemSchema).max(30),
+  fixedCostSharePct: z.number().min(0).max(100).nullable(),
+  note: z.string().max(400).nullable(),
+});
+
+const revenueStackSchema = z.object({
+  drivers: z.array(revenueDriverSchema).max(20),
+  lines: z.array(stackLineSchema).max(10),
+  templateId: z.string().max(60).nullable(),
+});
+
 const financialAssumptionsSchema = z.object({
   currency: z.string().min(1).max(10).nullable().optional(),
   reportingCurrency: z.string().min(1).max(10).nullable().optional(),
@@ -202,6 +244,7 @@ const financialAssumptionsSchema = z.object({
     optimistic: sensitivityScenarioSchema.optional(),
     conservative: sensitivityScenarioSchema.optional(),
   }).optional(),
+  revenueStack: revenueStackSchema.nullable().optional(),
   modeProfiles: z.object({
     greenfield: modeFinancialProfileSchema.optional(),
     acquisition: modeFinancialProfileSchema.optional(),

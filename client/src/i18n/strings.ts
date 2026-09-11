@@ -1039,6 +1039,9 @@ export const UI_STRINGS = {
   hmComparisonDone: loc("Comparación completada", "Comparison complete"),
   hmMissingColon: loc("Faltan", "Missing"),
   hmPending: loc("Pendiente", "Pending"),
+  hmPickAMarket: loc("Seleccione un mercado", "Select a market"),
+  hmTaxFxUpdated: loc("Impuesto y FX actualizados", "Tax and FX refreshed"),
+  hmCompleteAssumptions: loc("Complete o actualice los supuestos", "Complete or refresh the assumptions"),
   hmEg: loc("Ej.", "E.g."),
   hmFcfFormula: loc("FCF = EBIT − impuestos − Δ capital de trabajo", "FCF = EBIT − taxes − Δ working capital"),
   hmClose: loc("Cerrar", "Close"),
@@ -1198,6 +1201,85 @@ export const UI_STRINGS = {
   hmGenerateFirst: loc("Genere primero una evaluación para exportarla.", "Generate an assessment first, so there is something to export."),
   hmPdfDone: loc("Informe PDF detallado generado.", "Detailed PDF report generated."),
   hmPdfFailed: loc("No se pudo crear el informe PDF.", "The PDF report could not be created."),
+
+  // Pila de ingresos
+  rsTitle: loc("Cuenta de resultados por líneas", "P&L by line"),
+  rsDesc: loc(
+    "Las partidas reales del negocio, cada una atada a su propio driver. Sustituye al par captura-más-margen: el ingreso deja de derivarse del SOM y el SOM pasa a ser el contraste contra el que se comprueba.",
+    "The real line items of the business, each tied to its own driver. It replaces the capture-and-margin pair: revenue stops being derived from the SOM, and the SOM becomes the check it is measured against."
+  ),
+  rsNotDeclared: loc("Sin cuenta declarada", "No P&L declared"),
+  rsNotDeclaredHelp: loc(
+    "Mientras no haya partidas, el caso sigue con el modelo de captura y margen. Parta de una plantilla o escriba la suya.",
+    "Until there are line items, the case keeps running on capture and margin. Start from a template or write your own."
+  ),
+  rsTemplate: loc("Partir de una plantilla", "Start from a template"),
+  rsTemplateNone: loc("Elegir plantilla…", "Choose a template…"),
+  rsTemplateApply: loc("Usar", "Use it"),
+  rsTemplateWarning: loc(
+    "Sustituye lo que haya escrito en la pila.",
+    "It replaces whatever is in the stack."
+  ),
+  rsClear: loc("Vaciar la pila", "Empty the stack"),
+  rsDrivers: loc("Drivers", "Drivers"),
+  rsDriversHelp: loc(
+    "Las cantidades base del negocio. Cada una crece del año 1 al horizonte con la forma que elija.",
+    "The base quantities of the business. Each grows from year one to the horizon in the shape you choose."
+  ),
+  rsAddDriver: loc("Añadir driver", "Add driver"),
+  rsDriverName: loc("Nombre", "Name"),
+  rsDriverUnit: loc("Mide", "Measures"),
+  rsDriverYearOne: loc("Año 1", "Year 1"),
+  rsDriverHorizon: loc("Horizonte", "Horizon"),
+  rsDriverRamp: loc("Rampa", "Ramp"),
+  rsLines: loc("Líneas de negocio", "Business lines"),
+  rsLinesHelp: loc(
+    "Cada línea lleva su ingreso, su coste directo y su parte del coste fijo del modo. Los repartos deben sumar 100.",
+    "Each line carries its revenue, its direct cost and its share of the mode's fixed cost. The shares must add up to 100."
+  ),
+  rsAddLine: loc("Añadir línea", "Add line"),
+  rsLineName: loc("Línea", "Line"),
+  rsFixedShare: loc("Coste fijo (%)", "Fixed cost (%)"),
+  rsAddItem: loc("Añadir partida", "Add item"),
+  rsItemName: loc("Partida", "Item"),
+  rsItemKind: loc("Tipo", "Type"),
+  rsItemDriver: loc("Driver", "Driver"),
+  rsItemRateKind: loc("Tarifa", "Rate"),
+  rsItemRate: loc("Valor", "Value"),
+  rsNoDriver: loc("Sin driver", "No driver"),
+  rsRemove: loc("Quitar", "Remove"),
+  rsSectorTag: loc("Sector", "Sector"),
+  rsUserTag: loc("Propio", "Own"),
+  rsResultTitle: loc("Lo que sale de la última evaluación", "What the last assessment produced"),
+  rsResultHelp: loc(
+    "No se recalcula al escribir. Vuelva a generar la evaluación para ver el efecto de un cambio.",
+    "It does not recalculate as you type. Generate the assessment again to see the effect of a change."
+  ),
+  rsResultPending: loc(
+    "Todavía no hay una evaluación que mostrar para este mercado.",
+    "There is no assessment to show for this market yet."
+  ),
+  rsColLine: loc("Línea", "Line"),
+  rsColRevenue: loc("Ingreso", "Revenue"),
+  rsColDirectCost: loc("Coste directo", "Direct cost"),
+  rsColContribution: loc("Contribución", "Contribution"),
+  rsColFixed: loc("Coste fijo", "Fixed cost"),
+  rsColResult: loc("Resultado", "Operating profit"),
+  rsAtHorizon: loc("en el horizonte", "at the horizon"),
+  rsTotal: loc("Total", "Total"),
+  rsPlausibility: loc("Contraste con el mercado", "Check against the market"),
+  rsMissing: loc("Falta por completar", "Still to complete"),
+  rsWarnings: loc("Avisos", "Warnings"),
+
+  // Lectura del modelo sobre el caso económico
+  erTitle: loc("Lo que dicen los números", "What the numbers say"),
+  erSupports: loc("Los números sostienen el supuesto", "The numbers support the assumption"),
+  erContradicts: loc("Los números contradicen el supuesto", "The numbers contradict the assumption"),
+  erSilent: loc("Los números todavía no dicen nada", "The numbers do not say anything yet"),
+  erConflict: loc(
+    "Ha declarado que el caso económico se sostiene y el modelo dice lo contrario. Una de las dos cosas hay que corregirla antes del comité.",
+    "You have declared that the economic case holds and the model says otherwise. One of the two has to be corrected before the committee."
+  ),
 
   language: loc("Idioma", "Language"),
 } as const;
