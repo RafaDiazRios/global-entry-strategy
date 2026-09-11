@@ -1,3 +1,4 @@
+import { pick, pickAll } from "@shared/i18n";
 import { describe, expect, it } from "vitest";
 import { evaluateStrategy } from "./engine";
 import { buildSituation, scoreEntryModes } from "./entryModeScoring";
@@ -65,7 +66,7 @@ describe("evaluateStrategy", () => {
 
     expect(result.countries[0].code).toBe("AA");
     expect(result.countries[0].scores.riskAdjusted).toBeGreaterThan(result.countries[1].scores.riskAdjusted);
-    expect(result.countries[0].entryModes.some((mode) => mode.mode === "Entrada digital o híbrida")).toBe(true);
+    expect(result.countries[0].entryModes.some((mode) => pick(mode.mode, "es") === "Entrada digital o híbrida")).toBe(true);
     expect(result.portfolio.leadingCountry).toBe("Mercado A");
     expect(result.countries[0].financial.market.tamAtHorizon).toBeGreaterThan(1_000_000);
     expect(result.countries[0].financial.alternatives).toHaveLength(7);
@@ -75,7 +76,7 @@ describe("evaluateStrategy", () => {
     expect(result.countries[0].eligibility.eligible).toBe(true);
     // Cada modo trae la procedencia de su perfil y el desglose de los ocho criterios.
     expect(result.countries[0].entryModes[0].criteria).toHaveLength(8);
-    expect(result.countries[0].entryModes[0].provenance).toContain("7.4");
+    expect(pick(result.countries[0].entryModes[0].provenance, "es")).toContain("7.4");
   });
 
   it("identifies a limited-evidence situation without inventing data", () => {

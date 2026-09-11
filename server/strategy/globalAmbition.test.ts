@@ -1,3 +1,4 @@
+import { pick, pickAll } from "@shared/i18n";
 import { describe, expect, it } from "vitest";
 import { emptyAmbitionInput, industryDemandFor, INDUSTRY_DEMAND_TABLE } from "@shared/domain/globalAmbition";
 import { ambitionCompleteness, ambitionGap, computeIndices, DEFAULT_THRESHOLDS, overlapIndex, positionOnAmbitionMap } from "./globalAmbition";
@@ -38,7 +39,8 @@ describe("learning assignment 1, p. 220 — Air Liquide", () => {
     const indices = computeIndices(airLiquide());
     const position = positionOnAmbitionMap(indices.gri as number, indices.gci as number);
     expect(position.role).toBe("global_player");
-    expect(position.zone).toBe("Jugador global");
+    expect(pick(position.zone, "es")).toBe("Jugador global");
+    expect(pick(position.zone, "en")).toBe("Global player");
   });
 
   it("normaliza a porcentajes aunque los datos entren en millones de euros", () => {
@@ -93,7 +95,8 @@ describe("brecha de ambición", () => {
     input.currentRole = "regional_player";
     const gap = ambitionGap(input, computeIndices(input));
     expect(gap.selfAssessmentMismatch).toBe(true);
-    expect(gap.note).toMatch(/contradicción/);
+    expect(pick(gap.note, "es")).toMatch(/contradicción/);
+    expect(pick(gap.note, "en")).toMatch(/contradiction/);
   });
 
   it("no inventa brecha cuando el objetivo coincide con la posición observada", () => {
@@ -131,7 +134,7 @@ describe("exhaustividad", () => {
     input.countryRoles = [{ countryCode: "CHN", role: "key", justification: "Mayor mercado de gas industrial" }];
     const before = ambitionCompleteness(input, computeIndices(input));
     expect(before.complete).toBe(false);
-    expect(before.missing).toContain("Liability of foreignness declarada");
+    expect(pickAll(before.missing, "es")).toContain("Liability of foreignness declarada");
 
     input.liabilityOfForeignness = "Sin red local de distribución industrial; se compensa con tecnología de separación de aire propia.";
     expect(ambitionCompleteness(input, computeIndices(input)).complete).toBe(true);

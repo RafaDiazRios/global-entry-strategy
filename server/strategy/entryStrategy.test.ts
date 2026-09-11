@@ -1,3 +1,4 @@
+import { pick, pickAll } from "@shared/i18n";
 import { describe, expect, it } from "vitest";
 import { emptyEntryStrategyInput, ENTRY_OBJECTIVES, MODE_MAPPING, WINDOW_PHASES } from "@shared/domain/entryStrategy";
 import { entryStrategyCompleteness, entryStrategyWarnings, mappingShortlist, paceProfile, phaseDefinition } from "./entryStrategy";
@@ -19,8 +20,9 @@ describe("tablas del capítulo 7", () => {
 
   it("cubre las nueve casillas del mapa de la Fig. 7.3", () => {
     expect(MODE_MAPPING).toHaveLength(9);
-    expect(mappingShortlist("high", "poor")?.modes).toContain("Licencia");
-    expect(mappingShortlist("low", "poor")?.modes).toEqual(["Exportación ocasional"]);
+    expect(pickAll(mappingShortlist("high", "poor")?.modes, "es")).toContain("Licencia");
+    expect(pickAll(mappingShortlist("high", "poor")?.modes, "en")).toContain("Licensing");
+    expect(pickAll(mappingShortlist("low", "poor")?.modes, "es")).toEqual(["Exportación ocasional"]);
   });
 
   it("no propone nada mientras falte uno de los dos ejes", () => {

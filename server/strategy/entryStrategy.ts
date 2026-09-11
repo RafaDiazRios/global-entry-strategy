@@ -1,3 +1,4 @@
+import { loc, pick, type Localized } from "@shared/i18n";
 import { entryModes, type EntryModeKey } from "@shared/domain/entryModes";
 import {
   Band,
@@ -25,7 +26,7 @@ import {
 export function mappingShortlist(attractiveness: Band | null, climate: ClimateBand | null) {
   if (!attractiveness || !climate) return null;
   const cell = MODE_MAPPING.find((entry) => entry.attractiveness === attractiveness && entry.climate === climate);
-  return cell ? { modes: cell.modes, provenance: "Fig. 7.3, p. 272" } : null;
+  return cell ? { modes: cell.modes, provenance: loc("Fig. 7.3, p. 272", "Fig. 7.3, p. 272") } : null;
 }
 
 /* ------------------------------------------------------------------------------------ */
@@ -38,7 +39,7 @@ export type PaceProfile = {
   answered: number;
   total: number;
   recommendation: "gradual" | "equilibrado" | "rapido" | null;
-  drivers: { id: PaceFactorId; label: string; pushes: "faster" | "slower"; value: number }[];
+  drivers: { id: PaceFactorId; label: Localized; pushes: "faster" | "slower"; value: number }[];
 };
 
 /**
@@ -72,7 +73,7 @@ export function paceProfile(input: EntryStrategyInput): PaceProfile {
 /* Coherencia                                                                            */
 /* ------------------------------------------------------------------------------------ */
 
-export type EntryWarning = { id: string; severity: "block" | "warn"; message: string; provenance: string };
+export type EntryWarning = { id: string; severity: "block" | "warn"; message: Localized; provenance: Localized };
 
 const HIGH_COMMITMENT: EntryModeKey[] = ["greenfield", "acquisition"];
 
@@ -80,8 +81,9 @@ export function phaseDefinition(phase: WindowPhaseId | null) {
   return phase ? WINDOW_PHASES.find((entry) => entry.id === phase) ?? null : null;
 }
 
-export function modeLabel(key: string | null) {
-  return key ? entryModes.find((mode) => mode.key === key)?.label ?? key : null;
+export function modeLabel(key: string | null): Localized | null {
+  if (!key) return null;
+  return entryModes.find((mode) => mode.key === key)?.label ?? loc(key, key);
 }
 
 export function entryStrategyWarnings(input: EntryStrategyInput): EntryWarning[] {
@@ -92,8 +94,11 @@ export function entryStrategyWarnings(input: EntryStrategyInput): EntryWarning[]
     warnings.push({
       id: "no_objective",
       severity: "block",
-      message: "Sin objetivo de entrada no hay estrategia que evaluar: el objetivo condiciona el tipo de país, el momento y el modo.",
-      provenance: "Tabla 7.1, pp. 260-261",
+      message: loc(
+        "Sin objetivo de entrada no hay estrategia que evaluar: el objetivo condiciona el tipo de país, el momento y el modo.",
+        "Without an entry objective there is no strategy to evaluate: the objective drives the type of country, the timing and the mode."
+      ),
+      provenance: loc("Tabla 7.1, pp. 260-261", "Table 7.1, pp. 260-261"),
     });
   }
 
@@ -101,8 +106,11 @@ export function entryStrategyWarnings(input: EntryStrategyInput): EntryWarning[]
     warnings.push({
       id: "mode_out_of_phase",
       severity: "warn",
-      message: `En fase «${phase.label}» el libro no considera apropiado el modo «${modeLabel(input.preferredMode)}». ${phase.guidance}`,
-      provenance: "pp. 261-262",
+      message: loc(
+        `En fase «${pick(phase.label, "es")}» el libro no considera apropiado el modo «${pick(modeLabel(input.preferredMode), "es")}». ${pick(phase.guidance, "es")}`,
+        `In the \u201c${pick(phase.label, "en")}\u201d phase the book does not consider the \u201c${pick(modeLabel(input.preferredMode), "en")}\u201d mode appropriate. ${pick(phase.guidance, "en")}`
+      ),
+      provenance: loc("pp. 261-262", "pp. 261-262"),
     });
   }
 
@@ -110,8 +118,11 @@ export function entryStrategyWarnings(input: EntryStrategyInput): EntryWarning[]
     warnings.push({
       id: "premature_commitment",
       severity: "warn",
-      message: "Una inversión significativa en fase prematura no genera ingresos suficientes a largo plazo: la falta de demanda no se resuelve con más capital.",
-      provenance: "p. 261",
+      message: loc(
+        "Una inversión significativa en fase prematura no genera ingresos suficientes a largo plazo: la falta de demanda no se resuelve con más capital.",
+        "A significant investment in the premature phase does not generate enough long-term revenue: missing demand is not fixed with more capital."
+      ),
+      provenance: loc("p. 261", "p. 261"),
     });
   }
 
@@ -119,8 +130,11 @@ export function entryStrategyWarnings(input: EntryStrategyInput): EntryWarning[]
     warnings.push({
       id: "first_mover_too_late",
       severity: "warn",
-      message: "No se puede ser primer entrante en una fase donde los competidores ya se han llevado esa ventaja. La posición realista es seguidor o adquirente.",
-      provenance: "p. 262 y p. 277",
+      message: loc(
+        "No se puede ser primer entrante en una fase donde los competidores ya se han llevado esa ventaja. La posición realista es seguidor o adquirente.",
+        "You cannot be a first mover in a phase where competitors have already taken that advantage. The realistic stance is follower or acquirer."
+      ),
+      provenance: loc("p. 262 y p. 277", "p. 262 and p. 277"),
     });
   }
 
@@ -128,8 +142,11 @@ export function entryStrategyWarnings(input: EntryStrategyInput): EntryWarning[]
     warnings.push({
       id: "first_mover_unjustified",
       severity: "warn",
-      message: "Ser primer entrante significa asumir el riesgo de abrir el mercado para otros. Conviene justificar qué recurso se pre-empta con ello.",
-      provenance: "Tabla 7.2, p. 262",
+      message: loc(
+        "Ser primer entrante significa asumir el riesgo de abrir el mercado para otros. Conviene justificar qué recurso se pre-empta con ello.",
+        "Being a first mover means carrying the risk of opening the market for others. It is worth stating which resource that pre-empts."
+      ),
+      provenance: loc("Tabla 7.2, p. 262", "Table 7.2, p. 262"),
     });
   }
 
@@ -138,20 +155,27 @@ export function entryStrategyWarnings(input: EntryStrategyInput): EntryWarning[]
     warnings.push({
       id: "pace_against_mode",
       severity: "warn",
-      message: "Los factores de ritmo apuntan a un compromiso gradual y el modo elegido es de compromiso alto desde el primer día. O se revisa el modo, o se explica qué compensa esa prisa.",
-      provenance: "p. 262",
+      message: loc(
+        "Los factores de ritmo apuntan a un compromiso gradual y el modo elegido es de compromiso alto desde el primer día. O se revisa el modo, o se explica qué compensa esa prisa.",
+        "The pace factors point to a gradual commitment while the chosen mode is a high commitment from day one. Either revisit the mode, or explain what makes that haste worth it."
+      ),
+      provenance: loc("p. 262", "p. 262"),
     });
   }
 
   const shortlist = mappingShortlist(input.marketAttractiveness, input.politicalClimate);
   if (shortlist && input.preferredMode) {
-    const label = modeLabel(input.preferredMode) ?? "";
-    const compatible = shortlist.modes.some((mode) => similar(mode, label));
+    const label = modeLabel(input.preferredMode);
+    // La comparación se hace siempre en español: es el idioma en que están escritas las raíces.
+    const compatible = shortlist.modes.some((mode) => similar(pick(mode, "es"), pick(label, "es")));
     if (!compatible) {
       warnings.push({
         id: "mode_off_mapping",
         severity: "warn",
-        message: `Con ese atractivo de mercado y ese clima de inversión, el mapa apunta a: ${shortlist.modes.join(", ")}. El modo elegido queda fuera y conviene decir por qué.`,
+        message: loc(
+          `Con ese atractivo de mercado y ese clima de inversión, el mapa apunta a: ${shortlist.modes.map((mode) => pick(mode, "es")).join(", ")}. El modo elegido queda fuera y conviene decir por qué.`,
+          `With that market attractiveness and that investment climate, the map points to: ${shortlist.modes.map((mode) => pick(mode, "en")).join(", ")}. The chosen mode falls outside it, and it is worth saying why.`
+        ),
         provenance: shortlist.provenance,
       });
     }
@@ -173,19 +197,19 @@ function similar(a: string, b: string) {
 /* Exhaustividad                                                                         */
 /* ------------------------------------------------------------------------------------ */
 
-export type EntryCompleteness = { complete: boolean; missing: string[]; answered: number; total: number };
+export type EntryCompleteness = { complete: boolean; missing: Localized[]; answered: number; total: number };
 
 export function entryStrategyCompleteness(input: EntryStrategyInput): EntryCompleteness {
   const pace = paceProfile(input);
-  const checks: { label: string; done: boolean }[] = [
-    { label: "País al que se refiere la estrategia", done: Boolean(input.countryCode) },
-    { label: "Al menos un objetivo de entrada, justificado", done: input.objectives.some((objective) => objective.selected && (objective.justification ?? "").trim().length > 0) },
-    { label: "Fase de la ventana, con la evidencia que la sostiene", done: Boolean(input.phase) && (input.phaseEvidence ?? "").trim().length > 0 },
-    { label: "Posición ante el momento: primer entrante, seguidor o adquirente", done: Boolean(input.timingStance) },
-    { label: "Los seis factores de ritmo", done: pace.answered === pace.total },
-    { label: "Atractivo de mercado y clima político para el mapa de modos", done: Boolean(input.marketAttractiveness && input.politicalClimate) },
-    { label: "Modo preferido con su razón", done: Boolean(input.preferredMode) && (input.modeRationale ?? "").trim().length > 0 },
-    { label: "Requisitos del gobierno que condicionan el modo", done: (input.governmentRequirements ?? "").trim().length > 0 },
+  const checks: { label: Localized; done: boolean }[] = [
+    { label: loc("País al que se refiere la estrategia", "The country the strategy refers to"), done: Boolean(input.countryCode) },
+    { label: loc("Al menos un objetivo de entrada, justificado", "At least one entry objective, justified"), done: input.objectives.some((objective) => objective.selected && (objective.justification ?? "").trim().length > 0) },
+    { label: loc("Fase de la ventana, con la evidencia que la sostiene", "The window phase, with the evidence behind it"), done: Boolean(input.phase) && (input.phaseEvidence ?? "").trim().length > 0 },
+    { label: loc("Posición ante el momento: primer entrante, seguidor o adquirente", "Timing stance: first mover, follower or acquirer"), done: Boolean(input.timingStance) },
+    { label: loc("Los seis factores de ritmo", "The six pace factors"), done: pace.answered === pace.total },
+    { label: loc("Atractivo de mercado y clima político para el mapa de modos", "Market attractiveness and political climate for the mode map"), done: Boolean(input.marketAttractiveness && input.politicalClimate) },
+    { label: loc("Modo preferido con su razón", "Preferred mode with its rationale"), done: Boolean(input.preferredMode) && (input.modeRationale ?? "").trim().length > 0 },
+    { label: loc("Requisitos del gobierno que condicionan el modo", "Government requirements that constrain the mode"), done: (input.governmentRequirements ?? "").trim().length > 0 },
   ];
   const missing = checks.filter((check) => !check.done).map((check) => check.label);
   return { complete: missing.length === 0, missing, answered: checks.length - missing.length, total: checks.length };

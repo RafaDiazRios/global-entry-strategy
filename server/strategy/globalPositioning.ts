@@ -1,3 +1,4 @@
+import { loc, type Localized } from "@shared/i18n";
 import {
   CONFIGURATIONS,
   ConfigurationId,
@@ -63,7 +64,7 @@ export type ValueCurveDiagnosis = {
   /** Atributos donde la curva propuesta no se separa de ningún competidor. */
   undifferentiated: string[];
   divergence: number | null;
-  note: string | null;
+  note: Localized | null;
 };
 
 /**
@@ -93,10 +94,23 @@ export function diagnoseValueCurve(input: PositioningInput): ValueCurveDiagnosis
   }
 
   const divergence = comparable ? Number((totalDistance / comparable).toFixed(2)) : null;
-  let note: string | null = null;
-  if (!input.valueCurve.length) note = "Sin atributos de valor no hay curva que comparar.";
-  else if (!competitorIds.length) note = "Sin competidores en la curva, la comparación es contra nada: añade al menos uno.";
-  else if (divergence !== null && divergence < 0.5) note = "La curva propuesta se solapa con la del competidor más cercano: no hay espacio nuevo, solo el mismo con otro nombre.";
+  let note: Localized | null = null;
+  if (!input.valueCurve.length) {
+    note = loc(
+      "Sin atributos de valor no hay curva que comparar.",
+      "With no value attributes there is no curve to compare."
+    );
+  } else if (!competitorIds.length) {
+    note = loc(
+      "Sin competidores en la curva, la comparación es contra nada: añade al menos uno.",
+      "With no competitors on the curve there is nothing to compare against: add at least one."
+    );
+  } else if (divergence !== null && divergence < 0.5) {
+    note = loc(
+      "La curva propuesta se solapa con la del competidor más cercano: no hay espacio nuevo, solo el mismo con otro nombre.",
+      "The to-be curve overlaps the closest competitor's: there is no new space, only the same one under another name."
+    );
+  }
 
   return { errc, undifferentiated, divergence, note };
 }
@@ -105,11 +119,14 @@ export function diagnoseValueCurve(input: PositioningInput): ValueCurveDiagnosis
 /* Configuración de la cadena de valor                                                   */
 /* ------------------------------------------------------------------------------------ */
 
+/** La dirección es un identificador, no una palabra: quien la pinta elige el idioma. */
+export type ChainMoveDirection = "centralize" | "decentralize";
+
 export type ValueChainDiagnosis = {
   currentConfiguration: ConfigurationId | null;
   targetConfiguration: ConfigurationId | null;
   /** Funciones que hay que subir o bajar de nivel para alcanzar la configuración objetivo. */
-  moves: { functionId: string; label: string; from: ValueChainLevel; to: ValueChainLevel; direction: "centralizar" | "descentralizar" }[];
+  moves: { functionId: string; label: Localized; from: ValueChainLevel; to: ValueChainLevel; direction: ChainMoveDirection }[];
   answered: number;
   total: number;
 };
@@ -136,7 +153,7 @@ export function diagnoseValueChain(input: PositioningInput): ValueChainDiagnosis
     current.push(cell.current);
     target.push(cell.target);
     if (cell.current && cell.target && cell.current !== cell.target) {
-      const direction = LEVEL_ORDER.indexOf(cell.target) > LEVEL_ORDER.indexOf(cell.current) ? "centralizar" : "descentralizar";
+      const direction: ChainMoveDirection = LEVEL_ORDER.indexOf(cell.target) > LEVEL_ORDER.indexOf(cell.current) ? "centralize" : "decentralize";
       moves.push({ functionId: fn.id, label: fn.label, from: cell.current, to: cell.target, direction });
     }
   }
@@ -151,8 +168,9 @@ export function diagnoseValueChain(input: PositioningInput): ValueChainDiagnosis
   };
 }
 
-export function configurationLabel(id: ConfigurationId | null) {
-  return id ? CONFIGURATIONS.find((configuration) => configuration.id === id)?.label ?? id : null;
+export function configurationLabel(id: ConfigurationId | null): Localized | null {
+  if (!id) return null;
+  return CONFIGURATIONS.find((configuration) => configuration.id === id)?.label ?? loc(id, id);
 }
 
 /* ------------------------------------------------------------------------------------ */
@@ -183,7 +201,7 @@ export function resourceGap(input: PositioningInput): ResourceGap {
 /* Coherencia interna del módulo                                                         */
 /* ------------------------------------------------------------------------------------ */
 
-export type PositioningWarning = { id: string; severity: "block" | "warn"; message: string; provenance: string };
+export type PositioningWarning = { id: string; severity: "block" | "warn"; message: Localized; provenance: Localized };
 
 /**
  * Tres incoherencias que el capítulo 5 hace evidentes en cuanto se leen juntas las piezas,
@@ -198,8 +216,11 @@ export function positioningWarnings(input: PositioningInput): PositioningWarning
     warnings.push({
       id: "standardized_but_multilocal",
       severity: "warn",
-      message: "La propuesta de valor es estandarizada pero la cadena de valor se quiere gestionar país a país. Una posición estandarizada con liderazgo en costes pide una organización integrada, no una confederación de filiales.",
-      provenance: "p. 202",
+      message: loc(
+        "La propuesta de valor es estandarizada pero la cadena de valor se quiere gestionar país a país. Una posición estandarizada con liderazgo en costes pide una organización integrada, no una confederación de filiales.",
+        "The value proposition is standardized but the value chain is to be run country by country. A standardized position with cost leadership calls for an integrated organization, not a confederation of subsidiaries."
+      ),
+      provenance: loc("p. 202", "p. 202"),
     });
   }
 
@@ -207,8 +228,11 @@ export function positioningWarnings(input: PositioningInput): PositioningWarning
     warnings.push({
       id: "cost_without_integration",
       severity: "warn",
-      message: "Se compite en coste con una configuración multinacional: sin integración no hay economías de escala que sostengan esa ventaja.",
-      provenance: "pp. 197-198 y p. 202",
+      message: loc(
+        "Se compite en coste con una configuración multinacional: sin integración no hay economías de escala que sostengan esa ventaja.",
+        "You are competing on cost with a multinational configuration: without integration there are no economies of scale to sustain that advantage."
+      ),
+      provenance: loc("pp. 197-198 y p. 202", "pp. 197-198 and p. 202"),
     });
   }
 
@@ -218,8 +242,11 @@ export function positioningWarnings(input: PositioningInput): PositioningWarning
     warnings.push({
       id: "liability_of_foreignness",
       severity: "block",
-      message: "Falta declarar la desventaja concreta por ser extranjero en este mercado y la ventaja superior con la que se compensa. El libro lo plantea como condición, no como comentario.",
-      provenance: "p. 198",
+      message: loc(
+        "Falta declarar la desventaja concreta por ser extranjero en este mercado y la ventaja superior con la que se compensa. El libro lo plantea como condición, no como comentario.",
+        "The concrete handicap of being foreign in this market, and the superior advantage that offsets it, are still undeclared. The book states this as a condition, not as a remark."
+      ),
+      provenance: loc("p. 198", "p. 198"),
     });
   }
 
@@ -228,29 +255,32 @@ export function positioningWarnings(input: PositioningInput): PositioningWarning
     warnings.push({
       id: "advantage_without_sustainability",
       severity: "warn",
-      message: "Hay ventajas competitivas declaradas y ninguna vía de sostenibilidad explicada. Una ventaja que se imita de inmediato no es una ventaja.",
-      provenance: "Tabla 5.7, p. 197",
+      message: loc(
+        "Hay ventajas competitivas declaradas y ninguna vía de sostenibilidad explicada. Una ventaja que se imita de inmediato no es una ventaja.",
+        "Competitive advantages have been declared and no route to sustainability explained. An advantage that is imitated immediately is not an advantage."
+      ),
+      provenance: loc("Tabla 5.7, p. 197", "Table 5.7, p. 197"),
     });
   }
 
   return warnings;
 }
 
-export type PositioningCompleteness = { complete: boolean; missing: string[]; answered: number; total: number };
+export type PositioningCompleteness = { complete: boolean; missing: Localized[]; answered: number; total: number };
 
 export function positioningCompleteness(input: PositioningInput): PositioningCompleteness {
   const chain = diagnoseValueChain(input);
-  const checks: { label: string; done: boolean }[] = [
-    { label: "Las tres dimensiones de la propuesta de valor", done: Boolean(resolvePositioning(input)) },
-    { label: "Justificación del posicionamiento elegido", done: (input.positioningRationale ?? "").trim().length > 0 },
-    { label: "Curva de valor con al menos un competidor", done: input.valueCurve.length > 0 && input.competitors.length > 0 },
-    { label: "Curva propuesta, para poder derivar la rejilla ERRC", done: input.valueCurve.some((attribute) => attribute.toBe !== null) },
-    { label: "Configuración actual de las seis funciones", done: chain.answered === chain.total },
-    { label: "Configuración objetivo", done: Boolean(chain.targetConfiguration) },
-    { label: "Capacidades etiquetadas como ventaja competitiva", done: input.capabilities.some((capability) => capability.isAdvantage) },
-    { label: "Al menos una vía de sostenibilidad explicada", done: input.sustainability.some((entry) => (entry.how ?? "").trim().length > 0) },
-    { label: "Transfer-Adapt-Create sin capacidades sin etiquetar", done: input.tac.length > 0 && input.tac.every((entry) => entry.tag !== null) },
-    { label: "Liability of foreignness y su compensación", done: (input.liabilityOfForeignness.handicap ?? "").trim().length > 0 && (input.liabilityOfForeignness.compensatingAdvantage ?? "").trim().length > 0 },
+  const checks: { label: Localized; done: boolean }[] = [
+    { label: loc("Las tres dimensiones de la propuesta de valor", "The three dimensions of the value proposition"), done: Boolean(resolvePositioning(input)) },
+    { label: loc("Justificación del posicionamiento elegido", "Rationale for the chosen positioning"), done: (input.positioningRationale ?? "").trim().length > 0 },
+    { label: loc("Curva de valor con al menos un competidor", "Value curve with at least one competitor"), done: input.valueCurve.length > 0 && input.competitors.length > 0 },
+    { label: loc("Curva propuesta, para poder derivar la rejilla ERRC", "A to-be curve, so the ERRC grid can be derived"), done: input.valueCurve.some((attribute) => attribute.toBe !== null) },
+    { label: loc("Configuración actual de las seis funciones", "Current configuration of the six functions"), done: chain.answered === chain.total },
+    { label: loc("Configuración objetivo", "Target configuration"), done: Boolean(chain.targetConfiguration) },
+    { label: loc("Capacidades etiquetadas como ventaja competitiva", "Capabilities tagged as competitive advantage"), done: input.capabilities.some((capability) => capability.isAdvantage) },
+    { label: loc("Al menos una vía de sostenibilidad explicada", "At least one route to sustainability explained"), done: input.sustainability.some((entry) => (entry.how ?? "").trim().length > 0) },
+    { label: loc("Transfer-Adapt-Create sin capacidades sin etiquetar", "Transfer-Adapt-Create with no untagged capabilities"), done: input.tac.length > 0 && input.tac.every((entry) => entry.tag !== null) },
+    { label: loc("Liability of foreignness y su compensación", "Liability of foreignness and how it is offset"), done: (input.liabilityOfForeignness.handicap ?? "").trim().length > 0 && (input.liabilityOfForeignness.compensatingAdvantage ?? "").trim().length > 0 },
   ];
   const missing = checks.filter((check) => !check.done).map((check) => check.label);
   return { complete: missing.length === 0, missing, answered: checks.length - missing.length, total: checks.length };

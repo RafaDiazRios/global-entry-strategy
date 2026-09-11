@@ -341,9 +341,13 @@ function analyseEntryStrategy(input: entryDomain.EntryStrategyInput) {
 }
 
 function analysePositioning(input: positioningDomain.PositioningInput) {
+  const positioning = resolvePositioning(input);
   return {
     input,
-    positioning: resolvePositioning(input),
+    // La familia se resuelve aquí para que el cliente no tenga que conocer la tabla.
+    positioning: positioning
+      ? { ...positioning, familyLabel: positioningDomain.positioningFamilyLabel(positioning.familyId) }
+      : null,
     valueCurve: diagnoseValueCurve(input),
     valueChain: diagnoseValueChain(input),
     resourceGap: resourceGap(input),

@@ -1,3 +1,4 @@
+import { loc, pick, type Localized } from "@shared/i18n";
 import {
   AmbitionInput,
   GLOBAL_ROLES,
@@ -17,16 +18,21 @@ import {
 
 export type IndicesConvention = "overlap";
 
-export const CONVENTIONS: { id: IndicesConvention; label: string; formula: string; note: string }[] = [
+export const CONVENTIONS: { id: IndicesConvention; label: Localized; formula: string; note: Localized }[] = [
   {
     id: "overlap",
-    label: "Solapamiento de distribuciones",
+    label: loc("Solapamiento de distribuciones", "Overlap of distributions"),
     formula: "GRI = Σᵢ min(Sᵢ, Wᵢ)",
-    note:
+    note: loc(
       "Sᵢ es el porcentaje de ventas de la empresa en la región i y Wᵢ el porcentaje de la demanda mundial de la industria en esa región. " +
-      "Equivale exactamente a Σᵢ Wᵢ · min(Sᵢ/Wᵢ, 1), que es la lectura literal de la definición del libro —«the ratio of the company's " +
-      "distribution of sales to the industry distribution of demand» (p. 218)— ponderada por el peso de cada región y con el cociente " +
-      "limitado a 1, y también a 1 − ½·Σᵢ|Sᵢ − Wᵢ|. Escala 0-1: 1 significa que la empresa reparte sus ventas igual que el mercado mundial.",
+        "Equivale exactamente a Σᵢ Wᵢ · min(Sᵢ/Wᵢ, 1), que es la lectura literal de la definición del libro —«the ratio of the company's " +
+        "distribution of sales to the industry distribution of demand» (p. 218)— ponderada por el peso de cada región y con el cociente " +
+        "limitado a 1, y también a 1 − ½·Σᵢ|Sᵢ − Wᵢ|. Escala 0-1: 1 significa que la empresa reparte sus ventas igual que el mercado mundial.",
+      "Sᵢ is the share of company sales in region i and Wᵢ the share of world industry demand in that region. " +
+        "It is exactly equivalent to Σᵢ Wᵢ · min(Sᵢ/Wᵢ, 1), the literal reading of the book's definition \u2014\u201cthe ratio of the company's " +
+        "distribution of sales to the industry distribution of demand\u201d (p. 218)\u2014 weighted by each region's size and with the ratio " +
+        "capped at 1, and also to 1 − ½·Σᵢ|Sᵢ − Wᵢ|. Scale 0-1: 1 means the company spreads its sales exactly like the world market."
+    ),
   },
 ];
 
@@ -95,11 +101,11 @@ export const DEFAULT_THRESHOLDS: AmbitionThresholds = { low: 0.4, high: 0.6 };
 export type AmbitionPosition = {
   role: GlobalRoleId;
   /** Etiqueta de la casilla tal y como aparece dibujada en la Fig. 5.5. */
-  zone: string;
+  zone: Localized;
   gri: number;
   gci: number;
   thresholds: AmbitionThresholds;
-  provenance: string;
+  provenance: Localized;
 };
 
 function band(value: number, thresholds: AmbitionThresholds): "low" | "mid" | "high" {
@@ -119,28 +125,28 @@ export function positionOnAmbitionMap(gri: number, gci: number, thresholds: Ambi
   const x = band(gri, thresholds);
   const y = band(gci, thresholds);
   let role: GlobalRoleId;
-  let zone: string;
+  let zone: Localized;
 
   if (y === "low") {
-    if (x === "low") { role = "regional_player"; zone = "Jugador regional"; }
-    else if (x === "mid") { role = "global_exporter"; zone = "Exportador"; }
-    else { role = "global_exporter"; zone = "Exportador global"; }
+    if (x === "low") { role = "regional_player"; zone = loc("Jugador regional", "Regional player"); }
+    else if (x === "mid") { role = "global_exporter"; zone = loc("Exportador", "Exporter"); }
+    else { role = "global_exporter"; zone = loc("Exportador global", "Global exporter"); }
   } else if (x === "low") {
     role = "global_sourcer";
-    zone = "Aprovisionador global";
+    zone = loc("Aprovisionador global", "Global sourcer");
   } else if (x === "high" && y === "high") {
     role = "global_player";
-    zone = "Jugador global";
+    zone = loc("Jugador global", "Global player");
   } else {
     role = "regional_dominant_global_player";
-    zone = "Jugador global de dominante regional";
+    zone = loc("Jugador global de dominante regional", "Regional dominant global player");
   }
 
-  return { role, zone, gri, gci, thresholds, provenance: "Fig. 5.5, p. 185" };
+  return { role, zone, gri, gci, thresholds, provenance: loc("Fig. 5.5, p. 185", "Fig. 5.5, p. 185") };
 }
 
-export function roleLabel(id: GlobalRoleId) {
-  return GLOBAL_ROLES.find((role) => role.id === id)?.label ?? id;
+export function roleLabel(id: GlobalRoleId): Localized {
+  return GLOBAL_ROLES.find((role) => role.id === id)?.label ?? loc(id, id);
 }
 
 /* ------------------------------------------------------------------------------------ */
@@ -156,7 +162,7 @@ export type AmbitionGap = {
   /** Hay una distancia real entre lo que la empresa es y lo que dice querer ser. */
   hasGap: boolean;
   horizonYears: number | null;
-  note: string | null;
+  note: Localized | null;
 };
 
 export function ambitionGap(input: AmbitionInput, indices: Indices, thresholds: AmbitionThresholds = DEFAULT_THRESHOLDS): AmbitionGap {
@@ -164,11 +170,19 @@ export function ambitionGap(input: AmbitionInput, indices: Indices, thresholds: 
   const mismatch = Boolean(input.currentRole && observed && input.currentRole !== observed);
   const hasGap = Boolean(input.targetRole && (input.currentRole ?? observed) && input.targetRole !== (input.currentRole ?? observed));
 
-  let note: string | null = null;
+  let note: Localized | null = null;
   if (mismatch) {
-    note = `La empresa se declara «${roleLabel(input.currentRole as GlobalRoleId)}» pero sus índices la sitúan como «${roleLabel(observed as GlobalRoleId)}». Conviene resolver esa contradicción antes de fijar el objetivo.`;
+    const declared = roleLabel(input.currentRole as GlobalRoleId);
+    const measured = roleLabel(observed as GlobalRoleId);
+    note = loc(
+      `La empresa se declara «${pick(declared, "es")}» pero sus índices la sitúan como «${pick(measured, "es")}». Conviene resolver esa contradicción antes de fijar el objetivo.`,
+      `The company declares itself a \u201c${pick(declared, "en")}\u201d but its indices place it as a \u201c${pick(measured, "en")}\u201d. That contradiction is worth resolving before setting the target.`
+    );
   } else if (!input.targetRole) {
-    note = "Falta declarar el rol objetivo: sin él no hay brecha que medir ni prioridad de inversión que derivar.";
+    note = loc(
+      "Falta declarar el rol objetivo: sin él no hay brecha que medir ni prioridad de inversión que derivar.",
+      "The target role is missing: without it there is no gap to measure and no investment priority to derive."
+    );
   }
 
   return {
@@ -186,19 +200,19 @@ export function ambitionGap(input: AmbitionInput, indices: Indices, thresholds: 
 /* Exhaustividad del módulo                                                              */
 /* ------------------------------------------------------------------------------------ */
 
-export type AmbitionCompleteness = { complete: boolean; missing: string[]; answered: number; total: number };
+export type AmbitionCompleteness = { complete: boolean; missing: Localized[]; answered: number; total: number };
 
 export function ambitionCompleteness(input: AmbitionInput, indices: Indices): AmbitionCompleteness {
-  const checks: { label: string; done: boolean }[] = [
-    { label: "Al menos un motivo de globalización, con justificación", done: input.motives.some((motive) => motive.selected && (motive.justification ?? "").trim().length > 0) },
-    { label: "Rol global actual", done: Boolean(input.currentRole) },
-    { label: "Rol global objetivo y horizonte", done: Boolean(input.targetRole && input.targetHorizonYears) },
-    { label: "Demanda de la industria por regiones", done: indices.missing.industry.length === 0 },
-    { label: "Ventas de la empresa por regiones", done: indices.missing.revenue.length === 0 },
-    { label: "Activos o empleo por regiones", done: indices.missing.capability.length === 0 },
-    { label: "Etapa de globalización", done: Boolean(input.stage) },
-    { label: "Rol asignado a cada país del universo", done: input.countryRoles.length > 0 && input.countryRoles.every((entry) => entry.role !== null) },
-    { label: "Liability of foreignness declarada", done: (input.liabilityOfForeignness ?? "").trim().length > 0 },
+  const checks: { label: Localized; done: boolean }[] = [
+    { label: loc("Al menos un motivo de globalización, con justificación", "At least one globalization motive, with a justification"), done: input.motives.some((motive) => motive.selected && (motive.justification ?? "").trim().length > 0) },
+    { label: loc("Rol global actual", "Current global role"), done: Boolean(input.currentRole) },
+    { label: loc("Rol global objetivo y horizonte", "Target global role and horizon"), done: Boolean(input.targetRole && input.targetHorizonYears) },
+    { label: loc("Demanda de la industria por regiones", "Industry demand by region"), done: indices.missing.industry.length === 0 },
+    { label: loc("Ventas de la empresa por regiones", "Company revenue by region"), done: indices.missing.revenue.length === 0 },
+    { label: loc("Activos o empleo por regiones", "Assets or headcount by region"), done: indices.missing.capability.length === 0 },
+    { label: loc("Etapa de globalización", "Stage of globalization"), done: Boolean(input.stage) },
+    { label: loc("Rol asignado a cada país del universo", "A role assigned to every country in the universe"), done: input.countryRoles.length > 0 && input.countryRoles.every((entry) => entry.role !== null) },
+    { label: loc("Liability of foreignness declarada", "Liability of foreignness declared"), done: (input.liabilityOfForeignness ?? "").trim().length > 0 },
   ];
   const missing = checks.filter((check) => !check.done).map((check) => check.label);
   return { complete: missing.length === 0, missing, answered: checks.length - missing.length, total: checks.length };

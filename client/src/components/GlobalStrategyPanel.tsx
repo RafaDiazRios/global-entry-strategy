@@ -9,6 +9,8 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { trpc, type RouterOutputs } from "@/lib/trpc";
+import { useLanguage } from "@/i18n";
+import type { Localized } from "@shared/i18n";
 import {
   emptyAmbitionInput,
   industryDemandFor,
@@ -46,15 +48,13 @@ type Props = {
 };
 
 export function GlobalStrategyPanel({ caseId, subTab, onSubTabChange }: Props) {
+  const { ui } = useLanguage();
   if (caseId === null) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Estrategia global</CardTitle>
-          <CardDescription>
-            La ambición y el posicionamiento se analizan sobre un caso. Cree o seleccione uno en la pestaña de caso para
-            empezar.
-          </CardDescription>
+          <CardTitle>{ui("gsTitle")}</CardTitle>
+          <CardDescription>{ui("gsNoCase")}</CardDescription>
         </CardHeader>
       </Card>
     );
@@ -63,11 +63,12 @@ export function GlobalStrategyPanel({ caseId, subTab, onSubTabChange }: Props) {
 }
 
 function Loaded({ caseId, subTab, onSubTabChange }: { caseId: number; subTab?: SubTab; onSubTabChange?: (tab: SubTab) => void }) {
+  const { ui } = useLanguage();
   const reference = trpc.globalStrategy.reference.useQuery();
   if (reference.isLoading || !reference.data) {
     return (
       <div className="flex items-center gap-2 py-10 text-sm text-muted-foreground">
-        <Loader2 className="h-4 w-4 animate-spin" /> Cargando las tablas del capítulo 5…
+        <Loader2 className="h-4 w-4 animate-spin" /> {ui("gsLoading")}
       </div>
     );
   }
@@ -79,11 +80,11 @@ function Loaded({ caseId, subTab, onSubTabChange }: { caseId: number; subTab?: S
         última quedaba cortada fuera del contenedor y parecía que no existía.
       */}
       <TabsList className="h-auto w-full flex-wrap justify-start gap-1">
-        <TabsTrigger value="ambition"><Compass className="mr-2 h-4 w-4" />Ambición global</TabsTrigger>
-        <TabsTrigger value="positioning"><Layers className="mr-2 h-4 w-4" />Posicionamiento</TabsTrigger>
-        <TabsTrigger value="entry"><DoorOpen className="mr-2 h-4 w-4" />Entrada</TabsTrigger>
-        <TabsTrigger value="partnering"><Handshake className="mr-2 h-4 w-4" />Vía y socio</TabsTrigger>
-        <TabsTrigger value="coherence"><ShieldCheck className="mr-2 h-4 w-4" />Coherencia</TabsTrigger>
+        <TabsTrigger value="ambition"><Compass className="mr-2 h-4 w-4" />{ui("gsSubAmbition")}</TabsTrigger>
+        <TabsTrigger value="positioning"><Layers className="mr-2 h-4 w-4" />{ui("gsSubPositioning")}</TabsTrigger>
+        <TabsTrigger value="entry"><DoorOpen className="mr-2 h-4 w-4" />{ui("gsSubEntry")}</TabsTrigger>
+        <TabsTrigger value="partnering"><Handshake className="mr-2 h-4 w-4" />{ui("gsSubPartnering")}</TabsTrigger>
+        <TabsTrigger value="coherence"><ShieldCheck className="mr-2 h-4 w-4" />{ui("gsSubCoherence")}</TabsTrigger>
       </TabsList>
       <TabsContent value="ambition"><AmbitionBlock caseId={caseId} reference={reference.data} /></TabsContent>
       <TabsContent value="positioning"><PositioningBlock caseId={caseId} reference={reference.data} /></TabsContent>
@@ -101,6 +102,7 @@ type Reference = RouterOutputs["globalStrategy"]["reference"];
 /* ------------------------------------------------------------------------------------ */
 
 function AmbitionBlock({ caseId, reference }: { caseId: number; reference: Reference }) {
+  const { t, ui } = useLanguage();
   const utils = trpc.useUtils();
   const query = trpc.globalStrategy.getAmbition.useQuery({ caseId });
   const [draft, setDraft] = useState<AmbitionInput>(emptyAmbitionInput());
@@ -114,7 +116,7 @@ function AmbitionBlock({ caseId, reference }: { caseId: number; reference: Refer
     onSuccess: () => {
       setDirty(false);
       utils.globalStrategy.getAmbition.invalidate({ caseId });
-      toast.success("Ambición guardada");
+      toast.success(ui("amToastSaved"));
     },
     onError: (error) => toast.error(error.message),
   });
@@ -144,8 +146,8 @@ function AmbitionBlock({ caseId, reference }: { caseId: number; reference: Refer
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Motivos de la globalización</CardTitle>
-          <CardDescription>Dunning, p. 181. Marcar sin justificar no cuenta como respondido.</CardDescription>
+          <CardTitle>{ui("amMotivesTitle")}</CardTitle>
+          <CardDescription>{ui("amMotivesDesc")}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {reference.motives.map((motive) => {
@@ -163,14 +165,14 @@ function AmbitionBlock({ caseId, reference }: { caseId: number; reference: Refer
                     }) as AmbitionInput["motives"] })}
                   />
                   <span>
-                    {motive.label}
-                    <span className="ml-2 text-xs font-normal text-muted-foreground">{motive.description}</span>
+                    {t(motive.label)}
+                    <span className="ml-2 text-xs font-normal text-muted-foreground">{t(motive.description)}</span>
                   </span>
                 </label>
                 {entry.selected && (
                   <Input
                     value={entry.justification ?? ""}
-                    placeholder="Por qué aplica en este caso"
+                    placeholder={ui("amWhyApplies")}
                     onChange={(event) => update({ motives: draft.motives.map((item) => (item.id === motive.id ? { ...item, justification: event.target.value } : item)) })}
                   />
                 )}
@@ -182,36 +184,36 @@ function AmbitionBlock({ caseId, reference }: { caseId: number; reference: Refer
 
       <Card>
         <CardHeader>
-          <CardTitle>Índices de globalización</CardTitle>
+          <CardTitle>{ui("amIndicesTitle")}</CardTitle>
           <CardDescription>
-            {analysis?.convention.formula} — {reference.industryDemandProvenance}
+            {analysis?.convention.formula} — {t(reference.industryDemandProvenance)}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-5">
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
-              <Label>Regiones</Label>
+              <Label>{ui("amRegions")}</Label>
               <select className={select} value={draft.regionSetId} onChange={(event) => changeRegionSet(event.target.value as RegionSetId)}>
-                {reference.regionSets.map((set) => <option key={set.id} value={set.id}>{set.label} · {set.provenance}</option>)}
+                {reference.regionSets.map((set) => <option key={set.id} value={set.id}>{t(set.label)} · {t(set.provenance)}</option>)}
               </select>
             </div>
             <div>
-              <Label>Industria de referencia (Tabla 5.2)</Label>
+              <Label>{ui("amIndustryRef")}</Label>
               <select className={select} value={draft.industryId ?? ""} onChange={(event) => pickIndustry(event.target.value)}>
-                <option value="">Introducir la demanda a mano</option>
-                {reference.industryDemand.map((row) => <option key={row.id} value={row.id}>{row.label}</option>)}
+                <option value="">{ui("amManualDemand")}</option>
+                {reference.industryDemand.map((row) => <option key={row.id} value={row.id}>{t(row.label)}</option>)}
               </select>
             </div>
           </div>
 
-          <FigureGrid label="Demanda mundial de la industria (%)" regions={regions} values={draft.industryDemand} onChange={(regionId, raw) => figures("industryDemand", regionId, raw)} />
-          <FigureGrid label="Ventas de la empresa por región" regions={regions} values={draft.companyRevenue} onChange={(regionId, raw) => figures("companyRevenue", regionId, raw)} help="En la unidad que prefiera: se normaliza a porcentaje." />
+          <FigureGrid label={ui("amWorldDemand")} regions={regions} values={draft.industryDemand} onChange={(regionId, raw) => figures("industryDemand", regionId, raw)} />
+          <FigureGrid label={ui("amCompanyRevenue")} regions={regions} values={draft.companyRevenue} onChange={(regionId, raw) => figures("companyRevenue", regionId, raw)} help={ui("amRevenueHelp")} />
           <div>
             <div className="mb-2 flex items-center gap-3">
-              <Label className="mb-0">Capacidad por región</Label>
+              <Label className="mb-0">{ui("amCapabilityByRegion")}</Label>
               <select className="h-8 rounded-md border border-input bg-background px-2 text-xs" value={draft.capabilityBasis} onChange={(event) => update({ capabilityBasis: event.target.value as AmbitionInput["capabilityBasis"] })}>
-                <option value="assets">Activos</option>
-                <option value="personnel">Empleo</option>
+                <option value="assets">{ui("amAssets")}</option>
+                <option value="personnel">{ui("amPersonnel")}</option>
               </select>
             </div>
             <FigureGrid label="" regions={regions} values={draft.companyCapability} onChange={(regionId, raw) => figures("companyCapability", regionId, raw)} />
@@ -222,10 +224,10 @@ function AmbitionBlock({ caseId, reference }: { caseId: number; reference: Refer
               <div className="flex flex-wrap items-center gap-3">
                 <Badge variant="outline">GRI {analysis.indices.gri === null ? "—" : analysis.indices.gri.toFixed(3)}</Badge>
                 <Badge variant="outline">GCI {analysis.indices.gci === null ? "—" : analysis.indices.gci.toFixed(3)}</Badge>
-                {analysis.position && <Badge>{analysis.position.zone} · {analysis.position.provenance}</Badge>}
+                {analysis.position && <Badge>{t(analysis.position.zone)} · {t(analysis.position.provenance)}</Badge>}
               </div>
-              <p className="mt-3 text-xs text-muted-foreground">{analysis.convention.note}</p>
-              {analysis.gap.note && <p className="mt-2 text-sm">{analysis.gap.note}</p>}
+              <p className="mt-3 text-xs text-muted-foreground">{t(analysis.convention.note)}</p>
+              {analysis.gap.note && <p className="mt-2 text-sm">{t(analysis.gap.note)}</p>}
             </div>
           )}
         </CardContent>
@@ -233,44 +235,44 @@ function AmbitionBlock({ caseId, reference }: { caseId: number; reference: Refer
 
       <Card>
         <CardHeader>
-          <CardTitle>Rol y etapa</CardTitle>
-          <CardDescription>pp. 181-182 para los roles, p. 219 para las etapas, Tabla 5.8 para el diseño organizativo.</CardDescription>
+          <CardTitle>{ui("amRoleStageTitle")}</CardTitle>
+          <CardDescription>{ui("amRoleStageDesc")}</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 sm:grid-cols-2">
           <div>
-            <Label>Rol hoy</Label>
+            <Label>{ui("amRoleToday")}</Label>
             <select className={select} value={draft.currentRole ?? ""} onChange={(event) => update({ currentRole: (event.target.value || null) as AmbitionInput["currentRole"] })}>
-              <option value="">Sin declarar</option>
-              {reference.globalRoles.map((role) => <option key={role.id} value={role.id}>{role.label}</option>)}
+              <option value="">{ui("gsUndeclared")}</option>
+              {reference.globalRoles.map((role) => <option key={role.id} value={role.id}>{t(role.label)}</option>)}
             </select>
           </div>
           <div>
-            <Label>Rol objetivo</Label>
+            <Label>{ui("amRoleTarget")}</Label>
             <select className={select} value={draft.targetRole ?? ""} onChange={(event) => update({ targetRole: (event.target.value || null) as AmbitionInput["targetRole"] })}>
-              <option value="">Sin declarar</option>
-              {reference.globalRoles.map((role) => <option key={role.id} value={role.id}>{role.label}</option>)}
+              <option value="">{ui("gsUndeclared")}</option>
+              {reference.globalRoles.map((role) => <option key={role.id} value={role.id}>{t(role.label)}</option>)}
             </select>
           </div>
           <div>
-            <Label>Horizonte (años)</Label>
+            <Label>{ui("amHorizon")}</Label>
             <Input type="number" min={1} max={30} value={draft.targetHorizonYears ?? ""} onChange={(event) => update({ targetHorizonYears: event.target.value ? Number(event.target.value) : null })} />
           </div>
           <div>
-            <Label>Etapa de globalización</Label>
+            <Label>{ui("amStage")}</Label>
             <select className={select} value={draft.stage ?? ""} onChange={(event) => update({ stage: (event.target.value || null) as AmbitionInput["stage"] })}>
-              <option value="">Sin declarar</option>
-              {reference.stages.map((stage) => <option key={stage.id} value={stage.id}>{stage.label}</option>)}
+              <option value="">{ui("gsUndeclared")}</option>
+              {reference.stages.map((stage) => <option key={stage.id} value={stage.id}>{t(stage.label)}</option>)}
             </select>
           </div>
           <div className="sm:col-span-2">
-            <Label>Diseño organizativo (Tabla 5.8)</Label>
+            <Label>{ui("amOrgDesign")}</Label>
             <select className={select} value={draft.organizationalPhase ?? ""} onChange={(event) => update({ organizationalPhase: (event.target.value || null) as AmbitionInput["organizationalPhase"] })}>
-              <option value="">Sin declarar</option>
-              {reference.organizationalDesigns.map((design) => <option key={design.id} value={design.id}>{design.label}</option>)}
+              <option value="">{ui("gsUndeclared")}</option>
+              {reference.organizationalDesigns.map((design) => <option key={design.id} value={design.id}>{t(design.label)}</option>)}
             </select>
             {draft.organizationalPhase && (
               <p className="mt-2 text-xs text-muted-foreground">
-                {reference.organizationalDesigns.find((design) => design.id === draft.organizationalPhase)?.structure}
+                {t(reference.organizationalDesigns.find((design) => design.id === draft.organizationalPhase)?.structure)}
               </p>
             )}
           </div>
@@ -279,32 +281,32 @@ function AmbitionBlock({ caseId, reference }: { caseId: number; reference: Refer
 
       <Card>
         <CardHeader>
-          <CardTitle>Roles de país</CardTitle>
-          <CardDescription>pp. 187-188. El rol fija la prioridad de inversión y condiciona la estrategia de entrada.</CardDescription>
+          <CardTitle>{ui("amCountryRolesTitle")}</CardTitle>
+          <CardDescription>{ui("amCountryRolesDesc")}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           {draft.countryRoles.map((entry, index) => (
             <div key={index} className="grid gap-2 sm:grid-cols-[6rem_12rem_1fr_auto]">
               <Input value={entry.countryCode} placeholder="ESP" maxLength={3} onChange={(event) => update({ countryRoles: draft.countryRoles.map((item, position) => (position === index ? { ...item, countryCode: event.target.value.toUpperCase() } : item)) })} />
               <select className={select} value={entry.role ?? ""} onChange={(event) => update({ countryRoles: draft.countryRoles.map((item, position) => (position === index ? { ...item, role: (event.target.value || null) as typeof item.role } : item)) })}>
-                <option value="">Sin rol</option>
-                {reference.countryRoles.map((role) => <option key={role.id} value={role.id}>{role.label}</option>)}
+                <option value="">{ui("amNoRole")}</option>
+                {reference.countryRoles.map((role) => <option key={role.id} value={role.id}>{t(role.label)}</option>)}
               </select>
-              <Input value={entry.justification ?? ""} placeholder="Criterio que lo sostiene" onChange={(event) => update({ countryRoles: draft.countryRoles.map((item, position) => (position === index ? { ...item, justification: event.target.value } : item)) })} />
-              <Button variant="ghost" size="sm" onClick={() => update({ countryRoles: draft.countryRoles.filter((_, position) => position !== index) })}>Quitar</Button>
+              <Input value={entry.justification ?? ""} placeholder={ui("amCriterion")} onChange={(event) => update({ countryRoles: draft.countryRoles.map((item, position) => (position === index ? { ...item, justification: event.target.value } : item)) })} />
+              <Button variant="ghost" size="sm" onClick={() => update({ countryRoles: draft.countryRoles.filter((_, position) => position !== index) })}>{ui("gsRemove")}</Button>
             </div>
           ))}
-          <Button variant="outline" size="sm" onClick={() => update({ countryRoles: [...draft.countryRoles, { countryCode: "", role: null, justification: null }] })}>Añadir país</Button>
+          <Button variant="outline" size="sm" onClick={() => update({ countryRoles: [...draft.countryRoles, { countryCode: "", role: null, justification: null }] })}>{ui("amAddCountry")}</Button>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle>Liability of foreignness</CardTitle>
-          <CardDescription>p. 198. Campo obligatorio: sin él el módulo no se da por completo.</CardDescription>
+          <CardTitle>{ui("amLofTitle")}</CardTitle>
+          <CardDescription>{ui("amLofDesc")}</CardDescription>
         </CardHeader>
         <CardContent>
-          <Textarea rows={3} value={draft.liabilityOfForeignness ?? ""} placeholder="Qué desventaja concreta tiene la empresa por ser extranjera aquí, y con qué ventaja superior la compensa" onChange={(event) => update({ liabilityOfForeignness: event.target.value })} />
+          <Textarea rows={3} value={draft.liabilityOfForeignness ?? ""} placeholder={ui("amLofPlaceholder")} onChange={(event) => update({ liabilityOfForeignness: event.target.value })} />
         </CardContent>
       </Card>
 
@@ -320,11 +322,12 @@ function AmbitionBlock({ caseId, reference }: { caseId: number; reference: Refer
 
 function FigureGrid({ label, regions, values, onChange, help }: {
   label: string;
-  regions: { id: string; label: string }[];
+  regions: { id: string; label: Localized }[];
   values: Record<string, number | null>;
   onChange: (regionId: string, raw: string) => void;
   help?: string;
 }) {
+  const { t } = useLanguage();
   return (
     <div>
       {label && <Label>{label}</Label>}
@@ -332,7 +335,7 @@ function FigureGrid({ label, regions, values, onChange, help }: {
       <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${Math.min(regions.length, 4)}, minmax(0, 1fr))` }}>
         {regions.map((region) => (
           <div key={region.id}>
-            <span className="text-xs text-muted-foreground">{region.label}</span>
+            <span className="text-xs text-muted-foreground">{t(region.label)}</span>
             <Input inputMode="decimal" value={values[region.id] ?? ""} onChange={(event) => onChange(region.id, event.target.value)} />
           </div>
         ))}
@@ -346,6 +349,7 @@ function FigureGrid({ label, regions, values, onChange, help }: {
 /* ------------------------------------------------------------------------------------ */
 
 function PositioningBlock({ caseId, reference }: { caseId: number; reference: Reference }) {
+  const { t, ui } = useLanguage();
   const utils = trpc.useUtils();
   const query = trpc.globalStrategy.getPositioning.useQuery({ caseId });
   const [draft, setDraft] = useState<PositioningInput>(emptyPositioningInput());
@@ -359,7 +363,7 @@ function PositioningBlock({ caseId, reference }: { caseId: number; reference: Re
     onSuccess: () => {
       setDirty(false);
       utils.globalStrategy.getPositioning.invalidate({ caseId });
-      toast.success("Posicionamiento guardado");
+      toast.success(ui("poToastSaved"));
     },
     onError: (error) => toast.error(error.message),
   });
@@ -368,6 +372,7 @@ function PositioningBlock({ caseId, reference }: { caseId: number; reference: Re
   const update = (patch: Partial<PositioningInput>) => { setDraft((current) => ({ ...current, ...patch })); setDirty(true); };
   const newId = () => Math.random().toString(36).slice(2, 10);
 
+  // Las etiquetas de los atributos las escribe quien analiza: no se traducen.
   const errcByAction = useMemo(() => {
     const grouped: Record<string, string[]> = {};
     for (const entry of analysis?.valueCurve.errc ?? []) {
@@ -381,37 +386,37 @@ function PositioningBlock({ caseId, reference }: { caseId: number; reference: Re
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Propuesta de valor</CardTitle>
-          <CardDescription>Fig. 5.8, p. 189. Las tres elecciones dan una de las ocho posiciones de la {reference.positioningsProvenance}.</CardDescription>
+          <CardTitle>{ui("poTitle")}</CardTitle>
+          <CardDescription>{ui("poDescPre")} {t(reference.positioningsProvenance)}.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-3">
             {reference.valuePropositionDimensions.map((dimension) => (
               <div key={dimension.id}>
-                <Label>{dimension.label}</Label>
+                <Label>{t(dimension.label)}</Label>
                 <select
                   className={select}
                   value={(draft[dimension.id as "scope" | "advantage" | "standardization"] as string) ?? ""}
                   onChange={(event) => update({ [dimension.id]: event.target.value || null } as Partial<PositioningInput>)}
                 >
-                  <option value="">Sin decidir</option>
-                  {dimension.options.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
+                  <option value="">{ui("gsUndecided")}</option>
+                  {dimension.options.map((option) => <option key={option.id} value={option.id}>{t(option.label)}</option>)}
                 </select>
-                <p className="mt-1 text-xs text-muted-foreground">{dimension.question}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{t(dimension.question)}</p>
               </div>
             ))}
           </div>
           {analysis?.positioning && (
             <div className="rounded-md border bg-muted/40 p-4">
               <div className="flex flex-wrap items-center gap-2">
-                <Badge>{analysis.positioning.label}</Badge>
-                <span className="text-xs text-muted-foreground">{analysis.positioning.family}</span>
+                <Badge>{t(analysis.positioning.label)}</Badge>
+                <span className="text-xs text-muted-foreground">{t(analysis.positioning.familyLabel)}</span>
               </div>
-              <p className="mt-2 text-sm text-muted-foreground">Ejemplos del libro: {analysis.positioning.examples.join(", ")}.</p>
+              <p className="mt-2 text-sm text-muted-foreground">{ui("poExamples")}: {analysis.positioning.examples.join(", ")}.</p>
             </div>
           )}
           <div>
-            <Label>Por qué esta posición y no otra</Label>
+            <Label>{ui("poWhyThis")}</Label>
             <Textarea rows={2} value={draft.positioningRationale ?? ""} onChange={(event) => update({ positioningRationale: event.target.value })} />
           </div>
         </CardContent>
@@ -419,22 +424,19 @@ function PositioningBlock({ caseId, reference }: { caseId: number; reference: Re
 
       <Card>
         <CardHeader>
-          <CardTitle>Curva de valor y rejilla ERRC</CardTitle>
-          <CardDescription>
-            Fig. 5.9, p. 189, con la rejilla del módulo 10 del programa. La rejilla no se rellena: sale de comparar la curva
-            actual con la propuesta.
-          </CardDescription>
+          <CardTitle>{ui("poCurveTitle")}</CardTitle>
+          <CardDescription>{ui("poCurveDesc")}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex flex-wrap items-end gap-2">
             {draft.competitors.map((competitor, index) => (
               <div key={competitor.id}>
-                <Label className="text-xs">Competidor {index + 1}</Label>
+                <Label className="text-xs">{ui("poCompetitor")} {index + 1}</Label>
                 <Input className="w-40" value={competitor.label} onChange={(event) => update({ competitors: draft.competitors.map((item) => (item.id === competitor.id ? { ...item, label: event.target.value } : item)) })} />
               </div>
             ))}
             {draft.competitors.length < 3 && (
-              <Button variant="outline" size="sm" onClick={() => update({ competitors: [...draft.competitors, { id: newId(), label: "" }] })}>Añadir competidor</Button>
+              <Button variant="outline" size="sm" onClick={() => update({ competitors: [...draft.competitors, { id: newId(), label: "" }] })}>{ui("poAddCompetitor")}</Button>
             )}
           </div>
 
@@ -442,10 +444,10 @@ function PositioningBlock({ caseId, reference }: { caseId: number; reference: Re
             <table className="w-full min-w-[42rem] text-sm">
               <thead>
                 <tr className="border-b text-left text-xs uppercase text-muted-foreground">
-                  <th className="py-2">Atributo de valor</th>
-                  <th className="py-2 w-20">Hoy</th>
-                  <th className="py-2 w-20">Propuesta</th>
-                  {draft.competitors.map((competitor) => <th key={competitor.id} className="py-2 w-24">{competitor.label || "Competidor"}</th>)}
+                  <th className="py-2">{ui("poAttribute")}</th>
+                  <th className="py-2 w-20">{ui("poAsIs")}</th>
+                  <th className="py-2 w-20">{ui("poToBe")}</th>
+                  {draft.competitors.map((competitor) => <th key={competitor.id} className="py-2 w-24">{competitor.label || ui("poCompetitor")}</th>)}
                   <th />
                 </tr>
               </thead>
@@ -465,20 +467,20 @@ function PositioningBlock({ caseId, reference }: { caseId: number; reference: Re
                         />
                       </td>
                     ))}
-                    <td className="py-2"><Button variant="ghost" size="sm" onClick={() => update({ valueCurve: draft.valueCurve.filter((item) => item.id !== attribute.id) })}>Quitar</Button></td>
+                    <td className="py-2"><Button variant="ghost" size="sm" onClick={() => update({ valueCurve: draft.valueCurve.filter((item) => item.id !== attribute.id) })}>{ui("gsRemove")}</Button></td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-          <Button variant="outline" size="sm" onClick={() => update({ valueCurve: [...draft.valueCurve, { id: newId(), label: "", asIs: null, toBe: null, competitors: {}, note: null }] })}>Añadir atributo</Button>
+          <Button variant="outline" size="sm" onClick={() => update({ valueCurve: [...draft.valueCurve, { id: newId(), label: "", asIs: null, toBe: null, competitors: {}, note: null }] })}>{ui("poAddAttribute")}</Button>
 
           {analysis && (
             <div className="rounded-md border bg-muted/40 p-4">
               <div className="grid gap-3 sm:grid-cols-4">
                 {reference.errcActions.filter((action) => action.id !== "keep").map((action) => (
                   <div key={action.id}>
-                    <div className="text-xs font-semibold uppercase text-muted-foreground">{action.label}</div>
+                    <div className="text-xs font-semibold uppercase text-muted-foreground">{t(action.label)}</div>
                     <ul className="mt-1 space-y-1 text-sm">
                       {(errcByAction[action.id] ?? []).map((label) => <li key={label}>{label}</li>)}
                       {!(errcByAction[action.id] ?? []).length && <li className="text-muted-foreground">—</li>}
@@ -487,8 +489,8 @@ function PositioningBlock({ caseId, reference }: { caseId: number; reference: Re
                 ))}
               </div>
               <p className="mt-3 text-xs text-muted-foreground">
-                Divergencia frente al competidor más parecido: {analysis.valueCurve.divergence === null ? "sin datos" : analysis.valueCurve.divergence.toFixed(2)}.
-                {analysis.valueCurve.note ? ` ${analysis.valueCurve.note}` : ""}
+                {ui("poDivergence")}: {analysis.valueCurve.divergence === null ? ui("poNoData") : analysis.valueCurve.divergence.toFixed(2)}.
+                {analysis.valueCurve.note ? ` ${t(analysis.valueCurve.note)}` : ""}
               </p>
             </div>
           )}
@@ -497,8 +499,8 @@ function PositioningBlock({ caseId, reference }: { caseId: number; reference: Re
 
       <Card>
         <CardHeader>
-          <CardTitle>Configuración de la cadena de valor</CardTitle>
-          <CardDescription>Fig. 5.12, p. 193. Dónde se gestiona hoy cada función y dónde debería gestionarse.</CardDescription>
+          <CardTitle>{ui("poChainTitle")}</CardTitle>
+          <CardDescription>{ui("poChainDesc")}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           {VALUE_CHAIN_FUNCTIONS.map((fn) => {
@@ -506,23 +508,28 @@ function PositioningBlock({ caseId, reference }: { caseId: number; reference: Re
             return (
               <div key={fn.id} className="grid gap-2 sm:grid-cols-[1fr_9rem_9rem]">
                 <div>
-                  <div className="text-sm font-medium">{fn.label}</div>
-                  <div className="text-xs text-muted-foreground">{fn.hints[(cell.target ?? cell.current ?? "global") as ValueChainLevel]}</div>
+                  <div className="text-sm font-medium">{t(fn.label)}</div>
+                  <div className="text-xs text-muted-foreground">{t(fn.hints[(cell.target ?? cell.current ?? "global") as ValueChainLevel])}</div>
                 </div>
-                <LevelSelect label="Hoy" value={cell.current} levels={reference.valueChainLevels} onChange={(value) => update({ valueChain: { ...draft.valueChain, [fn.id]: { ...cell, current: value } } })} />
-                <LevelSelect label="Objetivo" value={cell.target} levels={reference.valueChainLevels} onChange={(value) => update({ valueChain: { ...draft.valueChain, [fn.id]: { ...cell, target: value } } })} />
+                <LevelSelect label={ui("poAsIs")} value={cell.current} levels={reference.valueChainLevels} onChange={(value) => update({ valueChain: { ...draft.valueChain, [fn.id]: { ...cell, current: value } } })} />
+                <LevelSelect label={ui("poTargetLevel")} value={cell.target} levels={reference.valueChainLevels} onChange={(value) => update({ valueChain: { ...draft.valueChain, [fn.id]: { ...cell, target: value } } })} />
               </div>
             );
           })}
           {analysis && (
             <div className="rounded-md border bg-muted/40 p-4 text-sm">
               <p>
-                Configuración actual: <strong>{configurationName(reference, analysis.valueChain.currentConfiguration)}</strong>. Objetivo:{" "}
-                <strong>{configurationName(reference, analysis.valueChain.targetConfiguration)}</strong>.
+                {ui("poCurrentConfig")}: <strong>{t(configurationName(reference, analysis.valueChain.currentConfiguration)) || ui("poUndeterminedLower")}</strong>. {ui("poTargetConfig")}:{" "}
+                <strong>{t(configurationName(reference, analysis.valueChain.targetConfiguration)) || ui("poUndeterminedLower")}</strong>.
               </p>
               {analysis.valueChain.moves.length > 0 && (
                 <ul className="mt-2 space-y-1 text-muted-foreground">
-                  {analysis.valueChain.moves.map((move) => <li key={move.functionId}>{move.label}: {move.direction} de {move.from} a {move.to}</li>)}
+                  {analysis.valueChain.moves.map((move) => (
+                    <li key={move.functionId}>
+                      {t(move.label)}: {move.direction === "centralize" ? ui("poCentralize") : ui("poDecentralize")} {ui("poFrom")}{" "}
+                      {t(levelLabel(reference, move.from))} {ui("poTo")} {t(levelLabel(reference, move.to))}
+                    </li>
+                  ))}
                 </ul>
               )}
             </div>
@@ -532,35 +539,35 @@ function PositioningBlock({ caseId, reference }: { caseId: number; reference: Re
 
       <Card>
         <CardHeader>
-          <CardTitle>Transfer, Adapt, Create</CardTitle>
-          <CardDescription>Fig. 5.14, p. 199. Lo etiquetado como «crear» es la brecha de recursos que abre la decisión de build-borrow-buy.</CardDescription>
+          <CardTitle>{ui("poTacTitle")}</CardTitle>
+          <CardDescription>{ui("poTacDesc")}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           {draft.tac.map((entry) => (
             <div key={entry.id} className="grid gap-2 sm:grid-cols-[8rem_1fr_10rem_8rem_auto]">
               <select className={select} value={entry.kind} onChange={(event) => update({ tac: draft.tac.map((item) => (item.id === entry.id ? { ...item, kind: event.target.value as typeof item.kind } : item)) })}>
-                {reference.capabilityKinds.map((kind) => <option key={kind.id} value={kind.id}>{kind.label}</option>)}
+                {reference.capabilityKinds.map((kind) => <option key={kind.id} value={kind.id}>{t(kind.label)}</option>)}
               </select>
-              <Input value={entry.label} placeholder="Recurso, activo o competencia" onChange={(event) => update({ tac: draft.tac.map((item) => (item.id === entry.id ? { ...item, label: event.target.value } : item)) })} />
+              <Input value={entry.label} placeholder={ui("poCapPlaceholder")} onChange={(event) => update({ tac: draft.tac.map((item) => (item.id === entry.id ? { ...item, label: event.target.value } : item)) })} />
               <select className={select} value={entry.functionId ?? ""} onChange={(event) => update({ tac: draft.tac.map((item) => (item.id === entry.id ? { ...item, functionId: (event.target.value || null) as typeof item.functionId } : item)) })}>
-                <option value="">Sin función</option>
-                {reference.valueChainFunctions.map((fn) => <option key={fn.id} value={fn.id}>{fn.label}</option>)}
+                <option value="">{ui("poNoFunction")}</option>
+                {reference.valueChainFunctions.map((fn) => <option key={fn.id} value={fn.id}>{t(fn.label)}</option>)}
               </select>
               <select className={select} value={entry.tag ?? ""} onChange={(event) => update({ tac: draft.tac.map((item) => (item.id === entry.id ? { ...item, tag: (event.target.value || null) as typeof item.tag } : item)) })}>
-                <option value="">Sin etiquetar</option>
-                {reference.tacTags.map((tag) => <option key={tag.id} value={tag.id}>{tag.label}</option>)}
+                <option value="">{ui("poUntagged")}</option>
+                {reference.tacTags.map((tag) => <option key={tag.id} value={tag.id}>{t(tag.label)}</option>)}
               </select>
-              <Button variant="ghost" size="sm" onClick={() => update({ tac: draft.tac.filter((item) => item.id !== entry.id) })}>Quitar</Button>
+              <Button variant="ghost" size="sm" onClick={() => update({ tac: draft.tac.filter((item) => item.id !== entry.id) })}>{ui("gsRemove")}</Button>
             </div>
           ))}
-          <Button variant="outline" size="sm" onClick={() => update({ tac: [...draft.tac, { id: newId(), kind: "competency", label: "", functionId: null, tag: null, note: null }] })}>Añadir capacidad</Button>
+          <Button variant="outline" size="sm" onClick={() => update({ tac: [...draft.tac, { id: newId(), kind: "competency", label: "", functionId: null, tag: null, note: null }] })}>{ui("poAddCapability")}</Button>
 
           {analysis && analysis.resourceGap.toCreate.length > 0 && (
             <div className="rounded-md border bg-muted/40 p-4 text-sm">
-              <div className="text-xs font-semibold uppercase text-muted-foreground">Hay que crear</div>
+              <div className="text-xs font-semibold uppercase text-muted-foreground">{ui("poToCreate")}</div>
               <ul className="mt-1 space-y-1">{analysis.resourceGap.toCreate.map((entry) => <li key={entry.id}>{entry.label}</li>)}</ul>
               {analysis.resourceGap.creationLoad !== null && (
-                <p className="mt-2 text-xs text-muted-foreground">Carga de creación: {(analysis.resourceGap.creationLoad * 100).toFixed(0)}% de las capacidades etiquetadas no viajan tal cual.</p>
+                <p className="mt-2 text-xs text-muted-foreground">{ui("poCreationLoad")}: {(analysis.resourceGap.creationLoad * 100).toFixed(0)}% {ui("poCreationLoadTail")}</p>
               )}
             </div>
           )}
@@ -569,16 +576,16 @@ function PositioningBlock({ caseId, reference }: { caseId: number; reference: Re
 
       <Card>
         <CardHeader>
-          <CardTitle>Liability of foreignness</CardTitle>
-          <CardDescription>p. 198. La desventaja y la ventaja superior que la compensa, por separado.</CardDescription>
+          <CardTitle>{ui("amLofTitle")}</CardTitle>
+          <CardDescription>{ui("poLofDesc")}</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-3 sm:grid-cols-2">
           <div>
-            <Label>Desventaja por ser extranjero</Label>
+            <Label>{ui("poHandicap")}</Label>
             <Textarea rows={3} value={draft.liabilityOfForeignness.handicap ?? ""} onChange={(event) => update({ liabilityOfForeignness: { ...draft.liabilityOfForeignness, handicap: event.target.value } })} />
           </div>
           <div>
-            <Label>Ventaja que la compensa</Label>
+            <Label>{ui("poCompensating")}</Label>
             <Textarea rows={3} value={draft.liabilityOfForeignness.compensatingAdvantage ?? ""} onChange={(event) => update({ liabilityOfForeignness: { ...draft.liabilityOfForeignness, compensatingAdvantage: event.target.value } })} />
           </div>
         </CardContent>
@@ -586,14 +593,14 @@ function PositioningBlock({ caseId, reference }: { caseId: number; reference: Re
 
       {analysis && analysis.warnings.length > 0 && (
         <Card>
-          <CardHeader><CardTitle className="text-base">Coherencia</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="text-base">{ui("gsCoherence")}</CardTitle></CardHeader>
           <CardContent className="space-y-2">
             {analysis.warnings.map((warning) => (
               <div key={warning.id} className="flex gap-2 rounded-md border p-3 text-sm">
                 <AlertTriangle className={`mt-0.5 h-4 w-4 shrink-0 ${warning.severity === "block" ? "text-destructive" : "text-amber-500"}`} />
                 <div>
-                  <p>{warning.message}</p>
-                  <p className="mt-1 text-xs text-muted-foreground">{warning.provenance}</p>
+                  <p>{t(warning.message)}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{t(warning.provenance)}</p>
                 </div>
               </div>
             ))}
@@ -611,23 +618,28 @@ function PositioningBlock({ caseId, reference }: { caseId: number; reference: Re
   );
 }
 
-function configurationName(reference: Reference, id: string | null) {
-  if (!id) return "sin determinar";
-  return reference.configurations.find((configuration) => configuration.id === id)?.label ?? id;
+function configurationName(reference: Reference, id: string | null): Localized | null {
+  if (!id) return null;
+  return reference.configurations.find((configuration) => configuration.id === id)?.label ?? null;
+}
+
+function levelLabel(reference: Reference, id: string): Localized | string {
+  return reference.valueChainLevels.find((level) => level.id === id)?.label ?? id;
 }
 
 function LevelSelect({ label, value, levels, onChange }: {
   label: string;
   value: ValueChainLevel | null;
-  levels: { id: string; label: string }[];
+  levels: { id: string; label: Localized }[];
   onChange: (value: ValueChainLevel | null) => void;
 }) {
+  const { t } = useLanguage();
   return (
     <div>
       <span className="text-xs text-muted-foreground">{label}</span>
       <select className={select} value={value ?? ""} onChange={(event) => onChange((event.target.value || null) as ValueChainLevel | null)}>
         <option value="">—</option>
-        {levels.map((level) => <option key={level.id} value={level.id}>{level.label}</option>)}
+        {levels.map((level) => <option key={level.id} value={level.id}>{t(level.label)}</option>)}
       </select>
     </div>
   );
@@ -654,24 +666,28 @@ function ScoreInput({ value, onChange }: { value: number | null; onChange: (valu
 function SaveBar({ dirty, pending, completeness, onSave }: {
   dirty: boolean;
   pending: boolean;
-  completeness: { answered: number; total: number; missing: string[] } | null;
+  completeness: { answered: number; total: number; missing: Localized[] } | null;
   onSave: () => void;
 }) {
+  const { t, ui } = useLanguage();
   return (
     <div className="sticky bottom-0 flex flex-wrap items-center justify-between gap-3 rounded-md border bg-background/95 p-3 backdrop-blur">
       <div className="text-sm">
         {completeness && (
           <>
-            <Badge variant="outline">{completeness.answered}/{completeness.total} respondido</Badge>
+            <Badge variant="outline">{completeness.answered}/{completeness.total} {ui("gsAnswered")}</Badge>
             {completeness.missing.length > 0 && (
-              <span className="ml-3 text-xs text-muted-foreground">Falta: {completeness.missing.slice(0, 2).join("; ")}{completeness.missing.length > 2 ? "…" : ""}</span>
+              <span className="ml-3 text-xs text-muted-foreground">
+                {ui("gsStillMissing")}: {completeness.missing.slice(0, 2).map((entry) => t(entry)).join("; ")}
+                {completeness.missing.length > 2 ? "…" : ""}
+              </span>
             )}
           </>
         )}
       </div>
       <Button onClick={onSave} disabled={!dirty || pending}>
         {pending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-        {dirty ? "Guardar" : "Guardado"}
+        {dirty ? ui("gsSave") : ui("gsSaved")}
       </Button>
     </div>
   );
@@ -682,6 +698,7 @@ function SaveBar({ dirty, pending, completeness, onSave }: {
 /* ------------------------------------------------------------------------------------ */
 
 function EntryBlock({ caseId, reference }: { caseId: number; reference: Reference }) {
+  const { t, ui } = useLanguage();
   const utils = trpc.useUtils();
   const query = trpc.globalStrategy.getEntryStrategy.useQuery({ caseId });
   const [draft, setDraft] = useState<EntryStrategyInput>(emptyEntryStrategyInput());
@@ -695,7 +712,7 @@ function EntryBlock({ caseId, reference }: { caseId: number; reference: Referenc
     onSuccess: () => {
       setDirty(false);
       utils.globalStrategy.getEntryStrategy.invalidate({ caseId });
-      toast.success("Estrategia de entrada guardada");
+      toast.success(ui("enToastSaved"));
     },
     onError: (error) => toast.error(error.message),
   });
@@ -707,12 +724,12 @@ function EntryBlock({ caseId, reference }: { caseId: number; reference: Referenc
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Por qué entrar</CardTitle>
-          <CardDescription>{reference.entryObjectivesProvenance}. El objetivo condiciona el tipo de país, el momento y el modo.</CardDescription>
+          <CardTitle>{ui("enWhyTitle")}</CardTitle>
+          <CardDescription>{t(reference.entryObjectivesProvenance)}. {ui("enWhyDescTail")}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="max-w-[10rem]">
-            <Label>País</Label>
+            <Label>{ui("enCountry")}</Label>
             <Input value={draft.countryCode ?? ""} maxLength={3} placeholder="CHN" onChange={(event) => update({ countryCode: event.target.value.toUpperCase() || null })} />
           </div>
           {reference.entryObjectives.map((objective) => {
@@ -730,12 +747,14 @@ function EntryBlock({ caseId, reference }: { caseId: number; reference: Referenc
                     }) as EntryStrategyInput["objectives"] })}
                   />
                   <span>
-                    {objective.label}
-                    <span className="ml-2 text-xs font-normal text-muted-foreground">Indicadores: {objective.kpis.join(", ")}. Momento: {objective.timing.toLowerCase()}.</span>
+                    {t(objective.label)}
+                    <span className="ml-2 text-xs font-normal text-muted-foreground">
+                      {ui("enKpis")}: {objective.kpis.map((kpi) => t(kpi)).join(", ")}. {ui("enTiming")}: {t(objective.timing).toLowerCase()}.
+                    </span>
                   </span>
                 </label>
                 {entry.selected && (
-                  <Input value={entry.justification ?? ""} placeholder="Qué busca la empresa aquí, en concreto" onChange={(event) => update({ objectives: draft.objectives.map((item) => (item.id === objective.id ? { ...item, justification: event.target.value } : item)) })} />
+                  <Input value={entry.justification ?? ""} placeholder={ui("enObjectivePlaceholder")} onChange={(event) => update({ objectives: draft.objectives.map((item) => (item.id === objective.id ? { ...item, justification: event.target.value } : item)) })} />
                 )}
               </div>
             );
@@ -745,48 +764,48 @@ function EntryBlock({ caseId, reference }: { caseId: number; reference: Referenc
 
       <Card>
         <CardHeader>
-          <CardTitle>Cuándo entrar</CardTitle>
-          <CardDescription>Las cuatro fases de la ventana de oportunidad, {reference.windowPhasesProvenance}.</CardDescription>
+          <CardTitle>{ui("enWhenTitle")}</CardTitle>
+          <CardDescription>{ui("enWhenDescPre")} {t(reference.windowPhasesProvenance)}.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
-              <Label>Fase de la ventana</Label>
+              <Label>{ui("enPhase")}</Label>
               <select className={select} value={draft.phase ?? ""} onChange={(event) => update({ phase: (event.target.value || null) as EntryStrategyInput["phase"] })}>
-                <option value="">Sin determinar</option>
-                {reference.windowPhases.map((phase) => <option key={phase.id} value={phase.id}>{phase.label}</option>)}
+                <option value="">{ui("gsUndetermined")}</option>
+                {reference.windowPhases.map((phase) => <option key={phase.id} value={phase.id}>{t(phase.label)}</option>)}
               </select>
             </div>
             <div>
-              <Label>Posición ante el momento</Label>
+              <Label>{ui("enStance")}</Label>
               <select className={select} value={draft.timingStance ?? ""} onChange={(event) => update({ timingStance: (event.target.value || null) as EntryStrategyInput["timingStance"] })}>
-                <option value="">Sin decidir</option>
-                {reference.timingStances.map((stance) => <option key={stance.id} value={stance.id}>{stance.label}</option>)}
+                <option value="">{ui("gsUndecided")}</option>
+                {reference.timingStances.map((stance) => <option key={stance.id} value={stance.id}>{t(stance.label)}</option>)}
               </select>
             </div>
           </div>
           {analysis?.phase && (
             <div className="rounded-md border bg-muted/40 p-3 text-sm">
-              <p className="text-muted-foreground">{analysis.phase.signal}</p>
-              <p className="mt-1">{analysis.phase.guidance}</p>
+              <p className="text-muted-foreground">{t(analysis.phase.signal)}</p>
+              <p className="mt-1">{t(analysis.phase.guidance)}</p>
             </div>
           )}
           <div>
-            <Label>Evidencia que sostiene esa fase</Label>
-            <Textarea rows={2} value={draft.phaseEvidence ?? ""} placeholder="Crecimiento del mercado, número y cuota de competidores, madurez del producto" onChange={(event) => update({ phaseEvidence: event.target.value })} />
+            <Label>{ui("enPhaseEvidence")}</Label>
+            <Textarea rows={2} value={draft.phaseEvidence ?? ""} placeholder={ui("enPhaseEvidencePlaceholder")} onChange={(event) => update({ phaseEvidence: event.target.value })} />
           </div>
           <div>
-            <Label>Por qué esa posición</Label>
-            <Textarea rows={2} value={draft.timingRationale ?? ""} placeholder="Si es primer entrante: qué recurso se pre-empta y quién se beneficiaría del trabajo de apertura" onChange={(event) => update({ timingRationale: event.target.value })} />
+            <Label>{ui("enWhyStance")}</Label>
+            <Textarea rows={2} value={draft.timingRationale ?? ""} placeholder={ui("enWhyStancePlaceholder")} onChange={(event) => update({ timingRationale: event.target.value })} />
           </div>
           <div className="grid gap-3 text-xs text-muted-foreground sm:grid-cols-2">
             <div>
-              <div className="font-semibold uppercase">Ventajas de ser primero</div>
-              <ul className="mt-1 space-y-1">{reference.firstMover.advantages.map((item) => <li key={item}>{item}</li>)}</ul>
+              <div className="font-semibold uppercase">{ui("enFirstMoverPros")}</div>
+              <ul className="mt-1 space-y-1">{reference.firstMover.advantages.map((item) => <li key={t(item)}>{t(item)}</li>)}</ul>
             </div>
             <div>
-              <div className="font-semibold uppercase">Desventajas</div>
-              <ul className="mt-1 space-y-1">{reference.firstMover.disadvantages.map((item) => <li key={item}>{item}</li>)}</ul>
+              <div className="font-semibold uppercase">{ui("enFirstMoverCons")}</div>
+              <ul className="mt-1 space-y-1">{reference.firstMover.disadvantages.map((item) => <li key={t(item)}>{t(item)}</li>)}</ul>
             </div>
           </div>
         </CardContent>
@@ -794,15 +813,17 @@ function EntryBlock({ caseId, reference }: { caseId: number; reference: Referenc
 
       <Card>
         <CardHeader>
-          <CardTitle>Ritmo de entrada</CardTitle>
-          <CardDescription>{reference.paceProvenance}. Escala 0 a 4.</CardDescription>
+          <CardTitle>{ui("enPaceTitle")}</CardTitle>
+          <CardDescription>{t(reference.paceProvenance)}. {ui("enPaceScale")}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           {reference.paceFactors.map((factor) => (
             <div key={factor.id} className="grid gap-2 sm:grid-cols-[1fr_6rem]">
               <div>
-                <div className="text-sm font-medium">{factor.label}</div>
-                <div className="text-xs text-muted-foreground">{factor.question} Un valor alto empuja a un compromiso {factor.direction === "faster" ? "rápido" : "gradual"}.</div>
+                <div className="text-sm font-medium">{t(factor.label)}</div>
+                <div className="text-xs text-muted-foreground">
+                  {t(factor.question)} {ui("enPaceHighPushes")} {factor.direction === "faster" ? ui("enPaceFast") : ui("enPaceGradual")}.
+                </div>
               </div>
               <Input
                 type="number"
@@ -819,11 +840,9 @@ function EntryBlock({ caseId, reference }: { caseId: number; reference: Referenc
           ))}
           {analysis?.pace.index !== null && analysis?.pace.recommendation && (
             <div className="rounded-md border bg-muted/40 p-3 text-sm">
-              Con {analysis.pace.answered} de {analysis.pace.total} factores contestados, el perfil apunta a un compromiso{" "}
-              <strong>{analysis.pace.recommendation === "rapido" ? "rápido" : analysis.pace.recommendation}</strong> (índice {analysis.pace.index?.toFixed(2)}).
-              <p className="mt-1 text-xs text-muted-foreground">
-                Es una síntesis de los seis factores de la p. 262, no una fórmula del libro: el libro los enumera sin ponderarlos.
-              </p>
+              {ui("enPaceSummaryPre")} {analysis.pace.answered} {ui("coOf")} {analysis.pace.total} {ui("enPaceSummaryMid")}{" "}
+              <strong>{paceWord(ui, analysis.pace.recommendation)}</strong> ({ui("enPaceIndex")} {analysis.pace.index?.toFixed(2)}).
+              <p className="mt-1 text-xs text-muted-foreground">{ui("enPaceNote")}</p>
             </div>
           )}
         </CardContent>
@@ -831,74 +850,74 @@ function EntryBlock({ caseId, reference }: { caseId: number; reference: Referenc
 
       <Card>
         <CardHeader>
-          <CardTitle>Cómo entrar</CardTitle>
-          <CardDescription>El mapa de la {reference.modeMappingProvenance} propone modos según atractivo y clima de inversión; la elección sigue siendo suya.</CardDescription>
+          <CardTitle>{ui("enHowTitle")}</CardTitle>
+          <CardDescription>{ui("enHowDescPre")} {t(reference.modeMappingProvenance)} {ui("enHowDescTail")}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-3">
             <div>
-              <Label>Atractivo del mercado</Label>
+              <Label>{ui("enAttractiveness")}</Label>
               <select className={select} value={draft.marketAttractiveness ?? ""} onChange={(event) => update({ marketAttractiveness: (event.target.value || null) as Band | null })}>
                 <option value="">—</option>
-                <option value="low">Bajo</option>
-                <option value="medium">Medio</option>
-                <option value="high">Alto</option>
+                <option value="low">{ui("enLow")}</option>
+                <option value="medium">{ui("enMedium")}</option>
+                <option value="high">{ui("enHigh")}</option>
               </select>
             </div>
             <div>
-              <Label>Clima político de inversión</Label>
+              <Label>{ui("enClimate")}</Label>
               <select className={select} value={draft.politicalClimate ?? ""} onChange={(event) => update({ politicalClimate: (event.target.value || null) as ClimateBand | null })}>
                 <option value="">—</option>
-                <option value="poor">Malo</option>
-                <option value="medium">Medio</option>
-                <option value="good">Bueno</option>
+                <option value="poor">{ui("enPoor")}</option>
+                <option value="medium">{ui("enMedium")}</option>
+                <option value="good">{ui("enGood")}</option>
               </select>
             </div>
             <div>
-              <Label>Modo preferido</Label>
+              <Label>{ui("enPreferredMode")}</Label>
               <select className={select} value={draft.preferredMode ?? ""} onChange={(event) => update({ preferredMode: event.target.value || null })}>
-                <option value="">Sin decidir</option>
-                {reference.entryModes.map((mode) => <option key={mode.key} value={mode.key}>{mode.label}</option>)}
+                <option value="">{ui("gsUndecided")}</option>
+                {reference.entryModes.map((mode) => <option key={mode.key} value={mode.key}>{t(mode.label)}</option>)}
               </select>
             </div>
           </div>
 
           {analysis?.shortlist && (
             <div className="rounded-md border bg-muted/40 p-3 text-sm">
-              El mapa apunta a: {analysis.shortlist.modes.join(", ")}.
-              <span className="ml-2 text-xs text-muted-foreground">{analysis.shortlist.provenance}</span>
+              {ui("enMapPointsTo")}: {analysis.shortlist.modes.map((mode) => t(mode)).join(", ")}.
+              <span className="ml-2 text-xs text-muted-foreground">{t(analysis.shortlist.provenance)}</span>
             </div>
           )}
 
           <div>
-            <Label>Por qué ese modo</Label>
+            <Label>{ui("enWhyMode")}</Label>
             <Textarea rows={2} value={draft.modeRationale ?? ""} onChange={(event) => update({ modeRationale: event.target.value })} />
           </div>
           <div>
-            <Label>Requisitos del gobierno que condicionan el modo</Label>
-            <Textarea rows={2} value={draft.governmentRequirements ?? ""} placeholder="Participación local obligatoria, aprobaciones, contenido local, restricciones sectoriales" onChange={(event) => update({ governmentRequirements: event.target.value })} />
+            <Label>{ui("enGovReq")}</Label>
+            <Textarea rows={2} value={draft.governmentRequirements ?? ""} placeholder={ui("enGovReqPlaceholder")} onChange={(event) => update({ governmentRequirements: event.target.value })} />
           </div>
           <div className="max-w-sm">
-            <Label>Modelo de entrada digital (opcional)</Label>
+            <Label>{ui("enDigitalModel")}</Label>
             <select className={select} value={draft.digitalModel ?? ""} onChange={(event) => update({ digitalModel: event.target.value || null })}>
-              <option value="">No aplica</option>
-              {reference.digitalEntryModels.map((model) => <option key={model.id} value={model.id}>{model.label}</option>)}
+              <option value="">{ui("enNotApplicable")}</option>
+              {reference.digitalEntryModels.map((model) => <option key={model.id} value={model.id}>{t(model.label)}</option>)}
             </select>
-            <p className="mt-1 text-xs text-muted-foreground">{reference.digitalEntryProvenance}</p>
+            <p className="mt-1 text-xs text-muted-foreground">{t(reference.digitalEntryProvenance)}</p>
           </div>
         </CardContent>
       </Card>
 
       {analysis && analysis.warnings.length > 0 && (
         <Card>
-          <CardHeader><CardTitle className="text-base">Coherencia</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="text-base">{ui("gsCoherence")}</CardTitle></CardHeader>
           <CardContent className="space-y-2">
             {analysis.warnings.map((warning) => (
               <div key={warning.id} className="flex gap-2 rounded-md border p-3 text-sm">
                 <AlertTriangle className={`mt-0.5 h-4 w-4 shrink-0 ${warning.severity === "block" ? "text-destructive" : "text-amber-500"}`} />
                 <div>
-                  <p>{warning.message}</p>
-                  <p className="mt-1 text-xs text-muted-foreground">{warning.provenance}</p>
+                  <p>{t(warning.message)}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{t(warning.provenance)}</p>
                 </div>
               </div>
             ))}
@@ -911,11 +930,19 @@ function EntryBlock({ caseId, reference }: { caseId: number; reference: Referenc
   );
 }
 
+/** El ritmo se calcula con identificadores; la palabra la pone la interfaz. */
+function paceWord(ui: (key: "enPaceFast" | "enPaceGradual" | "enPaceBalanced") => string, recommendation: string | null) {
+  if (recommendation === "rapido") return ui("enPaceFast");
+  if (recommendation === "gradual") return ui("enPaceGradual");
+  return ui("enPaceBalanced");
+}
+
 /* ------------------------------------------------------------------------------------ */
 /* M5 — Vía de acceso y socio (capítulos 7 y 8)                                          */
 /* ------------------------------------------------------------------------------------ */
 
 function PartneringBlock({ caseId, reference }: { caseId: number; reference: Reference }) {
+  const { t, ui } = useLanguage();
   const utils = trpc.useUtils();
   const query = trpc.globalStrategy.getPartnering.useQuery({ caseId });
   const positioning = trpc.globalStrategy.getPositioning.useQuery({ caseId });
@@ -930,7 +957,7 @@ function PartneringBlock({ caseId, reference }: { caseId: number; reference: Ref
     onSuccess: () => {
       setDirty(false);
       utils.globalStrategy.getPartnering.invalidate({ caseId });
-      toast.success("Vía de acceso y socio guardados");
+      toast.success(ui("paToastSaved"));
     },
     onError: (error) => toast.error(error.message),
   });
@@ -950,20 +977,20 @@ function PartneringBlock({ caseId, reference }: { caseId: number; reference: Ref
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Qué falta y cómo conseguirlo</CardTitle>
-          <CardDescription>{reference.bbbProvenance}. El árbol responde en orden y se detiene en la pregunta que decide; no promedia.</CardDescription>
+          <CardTitle>{ui("paGapsTitle")}</CardTitle>
+          <CardDescription>{t(reference.bbbProvenance)}. {ui("paGapsDescTail")}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {importable.length > 0 && (
             <div className="rounded-md border bg-muted/40 p-3 text-sm">
-              <p>Del Transfer-Adapt-Create hay {importable.length} capacidad(es) marcadas como «crear» que aún no están aquí.</p>
+              <p>{ui("paImportablePre")} {importable.length} {ui("paImportableTail")}</p>
               <Button
                 className="mt-2"
                 size="sm"
                 variant="outline"
                 onClick={() => update({ gaps: [...draft.gaps, ...importable.map((entry) => ({ id: newId(), label: entry.label, axes: {}, chosenRoute: null, note: null }))] })}
               >
-                Traerlas
+                {ui("paBring")}
               </Button>
             </div>
           )}
@@ -973,16 +1000,16 @@ function PartneringBlock({ caseId, reference }: { caseId: number; reference: Ref
             return (
               <div key={gap.id} className="space-y-3 rounded-md border p-3">
                 <div className="flex items-center gap-2">
-                  <Input value={gap.label} placeholder="Capacidad que hay que conseguir" onChange={(event) => update({ gaps: draft.gaps.map((item) => (item.id === gap.id ? { ...item, label: event.target.value } : item)) })} />
-                  <Button variant="ghost" size="sm" onClick={() => update({ gaps: draft.gaps.filter((item) => item.id !== gap.id) })}>Quitar</Button>
+                  <Input value={gap.label} placeholder={ui("paGapPlaceholder")} onChange={(event) => update({ gaps: draft.gaps.map((item) => (item.id === gap.id ? { ...item, label: event.target.value } : item)) })} />
+                  <Button variant="ghost" size="sm" onClick={() => update({ gaps: draft.gaps.filter((item) => item.id !== gap.id) })}>{ui("gsRemove")}</Button>
                 </div>
 
                 <div className="grid gap-2 sm:grid-cols-2">
                   {reference.bbbAxes.map((axis) => (
                     <div key={axis.id} className="grid grid-cols-[1fr_5rem] items-center gap-2">
                       <div>
-                        <div className="text-sm">{axis.label}</div>
-                        <div className="text-xs text-muted-foreground">{axis.question}</div>
+                        <div className="text-sm">{t(axis.label)}</div>
+                        <div className="text-xs text-muted-foreground">{t(axis.question)}</div>
                       </div>
                       <Input
                         type="number"
@@ -1001,21 +1028,23 @@ function PartneringBlock({ caseId, reference }: { caseId: number; reference: Ref
 
                 <div className="grid gap-2 sm:grid-cols-[14rem_1fr]">
                   <div>
-                    <Label className="text-xs">Vía elegida</Label>
+                    <Label className="text-xs">{ui("paChosenRoute")}</Label>
                     <select className={select} value={gap.chosenRoute ?? ""} onChange={(event) => update({ gaps: draft.gaps.map((item) => (item.id === gap.id ? { ...item, chosenRoute: (event.target.value || null) as typeof item.chosenRoute } : item)) })}>
-                      <option value="">Sin decidir</option>
-                      {reference.bbbRoutes.map((route) => <option key={route.id} value={route.id}>{route.label}</option>)}
+                      <option value="">{ui("gsUndecided")}</option>
+                      {reference.bbbRoutes.map((route) => <option key={route.id} value={route.id}>{t(route.label)}</option>)}
                     </select>
                   </div>
                   {verdict && (
                     <div className="self-end text-sm">
                       {verdict.route ? (
                         <>
-                          <Badge variant={verdict.divergesFromChoice ? "outline" : "default"}>El árbol dice: {reference.bbbRoutes.find((route) => route.id === verdict.route)?.label}</Badge>
-                          <p className="mt-1 text-xs text-muted-foreground">{verdict.reason}</p>
+                          <Badge variant={verdict.divergesFromChoice ? "outline" : "default"}>
+                            {ui("paTreeSays")} {t(reference.bbbRoutes.find((route) => route.id === verdict.route)?.label)}
+                          </Badge>
+                          <p className="mt-1 text-xs text-muted-foreground">{t(verdict.reason)}</p>
                         </>
                       ) : (
-                        <p className="text-xs text-muted-foreground">{verdict.reason}</p>
+                        <p className="text-xs text-muted-foreground">{t(verdict.reason)}</p>
                       )}
                     </div>
                   )}
@@ -1024,33 +1053,33 @@ function PartneringBlock({ caseId, reference }: { caseId: number; reference: Ref
             );
           })}
 
-          <Button variant="outline" size="sm" onClick={() => update({ gaps: [...draft.gaps, { id: newId(), label: "", axes: {}, chosenRoute: null, note: null }] })}>Añadir capacidad</Button>
+          <Button variant="outline" size="sm" onClick={() => update({ gaps: [...draft.gaps, { id: newId(), label: "", axes: {}, chosenRoute: null, note: null }] })}>{ui("paAddCapability")}</Button>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle>El socio</CardTitle>
-          <CardDescription>{reference.partnerTypesProvenance}. El tipo de socio cambia lo que se puede esperar y lo que hay que vigilar.</CardDescription>
+          <CardTitle>{ui("paPartnerTitle")}</CardTitle>
+          <CardDescription>{t(reference.partnerTypesProvenance)}. {ui("paPartnerDescTail")}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-3">
             <div>
-              <Label>Tipo de socio</Label>
+              <Label>{ui("paPartnerType")}</Label>
               <select className={select} value={draft.partnerType ?? ""} onChange={(event) => update({ partnerType: (event.target.value || null) as PartneringInput["partnerType"] })}>
-                <option value="">Sin caracterizar</option>
-                {reference.partnerTypes.map((type) => <option key={type.id} value={type.id}>{type.label}</option>)}
+                <option value="">{ui("paUncharacterized")}</option>
+                {reference.partnerTypes.map((type) => <option key={type.id} value={type.id}>{t(type.label)}</option>)}
               </select>
             </div>
             <div>
-              <Label>Categoría</Label>
+              <Label>{ui("paCategory")}</Label>
               <select className={select} value={draft.partnerCategory ?? ""} onChange={(event) => update({ partnerCategory: event.target.value || null })}>
-                <option value="">Sin decidir</option>
-                {reference.partnerCategories.map((category) => <option key={category.id} value={category.id}>{category.label}</option>)}
+                <option value="">{ui("gsUndecided")}</option>
+                {reference.partnerCategories.map((category) => <option key={category.id} value={category.id}>{t(category.label)}</option>)}
               </select>
             </div>
             <div>
-              <Label>Nombre (si ya hay candidato)</Label>
+              <Label>{ui("paName")}</Label>
               <Input value={draft.partnerName ?? ""} onChange={(event) => update({ partnerName: event.target.value || null })} />
             </div>
           </div>
@@ -1058,29 +1087,29 @@ function PartneringBlock({ caseId, reference }: { caseId: number; reference: Ref
           {analysis?.partner && (
             <div className="grid gap-3 rounded-md border bg-muted/40 p-3 text-sm sm:grid-cols-2">
               <div>
-                <div className="text-xs font-semibold uppercase text-muted-foreground">Lo que se busca en él</div>
-                <ul className="mt-1 space-y-1">{analysis.partner.foreignMotives.map((item) => <li key={item}>{item}</li>)}</ul>
+                <div className="text-xs font-semibold uppercase text-muted-foreground">{ui("paSought")}</div>
+                <ul className="mt-1 space-y-1">{analysis.partner.foreignMotives.map((item) => <li key={t(item)}>{t(item)}</li>)}</ul>
               </div>
               <div>
-                <div className="text-xs font-semibold uppercase text-muted-foreground">Lo que hay que vigilar</div>
-                <ul className="mt-1 space-y-1">{analysis.partner.foreignRisks.map((item) => <li key={item}>{item}</li>)}</ul>
+                <div className="text-xs font-semibold uppercase text-muted-foreground">{ui("paWatch")}</div>
+                <ul className="mt-1 space-y-1">{analysis.partner.foreignRisks.map((item) => <li key={t(item)}>{t(item)}</li>)}</ul>
               </div>
             </div>
           )}
 
           <div className="space-y-3">
-            <div className="text-sm font-medium">Las cuatro pruebas de encaje · {reference.partnerFitsProvenance}</div>
+            <div className="text-sm font-medium">{ui("paFourFits")} · {t(reference.partnerFitsProvenance)}</div>
             {reference.partnerFits.map((fit) => {
               const entry = draft.fits.find((item) => item.id === fit.id) ?? { id: fit.id, score: null, evidence: null };
               return (
                 <div key={fit.id} className="grid gap-2 sm:grid-cols-[1fr_5rem]">
                   <div>
-                    <div className="text-sm">{fit.label}</div>
-                    <div className="text-xs text-muted-foreground">{fit.question}</div>
+                    <div className="text-sm">{t(fit.label)}</div>
+                    <div className="text-xs text-muted-foreground">{t(fit.question)}</div>
                     <Input
                       className="mt-1"
                       value={entry.evidence ?? ""}
-                      placeholder="Evidencia concreta, no impresión"
+                      placeholder={ui("paEvidencePlaceholder")}
                       onChange={(event) => update({ fits: reference.partnerFits.map((option) => {
                         const existing = draft.fits.find((item) => item.id === option.id) ?? { id: option.id, score: null, evidence: null };
                         return option.id === fit.id ? { ...existing, evidence: event.target.value } : existing;
@@ -1106,7 +1135,7 @@ function PartneringBlock({ caseId, reference }: { caseId: number; reference: Ref
             })}
             {analysis && analysis.fits.average !== null && (
               <p className="text-xs text-muted-foreground">
-                Media {analysis.fits.average}/4 sobre {analysis.fits.answered} de {analysis.fits.total} pruebas. La media se muestra por comodidad: lo que decide es el encaje más débil, porque las cuatro no se compensan entre sí.
+                {ui("paAveragePre")} {analysis.fits.average}/4 {ui("paAverageMid")} {analysis.fits.answered} {ui("coOf")} {analysis.fits.total} {ui("paAverageTail")}
               </p>
             )}
           </div>
@@ -1115,75 +1144,75 @@ function PartneringBlock({ caseId, reference }: { caseId: number; reference: Ref
 
       <Card>
         <CardHeader>
-          <CardTitle>La entrada como opción real</CardTitle>
-          <CardDescription>{reference.realOptionProvenance}. Una inversión preliminar sin señales de salida no es una opción, es una apuesta pequeña.</CardDescription>
+          <CardTitle>{ui("paOptionTitle")}</CardTitle>
+          <CardDescription>{t(reference.realOptionProvenance)}. {ui("paOptionDescTail")}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-3">
             <div>
-              <Label>Prima: inversión preliminar</Label>
+              <Label>{ui("paPremium")}</Label>
               <Input type="number" value={draft.realOption.premium ?? ""} onChange={(event) => update({ realOption: { ...draft.realOption, premium: event.target.value === "" ? null : Number(event.target.value) } })} />
             </div>
             <div>
-              <Label>Moneda</Label>
+              <Label>{ui("paCurrency")}</Label>
               <Input maxLength={8} value={draft.realOption.currency ?? ""} placeholder="CNY" onChange={(event) => update({ realOption: { ...draft.realOption, currency: event.target.value || null } })} />
             </div>
             <div>
-              <Label>Periodo de observación (años)</Label>
+              <Label>{ui("paTrialYears")}</Label>
               <Input type="number" min={0} max={20} value={draft.realOption.trialYears ?? ""} onChange={(event) => update({ realOption: { ...draft.realOption, trialYears: event.target.value === "" ? null : Number(event.target.value) } })} />
             </div>
           </div>
 
           <div className="space-y-2">
-            <Label>Señales que disparan la decisión</Label>
+            <Label>{ui("paTriggers")}</Label>
             {draft.realOption.triggers.map((trigger) => (
               <div key={trigger.id} className="grid gap-2 sm:grid-cols-[1fr_1fr_8rem_auto]">
-                <Input value={trigger.signal} placeholder="Qué se observa" onChange={(event) => update({ realOption: { ...draft.realOption, triggers: draft.realOption.triggers.map((item) => (item.id === trigger.id ? { ...item, signal: event.target.value } : item)) } })} />
-                <Input value={trigger.threshold ?? ""} placeholder="Umbral verificable" onChange={(event) => update({ realOption: { ...draft.realOption, triggers: draft.realOption.triggers.map((item) => (item.id === trigger.id ? { ...item, threshold: event.target.value } : item)) } })} />
+                <Input value={trigger.signal} placeholder={ui("paSignalPlaceholder")} onChange={(event) => update({ realOption: { ...draft.realOption, triggers: draft.realOption.triggers.map((item) => (item.id === trigger.id ? { ...item, signal: event.target.value } : item)) } })} />
+                <Input value={trigger.threshold ?? ""} placeholder={ui("paThresholdPlaceholder")} onChange={(event) => update({ realOption: { ...draft.realOption, triggers: draft.realOption.triggers.map((item) => (item.id === trigger.id ? { ...item, threshold: event.target.value } : item)) } })} />
                 <select className={select} value={trigger.stance} onChange={(event) => update({ realOption: { ...draft.realOption, triggers: draft.realOption.triggers.map((item) => (item.id === trigger.id ? { ...item, stance: event.target.value as typeof item.stance } : item)) } })}>
-                  <option value="expand">Ampliar</option>
-                  <option value="hold">Mantener</option>
-                  <option value="retreat">Replegar</option>
+                  <option value="expand">{ui("paExpand")}</option>
+                  <option value="hold">{ui("paHold")}</option>
+                  <option value="retreat">{ui("paRetreat")}</option>
                 </select>
-                <Button variant="ghost" size="sm" onClick={() => update({ realOption: { ...draft.realOption, triggers: draft.realOption.triggers.filter((item) => item.id !== trigger.id) } })}>Quitar</Button>
+                <Button variant="ghost" size="sm" onClick={() => update({ realOption: { ...draft.realOption, triggers: draft.realOption.triggers.filter((item) => item.id !== trigger.id) } })}>{ui("gsRemove")}</Button>
               </div>
             ))}
-            <Button variant="outline" size="sm" onClick={() => update({ realOption: { ...draft.realOption, triggers: [...draft.realOption.triggers, { id: newId(), signal: "", threshold: null, stance: "expand" }] } })}>Añadir señal</Button>
+            <Button variant="outline" size="sm" onClick={() => update({ realOption: { ...draft.realOption, triggers: [...draft.realOption.triggers, { id: newId(), signal: "", threshold: null, stance: "expand" }] } })}>{ui("paAddSignal")}</Button>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
-              <Label>Si se desarrolla</Label>
+              <Label>{ui("paIfDevelops")}</Label>
               <select className={select} value={draft.realOption.expansionPathId ?? ""} onChange={(event) => update({ realOption: { ...draft.realOption, expansionPathId: event.target.value || null } })}>
-                <option value="">Sin decidir</option>
-                {reference.optionExpansionPaths.map((path) => <option key={path.id} value={path.id}>{path.label}</option>)}
+                <option value="">{ui("gsUndecided")}</option>
+                {reference.optionExpansionPaths.map((path) => <option key={path.id} value={path.id}>{t(path.label)}</option>)}
               </select>
             </div>
             <div>
-              <Label>Si no se desarrolla</Label>
+              <Label>{ui("paIfNot")}</Label>
               <select className={select} value={draft.realOption.retreatPathId ?? ""} onChange={(event) => update({ realOption: { ...draft.realOption, retreatPathId: event.target.value || null } })}>
-                <option value="">Sin decidir</option>
-                {reference.optionRetreatPaths.map((path) => <option key={path.id} value={path.id}>{path.label}</option>)}
+                <option value="">{ui("gsUndecided")}</option>
+                {reference.optionRetreatPaths.map((path) => <option key={path.id} value={path.id}>{t(path.label)}</option>)}
               </select>
             </div>
           </div>
 
           {analysis && !analysis.option.structured && analysis.option.missing.length > 0 && (
-            <p className="text-xs text-muted-foreground">Falta para que la opción esté estructurada: {analysis.option.missing.join("; ")}.</p>
+            <p className="text-xs text-muted-foreground">{ui("paOptionMissing")}: {analysis.option.missing.map((entry) => t(entry)).join("; ")}.</p>
           )}
         </CardContent>
       </Card>
 
       {analysis && analysis.warnings.length > 0 && (
         <Card>
-          <CardHeader><CardTitle className="text-base">Coherencia</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="text-base">{ui("gsCoherence")}</CardTitle></CardHeader>
           <CardContent className="space-y-2">
             {analysis.warnings.map((warning) => (
               <div key={warning.id} className="flex gap-2 rounded-md border p-3 text-sm">
                 <AlertTriangle className={`mt-0.5 h-4 w-4 shrink-0 ${warning.severity === "block" ? "text-destructive" : "text-amber-500"}`} />
                 <div>
-                  <p>{warning.message}</p>
-                  <p className="mt-1 text-xs text-muted-foreground">{warning.provenance}</p>
+                  <p>{t(warning.message)}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{t(warning.provenance)}</p>
                 </div>
               </div>
             ))}
@@ -1203,12 +1232,13 @@ function PartneringBlock({ caseId, reference }: { caseId: number; reference: Ref
 const SEVERITY_ORDER = { block: 0, warn: 1, info: 2 } as const;
 
 function CoherenceBlock({ caseId, onGo }: { caseId: number; onGo?: (tab: SubTab) => void }) {
+  const { t, ui } = useLanguage();
   const query = trpc.globalStrategy.coherence.useQuery({ caseId });
 
   if (query.isLoading || !query.data) {
     return (
       <div className="flex items-center gap-2 py-10 text-sm text-muted-foreground">
-        <Loader2 className="h-4 w-4 animate-spin" /> Cruzando los cuatro módulos…
+        <Loader2 className="h-4 w-4 animate-spin" /> {ui("coLoading")}
       </div>
     );
   }
@@ -1220,13 +1250,13 @@ function CoherenceBlock({ caseId, onGo }: { caseId: number; onGo?: (tab: SubTab)
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Índice de exhaustividad</CardTitle>
-          <CardDescription>Ponderado por el peso de cada módulo en la decisión. Un módulo sin empezar cuenta cero, no «casi hecho».</CardDescription>
+          <CardTitle>{ui("coIndexTitle")}</CardTitle>
+          <CardDescription>{ui("coIndexDesc")}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-baseline gap-3">
             <span className="text-4xl font-semibold tabular-nums">{index.pct}%</span>
-            <span className="text-sm text-muted-foreground">del análisis cubierto</span>
+            <span className="text-sm text-muted-foreground">{ui("coCovered")}</span>
           </div>
           <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
             <div className="h-full bg-primary transition-all" style={{ width: `${index.pct}%` }} />
@@ -1241,9 +1271,11 @@ function CoherenceBlock({ caseId, onGo }: { caseId: number; onGo?: (tab: SubTab)
                     className="text-sm hover:underline"
                     onClick={() => onGo?.(module.key as SubTab)}
                   >
-                    {module.label}
+                    {t(module.label)}
                   </button>
-                  <span className="ml-2 text-xs text-muted-foreground">peso {module.weight}% · {module.answered} de {module.total}</span>
+                  <span className="ml-2 text-xs text-muted-foreground">
+                    {ui("coWeight")} {module.weight}% · {module.answered} {ui("coOf")} {module.total}
+                  </span>
                   <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-muted">
                     <div className="h-full bg-primary/70" style={{ width: `${module.pct}%` }} />
                   </div>
@@ -1255,8 +1287,8 @@ function CoherenceBlock({ caseId, onGo }: { caseId: number; onGo?: (tab: SubTab)
 
           {index.blockers.length > 0 && (
             <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm">
-              <div className="text-xs font-semibold uppercase text-destructive">Impide cerrar la decisión</div>
-              <ul className="mt-1 space-y-1">{index.blockers.map((blocker) => <li key={blocker}>{blocker}</li>)}</ul>
+              <div className="text-xs font-semibold uppercase text-destructive">{ui("coBlockers")}</div>
+              <ul className="mt-1 space-y-1">{index.blockers.map((blocker) => <li key={t(blocker)}>{t(blocker)}</li>)}</ul>
             </div>
           )}
         </CardContent>
@@ -1264,16 +1296,14 @@ function CoherenceBlock({ caseId, onGo }: { caseId: number; onGo?: (tab: SubTab)
 
       <Card>
         <CardHeader>
-          <CardTitle>Contradicciones entre módulos</CardTitle>
-          <CardDescription>
-            Trece reglas que solo tienen sentido con dos módulos delante. Lo que cada bloque vigila por su cuenta se avisa dentro de él.
-          </CardDescription>
+          <CardTitle>{ui("coFindingsTitle")}</CardTitle>
+          <CardDescription>{ui("coFindingsDesc")}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-2">
           {!sorted.length ? (
             <div className="flex items-center gap-2 rounded-md border p-4 text-sm">
               <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-              Ninguna contradicción entre lo contestado hasta ahora. Ojo: con módulos a medias, esto dice poco.
+              {ui("coNone")}
             </div>
           ) : (
             sorted.map((finding) => (
@@ -1286,15 +1316,22 @@ function CoherenceBlock({ caseId, onGo }: { caseId: number; onGo?: (tab: SubTab)
                   )}
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <strong>{finding.title}</strong>
-                      {finding.severity === "block" && <Badge variant="outline" className="border-destructive/50 text-destructive">bloquea</Badge>}
+                      <strong>{t(finding.title)}</strong>
+                      {finding.severity === "block" && <Badge variant="outline" className="border-destructive/50 text-destructive">{ui("coBlocks")}</Badge>}
                     </div>
-                    <p className="mt-1">{finding.detail}</p>
+                    <p className="mt-1">{t(finding.detail)}</p>
                     <div className="mt-2 flex flex-wrap items-center gap-2">
-                      <span className="text-xs text-muted-foreground">{finding.provenance}</span>
+                      <span className="text-xs text-muted-foreground">{t(finding.provenance)}</span>
                       {finding.modules.map((module) => (
                         <Button key={module} variant="outline" size="sm" className="h-6 px-2 text-xs" onClick={() => onGo?.(module as SubTab)}>
-                          Ir a {module === "ambition" ? "Ambición" : module === "positioning" ? "Posicionamiento" : module === "entry" ? "Entrada" : "Vía y socio"}
+                          {ui("coGoTo")}{" "}
+                          {module === "ambition"
+                            ? ui("gsSubAmbition")
+                            : module === "positioning"
+                              ? ui("gsSubPositioning")
+                              : module === "entry"
+                                ? ui("gsSubEntry")
+                                : ui("gsSubPartnering")}
                         </Button>
                       ))}
                     </div>

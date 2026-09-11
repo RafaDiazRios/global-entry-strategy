@@ -1,3 +1,4 @@
+import { pick } from "@shared/i18n";
 import { evaluateFinancials, recommendInvestmentAction, type EntryModeKey, type FinancialAssumptions, type FinancialResult, type InvestmentRecommendation, type InvestmentThresholds } from "./financialEngine";
 import { buildSituation, scoreEntryModes, type EntryModeScore, type EntryModeWeights } from "./entryModeScoring";
 import {
@@ -522,7 +523,9 @@ export function evaluateStrategy(input: EvaluationInput): EvaluationResult {
     const entryModes = modeRanking.slice(0, 3);
     const financial = evaluateFinancials(
       input.financialByCountry?.[country.code],
-      modeRanking.map(({ key, mode }) => ({ key, mode })),
+      // El motor financiero todavía trabaja con cadenas: se le pasa la etiqueta en español
+      // hasta que la economía por alternativa se haga bilingüe.
+      modeRanking.map(({ key, mode }) => ({ key, mode: pick(mode, "es") })),
       input.horizonYears,
       { tornadoDeltaPct: input.tornadoDeltaPct },
     );

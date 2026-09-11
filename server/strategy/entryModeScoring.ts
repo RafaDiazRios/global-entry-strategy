@@ -1,3 +1,4 @@
+import type { Localized } from "@shared/i18n";
 import {
   entryModeCriteria,
   entryModes,
@@ -36,7 +37,7 @@ export type EntryModeSituation = {
 
 export type EntryModeCriterionResult = {
   key: EntryModeCriterionKey;
-  label: string;
+  label: Localized;
   /** Valor del modo en la Tabla 7.4, normalizado a 0-100. */
   modeValue: number;
   /** Necesidad o restricción del caso frente a la que se contrasta. */
@@ -51,11 +52,11 @@ export type EntryModeCriterionResult = {
 
 export type EntryModeScore = {
   key: EntryModeKey;
-  mode: string;
+  mode: Localized;
   score: number;
   commitment: EntryModeDefinition["commitment"];
-  rationale: string;
-  provenance: string;
+  rationale: Localized;
+  provenance: Localized;
   criteria: EntryModeCriterionResult[];
 };
 

@@ -1,3 +1,4 @@
+import { pick, pickAll } from "@shared/i18n";
 import { describe, expect, it } from "vitest";
 import { emptyPositioningInput, POSITIONINGS, type PositioningInput } from "@shared/domain/globalPositioning";
 import {
@@ -86,13 +87,13 @@ describe("curva de valor y rejilla ERRC", () => {
     const diagnosis = diagnoseValueCurve(input);
     expect(diagnosis.divergence).toBe(0);
     expect(diagnosis.undifferentiated).toHaveLength(2);
-    expect(diagnosis.note).toMatch(/espacio nuevo/);
+    expect(pick(diagnosis.note, "es")).toMatch(/espacio nuevo/);
   });
 
   it("dice que no hay nada que comparar cuando falta el competidor", () => {
     const input = emptyPositioningInput();
     input.valueCurve = [{ id: "a", label: "Calidad", asIs: 3, toBe: 4, competitors: {}, note: null }];
-    expect(diagnoseValueCurve(input).note).toMatch(/competidores/);
+    expect(pick(diagnoseValueCurve(input).note, "es")).toMatch(/competidores/);
   });
 });
 
@@ -110,8 +111,9 @@ describe("configuración de la cadena de valor", () => {
     const diagnosis = diagnoseValueChain(input);
     expect(diagnosis.currentConfiguration).toBe("multinational");
     expect(diagnosis.moves).toHaveLength(3);
-    expect(diagnosis.moves.every((move) => move.direction === "centralizar")).toBe(true);
-    expect(configurationLabel("global")).toBe("Configuración global");
+    expect(diagnosis.moves.every((move) => move.direction === "centralize")).toBe(true);
+    expect(pick(configurationLabel("global"), "es")).toBe("Configuración global");
+    expect(pick(configurationLabel("global"), "en")).toBe("Global configuration");
   });
 
   it("no clasifica nada mientras la matriz esté vacía", () => {
@@ -146,7 +148,7 @@ describe("avisos de coherencia", () => {
     const warnings = positioningWarnings(emptyPositioningInput());
     const blocker = warnings.find((warning) => warning.id === "liability_of_foreignness");
     expect(blocker?.severity).toBe("block");
-    expect(blocker?.provenance).toBe("p. 198");
+    expect(pick(blocker?.provenance, "es")).toBe("p. 198");
   });
 
   it("señala una propuesta estandarizada gestionada país a país", () => {
@@ -173,6 +175,6 @@ describe("avisos de coherencia", () => {
     input.tac = [{ id: "1", kind: "asset", label: "Marca", functionId: "marketing", tag: null, note: null }];
     const completeness = positioningCompleteness(input);
     expect(completeness.complete).toBe(false);
-    expect(completeness.missing).toContain("Transfer-Adapt-Create sin capacidades sin etiquetar");
+    expect(pickAll(completeness.missing, "es")).toContain("Transfer-Adapt-Create sin capacidades sin etiquetar");
   });
 });

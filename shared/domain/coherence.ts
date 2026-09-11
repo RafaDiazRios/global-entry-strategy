@@ -11,6 +11,7 @@
  * Cada una lleva la página del libro de la que sale la incompatibilidad.
  */
 
+import { loc, type Localized } from "../i18n";
 import type { AmbitionInput } from "./globalAmbition";
 import type { PositioningInput } from "./globalPositioning";
 import type { EntryStrategyInput } from "./entryStrategy";
@@ -25,9 +26,9 @@ export type CoherenceFinding = {
   severity: CoherenceSeverity;
   /** Los módulos que se contradicen. La interfaz los usa para llevar al usuario allí. */
   modules: ModuleKey[];
-  title: string;
-  detail: string;
-  provenance: string;
+  title: Localized;
+  detail: Localized;
+  provenance: Localized;
 };
 
 export type CaseDossier = {
@@ -45,9 +46,9 @@ export const MODULE_WEIGHTS: Record<ModuleKey, number> = {
   partnering: 25,
 };
 
-export const MODULE_LABELS: Record<ModuleKey, string> = {
-  ambition: "Ambición global",
-  positioning: "Posicionamiento",
-  entry: "Estrategia de entrada",
-  partnering: "Vía de acceso y socio",
+export const MODULE_LABELS: Record<ModuleKey, Localized> = {
+  ambition: loc("Ambición global", "Global ambition"),
+  positioning: loc("Posicionamiento", "Positioning"),
+  entry: loc("Estrategia de entrada", "Entry strategy"),
+  partnering: loc("Vía de acceso y socio", "Access route and partner"),
 };

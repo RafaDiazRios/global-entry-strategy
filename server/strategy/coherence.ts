@@ -1,3 +1,4 @@
+import { loc, pick, type Localized } from "@shared/i18n";
 import {
   CaseDossier,
   CoherenceFinding,
@@ -16,8 +17,9 @@ import { diagnoseFits, evaluateGaps, partneringCompleteness } from "./partnering
  * dos módulos delante, y por eso ninguna vive dentro de un módulo.
  */
 
-function modeLabel(key: string | null) {
-  return key ? entryModes.find((mode) => mode.key === key)?.label ?? key : null;
+function modeLabel(key: string | null): Localized | null {
+  if (!key) return null;
+  return entryModes.find((mode) => mode.key === key)?.label ?? loc(key, key);
 }
 
 export function evaluateCoherence(dossier: CaseDossier): CoherenceFinding[] {
@@ -32,9 +34,12 @@ export function evaluateCoherence(dossier: CaseDossier): CoherenceFinding[] {
       id: "global_ambition_without_key_countries",
       severity: "warn",
       modules: ["ambition"],
-      title: "Ambición global sin países clave",
-      detail: "El objetivo declarado es jugador global, pero ningún país del universo está marcado como clave. No estar presente en los países clave es un handicap serio para quien quiera serlo: o falta marcar alguno, o la ambición no es la que se ha declarado.",
-      provenance: "pp. 187-188",
+      title: loc("Ambición global sin países clave", "Global ambition with no key countries"),
+      detail: loc(
+        "El objetivo declarado es jugador global, pero ningún país del universo está marcado como clave. No estar presente en los países clave es un handicap serio para quien quiera serlo: o falta marcar alguno, o la ambición no es la que se ha declarado.",
+        "The declared target is global player, but no country in the universe is marked as key. Not being present in the key countries is a serious handicap for anyone aiming to be one: either a country is missing that mark, or the ambition is not the one declared."
+      ),
+      provenance: loc("pp. 187-188", "pp. 187-188"),
     });
   }
 
@@ -46,9 +51,12 @@ export function evaluateCoherence(dossier: CaseDossier): CoherenceFinding[] {
         id: "global_ambition_export_stage",
         severity: "warn",
         modules: ["ambition", "positioning"],
-        title: "Ambición global con organización de exportador",
-        detail: "Se aspira a jugador global desde la etapa de exportación y sin una configuración integrada de la cadena de valor. La etapa global exige operaciones coordinadas, no una confederación de ventas exteriores.",
-        provenance: "p. 193 y Tabla 5.8, pp. 200-202",
+        title: loc("Ambición global con organización de exportador", "Global ambition with an exporter's organization"),
+        detail: loc(
+          "Se aspira a jugador global desde la etapa de exportación y sin una configuración integrada de la cadena de valor. La etapa global exige operaciones coordinadas, no una confederación de ventas exteriores.",
+          "The aim is global player from the export stage and without an integrated value-chain configuration. The global stage demands coordinated operations, not a confederation of foreign sales."
+        ),
+        provenance: loc("p. 193 y Tabla 5.8, pp. 200-202", "p. 193 and Table 5.8, pp. 200-202"),
       });
     }
   }
@@ -62,9 +70,12 @@ export function evaluateCoherence(dossier: CaseDossier): CoherenceFinding[] {
       id: "adaptive_without_market_contact",
       severity: "warn",
       modules: ["positioning", "entry"],
-      title: "Propuesta adaptativa con entrada a distancia",
-      detail: `La propuesta de valor se adapta por país, pero el modo elegido es ${modeLabel(entry.preferredMode)}, que deja a la empresa lejos del mercado y sin control sobre la relación con el cliente. Adaptar lo que no se observa es difícil.`,
-      provenance: "Tabla 7.4, p. 271 y p. 269",
+      title: loc("Propuesta adaptativa con entrada a distancia", "Adaptive proposition with an arm's-length entry"),
+      detail: loc(
+        `La propuesta de valor se adapta por país, pero el modo elegido es ${pick(modeLabel(entry.preferredMode), "es")}, que deja a la empresa lejos del mercado y sin control sobre la relación con el cliente. Adaptar lo que no se observa es difícil.`,
+        `The value proposition is adapted country by country, but the chosen mode is ${pick(modeLabel(entry.preferredMode), "en")}, which keeps the firm far from the market and without control over the customer relationship. Adapting what you cannot observe is hard.`
+      ),
+      provenance: loc("Tabla 7.4, p. 271 y p. 269", "Table 7.4, p. 271 and p. 269"),
     });
   }
 
@@ -74,9 +85,12 @@ export function evaluateCoherence(dossier: CaseDossier): CoherenceFinding[] {
       id: "cost_advantage_low_penetration",
       severity: "warn",
       modules: ["positioning", "entry"],
-      title: "Ventaja en coste con penetración baja",
-      detail: "Se compite por coste, que vive de volumen acumulado y escala, con un modo cuya penetración de mercado el libro califica de baja. El volumen que sostiene la ventaja no va a llegar por esa vía.",
-      provenance: "Tabla 5.5, p. 194 y Tabla 7.4, p. 271",
+      title: loc("Ventaja en coste con penetración baja", "Cost advantage with low penetration"),
+      detail: loc(
+        "Se compite por coste, que vive de volumen acumulado y escala, con un modo cuya penetración de mercado el libro califica de baja. El volumen que sostiene la ventaja no va a llegar por esa vía.",
+        "You are competing on cost, which lives off accumulated volume and scale, with a mode whose market penetration the book rates as low. The volume that sustains the advantage will not arrive that way."
+      ),
+      provenance: loc("Tabla 5.5, p. 194 y Tabla 7.4, p. 271", "Table 5.5, p. 194 and Table 7.4, p. 271"),
     });
   }
 
@@ -90,9 +104,12 @@ export function evaluateCoherence(dossier: CaseDossier): CoherenceFinding[] {
       id: "learning_objective_arms_length",
       severity: "warn",
       modules: ["entry"],
-      title: "Objetivo de aprendizaje con entrada por contrato",
-      detail: "El objetivo declarado incluye aprender, y el libro asocia ese objetivo a la empresa conjunta, el centro de I+D o el observatorio. Una licencia o un distribuidor dejan el conocimiento del otro lado.",
-      provenance: "Tabla 7.1, p. 261",
+      title: loc("Objetivo de aprendizaje con entrada por contrato", "Learning objective with a contractual entry"),
+      detail: loc(
+        "El objetivo declarado incluye aprender, y el libro asocia ese objetivo a la empresa conjunta, el centro de I+D o el observatorio. Una licencia o un distribuidor dejan el conocimiento del otro lado.",
+        "The declared objective includes learning, and the book ties that objective to the joint venture, the R&D centre or the listening post. A licence or a distributor leaves the knowledge on the other side."
+      ),
+      provenance: loc("Tabla 7.1, p. 261", "Table 7.1, p. 261"),
     });
   }
 
@@ -102,9 +119,12 @@ export function evaluateCoherence(dossier: CaseDossier): CoherenceFinding[] {
       id: "coordination_objective_heavy_mode",
       severity: "info",
       modules: ["entry"],
-      title: "Objetivo de coordinación con inversión productiva",
-      detail: "Para un país hub, el libro asocia oficina de representación, sede regional o centro logístico. Si además hay una razón de mercado para invertir, conviene declararla como segundo objetivo en lugar de dejar que la coordinación justifique la fábrica.",
-      provenance: "Tabla 7.1, pp. 260-261",
+      title: loc("Objetivo de coordinación con inversión productiva", "Coordination objective with a productive investment"),
+      detail: loc(
+        "Para un país hub, el libro asocia oficina de representación, sede regional o centro logístico. Si además hay una razón de mercado para invertir, conviene declararla como segundo objetivo en lugar de dejar que la coordinación justifique la fábrica.",
+        "For a hub country the book points to a representative office, regional headquarters or a logistics centre. If there is also a market reason to invest, declare it as a second objective rather than letting coordination justify the plant."
+      ),
+      provenance: loc("Tabla 7.1, pp. 260-261", "Table 7.1, pp. 260-261"),
     });
   }
 
@@ -114,9 +134,12 @@ export function evaluateCoherence(dossier: CaseDossier): CoherenceFinding[] {
       id: "resource_objective_office",
       severity: "warn",
       modules: ["entry"],
-      title: "Objetivo de recursos con oficina de representación",
-      detail: "Acceder a un recurso pide explotarlo o contratarlo a largo plazo: filial propia si se permite, empresa conjunta si se exige, o contrato de suministro. Una oficina observa, no asegura suministro.",
-      provenance: "Tabla 7.1, pp. 260-261",
+      title: loc("Objetivo de recursos con oficina de representación", "Resource objective with a representative office"),
+      detail: loc(
+        "Acceder a un recurso pide explotarlo o contratarlo a largo plazo: filial propia si se permite, empresa conjunta si se exige, o contrato de suministro. Una oficina observa, no asegura suministro.",
+        "Getting access to a resource means exploiting it or contracting for it long term: a wholly owned subsidiary where allowed, a joint venture where required, or a supply contract. An office observes; it does not secure supply."
+      ),
+      provenance: loc("Tabla 7.1, pp. 260-261", "Table 7.1, pp. 260-261"),
     });
   }
 
@@ -130,9 +153,12 @@ export function evaluateCoherence(dossier: CaseDossier): CoherenceFinding[] {
         id: "overcommitment_to_secondary_country",
         severity: "warn",
         modules: ["ambition", "entry"],
-        title: "Inversión máxima en un país secundario",
-        detail: `${entry.countryCode} está clasificado como país de ${role === "marketing" ? "mercado" : "aprovisionamiento"} y el modo elegido es el de mayor compromiso. La clasificación existe precisamente para ordenar prioridades de inversión: o el país merece otro rol, o la inversión es desproporcionada.`,
-        provenance: "pp. 187-188",
+        title: loc("Inversión máxima en un país secundario", "Maximum investment in a secondary country"),
+        detail: loc(
+          `${entry.countryCode} está clasificado como país de ${role === "marketing" ? "mercado" : "aprovisionamiento"} y el modo elegido es el de mayor compromiso. La clasificación existe precisamente para ordenar prioridades de inversión: o el país merece otro rol, o la inversión es desproporcionada.`,
+          `${entry.countryCode} is classified as a ${role === "marketing" ? "marketing" : "sourcing"} country and the chosen mode is the highest-commitment one. The classification exists precisely to order investment priorities: either the country deserves another role, or the investment is out of proportion.`
+        ),
+        provenance: loc("pp. 187-188", "pp. 187-188"),
       });
     }
     if (!role && ambition.countryRoles.length > 0) {
@@ -140,9 +166,12 @@ export function evaluateCoherence(dossier: CaseDossier): CoherenceFinding[] {
         id: "entry_country_without_role",
         severity: "info",
         modules: ["ambition", "entry"],
-        title: "El país de entrada no tiene rol asignado",
-        detail: `Se está diseñando la entrada en ${entry.countryCode} y ese país no aparece con rol en el universo de la ambición. Sin rol no hay prioridad de inversión con la que contrastar el modo.`,
-        provenance: "pp. 187-188",
+        title: loc("El país de entrada no tiene rol asignado", "The entry country has no role assigned"),
+        detail: loc(
+          `Se está diseñando la entrada en ${entry.countryCode} y ese país no aparece con rol en el universo de la ambición. Sin rol no hay prioridad de inversión con la que contrastar el modo.`,
+          `The entry into ${entry.countryCode} is being designed and that country carries no role in the ambition's country universe. Without a role there is no investment priority to test the mode against.`
+        ),
+        provenance: loc("pp. 187-188", "pp. 187-188"),
       });
     }
   }
@@ -159,9 +188,12 @@ export function evaluateCoherence(dossier: CaseDossier): CoherenceFinding[] {
         id: "unresolved_resource_gap",
         severity: "block",
         modules: ["positioning", "partnering"],
-        title: "Capacidades declaradas «crear» sin vía de acceso",
-        detail: `El Transfer-Adapt-Create marcó ${unresolved.length} capacidad(es) que hay que crear y que no aparecen en la decisión de construir, alquilar o comprar: ${unresolved.slice(0, 3).map((entry) => entry.label).join(", ")}${unresolved.length > 3 ? "…" : ""}. Declarar una brecha y no resolverla es el agujero más común del análisis.`,
-        provenance: "Fig. 5.14, p. 199 y capítulo 8",
+        title: loc("Capacidades declaradas «crear» sin vía de acceso", "Capabilities tagged \u201ccreate\u201d with no access route"),
+        detail: loc(
+          `El Transfer-Adapt-Create marcó ${unresolved.length} capacidad(es) que hay que crear y que no aparecen en la decisión de construir, alquilar o comprar: ${unresolved.slice(0, 3).map((entry) => entry.label).join(", ")}${unresolved.length > 3 ? "…" : ""}. Declarar una brecha y no resolverla es el agujero más común del análisis.`,
+          `Transfer-Adapt-Create tagged ${unresolved.length} capability(ies) to be created that do not appear in the build, borrow or buy decision: ${unresolved.slice(0, 3).map((entry) => entry.label).join(", ")}${unresolved.length > 3 ? "\u2026" : ""}. Declaring a gap and never resolving it is the most common hole in the analysis.`
+        ),
+        provenance: loc("Fig. 5.14, p. 199 y capítulo 8", "Fig. 5.14, p. 199 and chapter 8"),
       });
     }
   }
@@ -172,9 +204,12 @@ export function evaluateCoherence(dossier: CaseDossier): CoherenceFinding[] {
       id: "high_creation_load_light_mode",
       severity: "warn",
       modules: ["positioning", "entry"],
-      title: "Mucho que construir con una entrada ligera",
-      detail: `El ${Math.round(gap.creationLoad * 100)}% de las capacidades no viaja tal cual, y el modo elegido no construye capacidades locales. O se revisa el modo, o alguien tiene que construirlas: normalmente, un socio.`,
-      provenance: "Fig. 5.14, p. 199 y Tabla 7.4, p. 271",
+      title: loc("Mucho que construir con una entrada ligera", "A lot to build with a light entry"),
+      detail: loc(
+        `El ${Math.round(gap.creationLoad * 100)}% de las capacidades no viaja tal cual, y el modo elegido no construye capacidades locales. O se revisa el modo, o alguien tiene que construirlas: normalmente, un socio.`,
+        `${Math.round(gap.creationLoad * 100)}% of the capabilities do not travel as they are, and the chosen mode builds no local capabilities. Either revisit the mode, or someone has to build them: usually a partner.`
+      ),
+      provenance: loc("Fig. 5.14, p. 199 y Tabla 7.4, p. 271", "Fig. 5.14, p. 199 and Table 7.4, p. 271"),
     });
   }
 
@@ -188,9 +223,12 @@ export function evaluateCoherence(dossier: CaseDossier): CoherenceFinding[] {
       id: "build_in_mature_market",
       severity: "warn",
       modules: ["entry", "partnering"],
-      title: "Construir en un mercado maduro",
-      detail: "La fase declarada es madura, donde el libro solo ve viable la adquisición o la inversión directa con un producto innovador, y sin embargo hay capacidades que se piensa construir desde cero. Construir lleva tiempo, y en fase madura el tiempo ya se agotó.",
-      provenance: "p. 262 y p. 277",
+      title: loc("Construir en un mercado maduro", "Building in a mature market"),
+      detail: loc(
+        "La fase declarada es madura, donde el libro solo ve viable la adquisición o la inversión directa con un producto innovador, y sin embargo hay capacidades que se piensa construir desde cero. Construir lleva tiempo, y en fase madura el tiempo ya se agotó.",
+        "The declared phase is mature, where the book sees only acquisition or direct investment with an innovative product as viable, and yet some capabilities are to be built from scratch. Building takes time, and in the mature phase the time is already gone."
+      ),
+      provenance: loc("p. 262 y p. 277", "p. 262 and p. 277"),
     });
   }
 
@@ -203,9 +241,12 @@ export function evaluateCoherence(dossier: CaseDossier): CoherenceFinding[] {
         id: "buy_with_weak_integration_fit",
         severity: "warn",
         modules: ["partnering"],
-        title: "Adquisición con encaje organizativo o cultural débil",
-        detail: "El árbol lleva a comprar y el encaje cultural u organizativo con el objetivo es débil. Las adquisiciones en el extranjero exigen capacidad de integración intercultural, que no suele ser el talento principal del inversor.",
-        provenance: "p. 265 y p. 278",
+        title: loc("Adquisición con encaje organizativo o cultural débil", "Acquisition with weak organizational or cultural fit"),
+        detail: loc(
+          "El árbol lleva a comprar y el encaje cultural u organizativo con el objetivo es débil. Las adquisiciones en el extranjero exigen capacidad de integración intercultural, que no suele ser el talento principal del inversor.",
+          "The tree leads to buying and the cultural or organizational fit with the target is weak. Foreign acquisitions demand cross-cultural integration capability, which is rarely the investor's main talent."
+        ),
+        provenance: loc("p. 265 y p. 278", "p. 265 and p. 278"),
       });
     }
   }
@@ -216,9 +257,12 @@ export function evaluateCoherence(dossier: CaseDossier): CoherenceFinding[] {
       id: "alliance_mode_without_partner_analysis",
       severity: "block",
       modules: ["entry", "partnering"],
-      title: "Entrada por alianza sin análisis de socio",
-      detail: "El modo elegido es la empresa conjunta y el socio no está caracterizado. Elegir bien al socio local es probablemente la decisión más crítica de una empresa conjunta, y aquí está sin tomar.",
-      provenance: "p. 265 y Tabla 7.3, p. 267",
+      title: loc("Entrada por alianza sin análisis de socio", "Alliance entry with no partner analysis"),
+      detail: loc(
+        "El modo elegido es la empresa conjunta y el socio no está caracterizado. Elegir bien al socio local es probablemente la decisión más crítica de una empresa conjunta, y aquí está sin tomar.",
+        "The chosen mode is the joint venture and the partner has not been characterized. Choosing the local partner well is probably the most critical decision in a joint venture, and it is still unmade."
+      ),
+      provenance: loc("p. 265 y Tabla 7.3, p. 267", "p. 265 and Table 7.3, p. 267"),
     });
   }
 
@@ -229,14 +273,14 @@ export function evaluateCoherence(dossier: CaseDossier): CoherenceFinding[] {
 /* Índice de exhaustividad                                                               */
 /* ------------------------------------------------------------------------------------ */
 
-export type ModuleScore = { key: ModuleKey; label: string; answered: number; total: number; weight: number; pct: number };
+export type ModuleScore = { key: ModuleKey; label: Localized; answered: number; total: number; weight: number; pct: number };
 
 export type CompletenessIndex = {
   /** 0 a 100, ponderado por la importancia de cada módulo en la decisión. */
   pct: number;
   modules: ModuleScore[];
   /** Lo que impide cerrar la decisión: findings bloqueantes más módulos vacíos. */
-  blockers: string[];
+  blockers: Localized[];
 };
 
 /**
@@ -321,9 +365,11 @@ export function completenessIndex(dossier: CaseDossier, findings: CoherenceFindi
 
   const weighted = modules.reduce((total, module) => total + (module.pct * module.weight) / 100, 0);
 
-  const blockers = [
+  const blockers: Localized[] = [
     ...findings.filter((finding) => finding.severity === "block").map((finding) => finding.title),
-    ...modules.filter((module) => module.pct === 0).map((module) => `${module.label}: sin empezar`),
+    ...modules
+      .filter((module) => module.pct === 0)
+      .map((module) => loc(`${pick(module.label, "es")}: sin empezar`, `${pick(module.label, "en")}: not started`)),
   ];
 
   return { pct: Math.round(weighted), modules, blockers };

@@ -1,3 +1,4 @@
+import { pick, pickAll } from "@shared/i18n";
 import { describe, expect, it } from "vitest";
 import { emptyAmbitionInput } from "@shared/domain/globalAmbition";
 import { emptyPositioningInput } from "@shared/domain/globalPositioning";
@@ -108,7 +109,7 @@ describe("la brecha de recursos y su resolución", () => {
     ];
     const finding = evaluateCoherence(dossier({ positioning })).find((item) => item.id === "unresolved_resource_gap");
     expect(finding?.severity).toBe("block");
-    expect(finding?.detail).toMatch(/Red de almacenes/);
+    expect(pick(finding?.detail, "es")).toMatch(/Red de almacenes/);
   });
 
   it("deja de bloquear cuando la capacidad aparece en el módulo de socio", () => {
@@ -199,6 +200,7 @@ describe("índice de exhaustividad", () => {
     entry.preferredMode = "alliance";
     const findings = evaluateCoherence(dossier({ entry }));
     const index = completenessIndex(dossier({ entry }), findings);
-    expect(index.blockers).toContain("Entrada por alianza sin análisis de socio");
+    expect(pickAll(index.blockers, "es")).toContain("Entrada por alianza sin análisis de socio");
+    expect(pickAll(index.blockers, "en")).toContain("Alliance entry with no partner analysis");
   });
 });

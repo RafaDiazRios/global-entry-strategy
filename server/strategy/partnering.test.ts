@@ -1,3 +1,4 @@
+import { pick, pickAll } from "@shared/i18n";
 import { describe, expect, it } from "vitest";
 import { emptyPartneringInput, PARTNER_TYPES, type PartneringInput } from "@shared/domain/partnering";
 import {
@@ -34,7 +35,7 @@ describe("árbol build-borrow-buy", () => {
     expect(buy.route).toBe("buy");
     const ally = decideRoute({ internal_relevance: 0, tradability: 0, partner_closeness: 4, integration_capacity: 0 });
     expect(ally.route).toBe("borrow_alliance");
-    expect(ally.reason).toMatch(/destruiría/);
+    expect(pick(ally.reason, "es")).toMatch(/destruiría/);
   });
 
   it("se detiene en la primera pregunta que decide, sin promediar", () => {
@@ -52,7 +53,8 @@ describe("árbol build-borrow-buy", () => {
     const verdicts = evaluateGaps(withGap({ internal_relevance: 0, tradability: 4 }, "buy"));
     expect(verdicts[0].route).toBe("borrow_contract");
     expect(verdicts[0].divergesFromChoice).toBe(true);
-    expect(routeLabel("borrow_contract")).toBe("Alquilar por contrato");
+    expect(pick(routeLabel("borrow_contract"), "es")).toBe("Alquilar por contrato");
+    expect(pick(routeLabel("borrow_contract"), "en")).toBe("Borrow through contract");
   });
 });
 
@@ -74,12 +76,12 @@ describe("encaje del socio", () => {
   it("lista los encajes puntuados sin evidencia", () => {
     const input = emptyPartneringInput();
     input.fits = [{ id: "strategic", score: 3, evidence: null }, { id: "capability", score: null, evidence: null }, { id: "cultural", score: null, evidence: null }, { id: "organizational", score: null, evidence: null }];
-    expect(diagnoseFits(input).unevidenced).toEqual(["Encaje estratégico"]);
+    expect(pickAll(diagnoseFits(input).unevidenced, "es")).toEqual(["Encaje estratégico"]);
   });
 
   it("trae los riesgos del tipo de socio de la Tabla 7.3", () => {
     expect(PARTNER_TYPES).toHaveLength(6);
-    expect(partnerTypeRisks("competitor")?.foreignRisks.join(" ")).toMatch(/fuga tecnológica/);
+    expect(pickAll(partnerTypeRisks("competitor")?.foreignRisks, "es").join(" ")).toMatch(/fuga tecnológica/);
     expect(partnerTypeRisks(null)).toBeNull();
   });
 });
@@ -90,7 +92,7 @@ describe("opción real", () => {
     input.realOption.premium = 600000;
     const diagnosis = diagnoseRealOption(input);
     expect(diagnosis.structured).toBe(false);
-    expect(diagnosis.missing.join(" ")).toMatch(/señal/);
+    expect(pickAll(diagnosis.missing, "es").join(" ")).toMatch(/señal/);
   });
 
   it("exige un umbral verificable y no solo una señal enunciada", () => {
@@ -104,7 +106,7 @@ describe("opción real", () => {
       retreatPathId: "continue_under_licence",
       note: null,
     };
-    expect(diagnoseRealOption(input).missing.join(" ")).toMatch(/umbral/);
+    expect(pickAll(diagnoseRealOption(input).missing, "es").join(" ")).toMatch(/umbral/);
 
     input.realOption.triggers[0].threshold = "20% de cuota al tercer año";
     const diagnosis = diagnoseRealOption(input);
