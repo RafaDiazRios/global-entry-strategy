@@ -98,18 +98,22 @@ pnpm build
 
 ### Migraciones de base de datos
 
-> **Al actualizar a esta versión hay que migrar.** Se añaden `strategyCases`,
-> `strategyCaseDocuments` y `strategyEvidence`, más la columna `caseId` en
-> `strategyScenarios`. La migración es aditiva y no toca datos existentes:
-> `pnpm drizzle-kit migrate` (o `pnpm db:push`).
-
-La tabla `strategyScenarios` almacena escenarios y resultados. Para cambios de esquema:
+Para aplicar migraciones pendientes:
 
 ```bash
-pnpm drizzle-kit generate
-# Revise la migración SQL generada antes de aplicarla.
-pnpm drizzle-kit migrate
+DATABASE_URL="postgresql://..." pnpm db:migrate
 ```
+
+En PowerShell, `$env:DATABASE_URL="postgresql://..."` en una sentencia aparte.
+
+**No ejecute `pnpm db:generate`.** Compara `drizzle/schema.ts` contra las fotos de
+`drizzle/meta`, y esas fotos se quedaron en la `0002`: de la `0003` en adelante las
+migraciones se escribieron a mano. Generar hoy produciría un fichero SQL que recrea cosas que
+ya existen. Una migración nueva se escribe a mano en `drizzle/`, con su entrada en
+`_journal.json`, siguiendo el patrón de las últimas.
+
+El detalle completo, incluido por qué la primera ejecución de `db:migrate` reaplica las siete
+sin romper nada, está en [docs/DESPLIEGUE.md](docs/DESPLIEGUE.md#5-migraciones).
 
 ## Arquitectura
 

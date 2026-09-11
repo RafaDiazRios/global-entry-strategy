@@ -127,20 +127,51 @@ Google.
 
 ## 5. Migraciones
 
-Las tablas ya están aplicadas, así que **no hace falta ejecutar nada ahora**. Cuando una
-fase futura añada tablas o columnas:
+**Ejecute `pnpm db:migrate`, nunca `db:generate`.** Son dos comandos distintos a propósito:
+antes eran uno solo (`db:push`) y ese atajo era una trampa. Por qué, abajo.
 
-```bash
-pnpm drizzle-kit generate    # genera el fichero SQL a partir de drizzle/schema.ts
-DATABASE_URL="postgresql://..." pnpm drizzle-kit migrate
+```powershell
+$env:DATABASE_URL="postgresql://..."
+pnpm db:migrate
 ```
 
-En Windows PowerShell, la primera línea del comando se escribe
-`$env:DATABASE_URL="postgresql://..."` en una sentencia aparte.
+La cadena es la misma del apartado 1 (el pooler de sesión de Supabase). En bash va delante
+del comando: `DATABASE_URL="postgresql://..." pnpm db:migrate`.
 
-La migración inicial (`0000_inicial_postgres.sql`) está escrita para poder aplicarse sobre
-una base donde las tablas ya existen sin romper nada, así que ejecutar `migrate` de más es
-inofensivo.
+### Por qué `db:generate` está separado y por qué no debe ejecutarlo
+
+`drizzle-kit generate` no lee la base: compara `drizzle/schema.ts` contra la última foto que
+haya en `drizzle/meta`. Y esas fotos se quedaron en el `0002`: existen `0000_snapshot.json`,
+`0001_snapshot.json` y `0002_snapshot.json`, y nada más. Las migraciones de la `0003` a la
+`0006` se escribieron a mano y se aplicaron directamente contra Supabase, sin pasar por
+`generate`.
+
+Consecuencia: ejecutar `generate` hoy compararía el esquema actual contra una foto de hace
+cuatro migraciones e intentaría inventarse un fichero SQL enorme, con `CREATE TYPE` y
+`CREATE TABLE` de cosas que ya existen. Por eso el script está aparte y con nombre propio, en
+lugar de escondido dentro de `db:push` donde se ejecutaba sin querer.
+
+Mientras las fotos no se reconstruyan, una migración nueva se escribe a mano en `drizzle/`,
+con su entrada en `_journal.json`, siguiendo el patrón de las últimas cuatro.
+
+### La primera vez: rellenar el registro
+
+Drizzle lleva su propia contabilidad de qué migraciones ha aplicado, en una tabla
+`drizzle.__drizzle_migrations`. **Esa tabla no existe todavía**, porque las migraciones se han
+ido aplicando por fuera. Así que la primera vez que ejecute `db:migrate` intentará aplicar las
+siete desde el principio.
+
+Es seguro, y conviene hacerlo una vez para que a partir de ahí drizzle funcione solo:
+
+- Ninguna de las siete contiene una sentencia destructiva. No hay `DROP`, ni `TRUNCATE`, ni
+  `DELETE`, ni cambios de tipo de columna.
+- Todas son idempotentes. La `0000` usa `CREATE TABLE IF NOT EXISTS` en las veinticuatro
+  tablas e índices; la `0001` activa RLS, que activarlo dos veces no hace nada; la `0002`
+  envuelve el `CREATE TYPE` en un bloque que captura `duplicate_object`; y de la `0003` a la
+  `0006` cada una comprueba si el valor del enum existe antes de añadirlo.
+
+Tras esa ejecución, la tabla de registro queda creada con las siete anotadas y las siguientes
+migraciones se aplican de una en una, como debe ser.
 
 ---
 
