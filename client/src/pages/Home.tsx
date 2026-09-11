@@ -21,6 +21,8 @@ import { CountryAssessmentPanel, assessmentProgress, emptyAssessment, type Count
 import { CaseWorkspace } from "@/components/CaseWorkspace";
 import { GlobalStrategyPanel } from "@/components/GlobalStrategyPanel";
 import { GuidedRoutePanel } from "@/components/GuidedRoutePanel";
+import { LanguageSwitch } from "@/components/LanguageSwitch";
+import { useLanguage } from "@/i18n";
 import { ScenarioArchive } from "@/components/ScenarioArchive";
 
 type Objective = "market" | "resources" | "learning" | "coordination";
@@ -155,6 +157,7 @@ function decisionStyle(action: CountryResult["investmentRecommendation"]["action
 
 export default function Home() {
   const { isAuthenticated } = useAuth();
+  const { ui } = useLanguage();
   const [activeTab, setActiveTab] = useState("brief");
   const [caseId, setCaseId] = useState<number | null>(null);
   const [caseDocumentId, setCaseDocumentId] = useState<number | null>(null);
@@ -626,7 +629,7 @@ export default function Home() {
             <p>Un instrumento de juicio estratégico. No un ranking universal de países.</p>
           </div>
           <div className="header-actions">
-            <div className="scenario-name"><Label htmlFor="scenario">Escenario</Label><Input id="scenario" value={scenarioName} onChange={(event) => setScenarioName(event.target.value)} /></div>
+            <div className="scenario-name"><Label htmlFor="scenario">Escenario</Label><Input id="scenario" value={scenarioName} onChange={(event) => setScenarioName(event.target.value)} /></div><LanguageSwitch />
             <Button variant="outline" onClick={exportPdfReport} disabled={!result}><FileDown className="mr-2 h-4 w-4" /> PDF</Button>
             <div className="flex items-center gap-2">
               {savedScenarioId !== null && (
@@ -669,15 +672,15 @@ export default function Home() {
           />
 
           <TabsList className="studio-tabs">
-            <TabsTrigger value="case"><FileText className="mr-2 h-4 w-4" /> 0. Caso</TabsTrigger>
-            <TabsTrigger value="brief"><Building2 className="mr-2 h-4 w-4" /> 1. Mandato</TabsTrigger>
-            <TabsTrigger value="ambition"><Compass className="mr-2 h-4 w-4" /> 2. Estrategia global</TabsTrigger>
-            <TabsTrigger value="screen"><Globe2 className="mr-2 h-4 w-4" /> 3. Mercados</TabsTrigger>
-            <TabsTrigger value="calibrate"><SlidersHorizontal className="mr-2 h-4 w-4" /> 4. Calibración</TabsTrigger>
-            <TabsTrigger value="finance"><CircleDollarSign className="mr-2 h-4 w-4" /> 5. Economía</TabsTrigger>
-            <TabsTrigger value="compare"><Columns3 className="mr-2 h-4 w-4" /> 6. Comparar</TabsTrigger>
-            <TabsTrigger value="decision"><Target className="mr-2 h-4 w-4" /> 7. Decisión</TabsTrigger>
-            <TabsTrigger value="approval"><ClipboardCheck className="mr-2 h-4 w-4" /> 8. Gates</TabsTrigger>
+            <TabsTrigger value="case"><FileText className="mr-2 h-4 w-4" /> {ui("tabCase")}</TabsTrigger>
+            <TabsTrigger value="brief"><Building2 className="mr-2 h-4 w-4" /> {ui("tabBrief")}</TabsTrigger>
+            <TabsTrigger value="ambition"><Compass className="mr-2 h-4 w-4" /> {ui("tabStrategy")}</TabsTrigger>
+            <TabsTrigger value="screen"><Globe2 className="mr-2 h-4 w-4" /> {ui("tabMarkets")}</TabsTrigger>
+            <TabsTrigger value="calibrate"><SlidersHorizontal className="mr-2 h-4 w-4" /> {ui("tabCalibration")}</TabsTrigger>
+            <TabsTrigger value="finance"><CircleDollarSign className="mr-2 h-4 w-4" /> {ui("tabEconomics")}</TabsTrigger>
+            <TabsTrigger value="compare"><Columns3 className="mr-2 h-4 w-4" /> {ui("tabCompare")}</TabsTrigger>
+            <TabsTrigger value="decision"><Target className="mr-2 h-4 w-4" /> {ui("tabDecision")}</TabsTrigger>
+            <TabsTrigger value="approval"><ClipboardCheck className="mr-2 h-4 w-4" /> {ui("tabGates")}</TabsTrigger>
           </TabsList>
 
           <TabsContent value="case" className="mt-6"><CaseWorkspace caseId={caseId} onCaseSelected={setCaseId} decisionContext={[companyName, industry, valueProposition].filter(Boolean).join(" · ")} defaults={{ companyName, homeCountry, industry }} activeDocumentId={caseDocumentId} onActiveDocumentChange={setCaseDocumentId} /></TabsContent>

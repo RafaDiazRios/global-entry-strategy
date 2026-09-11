@@ -161,7 +161,16 @@ función de costes que el caso no determina.
 - [x] Los bloqueantes se listan aparte, y desde cada contradicción se salta al módulo que la provoca.
 
 - [ ] Informe ampliado en PDF con la sección de coherencia. Pendiente.
-- [ ] Bilingüe español/inglés con selector. Acordado; unas 1.150 cadenas, la mayoría en dominio y motores.
+### Bilingüe — entrega 1 de 4
+
+- [x] Infraestructura: tipo `Localized` con los dos idiomas juntos, conmutador que recuerda la elección en el navegador y toma la del sistema la primera vez.
+- [x] La ruta guiada entera en los dos idiomas: doce pasos con su decisión, su porqué, su ejemplo del libro y sus criterios de calidad.
+- [x] Etiquetas de las nueve pestañas de navegación.
+- [x] Pruebas que comprueban que no hay huecos en ningún idioma y que el inglés no es la cadena española repetida.
+
+- [ ] Entrega 2: dominio compartido, las tablas del libro y las etiquetas de los marcos (~590 cadenas).
+- [ ] Entrega 3: motores, avisos de coherencia y criterios (~310 cadenas).
+- [ ] Entrega 4: copiloto de caso en el idioma elegido, e informe PDF.
 
 ## Consideraciones para la siguiente evolución
 

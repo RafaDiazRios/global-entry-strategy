@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { trpc } from "@/lib/trpc";
 import { evaluateRoute, type RouteSnapshot, type StepState } from "@shared/domain/guidedRoute";
+import { useLanguage } from "@/i18n";
 
 /**
  * La ruta guiada, encima de las pestañas.
@@ -31,6 +32,7 @@ type Props = {
 };
 
 export function GuidedRoutePanel({ caseId, scenario, onGo }: Props) {
+  const { t, ui } = useLanguage();
   const [open, setOpen] = useState(true);
   const [showAll, setShowAll] = useState(false);
 
@@ -77,12 +79,12 @@ export function GuidedRoutePanel({ caseId, scenario, onGo }: Props) {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <Compass className="h-4 w-4 text-muted-foreground" />
-            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Ruta del análisis</span>
-            <Badge variant="outline">{route.doneCount} de {route.total} pasos</Badge>
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{ui("routeEyebrow")}</span>
+            <Badge variant="outline">{route.doneCount} {ui("routeOf")} {route.total} {ui("routeProgress")}</Badge>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm" onClick={() => setShowAll((value) => !value)}>{showAll ? "Ver solo lo pendiente" : "Ver los doce pasos"}</Button>
-            <Button variant="ghost" size="sm" aria-label={open ? "Plegar la ruta" : "Desplegar la ruta"} onClick={() => setOpen((value) => !value)}>
+            <Button variant="ghost" size="sm" onClick={() => setShowAll((value) => !value)}>{showAll ? ui("routeShowPending") : ui("routeShowAll")}</Button>
+            <Button variant="ghost" size="sm" aria-label={open ? ui("routeCollapse") : ui("routeExpand")} onClick={() => setOpen((value) => !value)}>
               {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
             </Button>
           </div>
@@ -97,34 +99,34 @@ export function GuidedRoutePanel({ caseId, scenario, onGo }: Props) {
             {current ? (
               <div className="mt-5 rounded-md border bg-muted/40 p-4">
                 <div className="flex flex-wrap items-center gap-2">
-                  <Badge>Paso {current.step.order}</Badge>
-                  <h3 className="text-base font-semibold">{current.step.title}</h3>
+                  <Badge>{ui("routeStep")} {current.step.order}</Badge>
+                  <h3 className="text-base font-semibold">{t(current.step.title)}</h3>
                 </div>
 
-                <p className="mt-2 text-sm"><strong>Qué decides aquí.</strong> {current.step.decision}</p>
-                <p className="mt-1 text-sm text-muted-foreground"><strong className="text-foreground">Por qué importa.</strong> {current.step.why}</p>
+                <p className="mt-2 text-sm"><strong>{ui("routeWhatYouDecide")}</strong> {t(current.step.decision)}</p>
+                <p className="mt-1 text-sm text-muted-foreground"><strong className="text-foreground">{ui("routeWhyItMatters")}</strong> {t(current.step.why)}</p>
 
                 <div className="mt-3 flex gap-2 rounded-md border-l-2 border-muted-foreground/40 bg-background/60 p-3 text-sm">
                   <BookOpen className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
                   <div>
-                    <p>{current.step.example.text}</p>
+                    <p>{t(current.step.example.text)}</p>
                     <p className="mt-1 text-xs text-muted-foreground">{current.step.example.source}</p>
                   </div>
                 </div>
 
                 <div className="mt-3 grid gap-3 sm:grid-cols-2">
                   <div>
-                    <div className="text-xs font-semibold uppercase text-muted-foreground">Una respuesta buena</div>
+                    <div className="text-xs font-semibold uppercase text-muted-foreground">{ui("routeGoodAnswer")}</div>
                     <ul className="mt-1 space-y-1 text-sm">
                       {current.step.quality.map((item) => (
-                        <li key={item} className="flex gap-2"><Target className="mt-1 h-3 w-3 shrink-0 text-muted-foreground" />{item}</li>
+                        <li key={item.es} className="flex gap-2"><Target className="mt-1 h-3 w-3 shrink-0 text-muted-foreground" />{t(item)}</li>
                       ))}
                     </ul>
                   </div>
                   <div>
-                    <div className="text-xs font-semibold uppercase text-muted-foreground">Para darlo por hecho falta</div>
+                    <div className="text-xs font-semibold uppercase text-muted-foreground">{ui("routeStillMissing")}</div>
                     <ul className="mt-1 space-y-1 text-sm">
-                      {current.missing.length ? current.missing.map((item) => <li key={item}>{item}</li>) : <li className="text-muted-foreground">Nada: puede continuar</li>}
+                      {current.missing.length ? current.missing.map((item) => <li key={item.es}>{t(item)}</li>) : <li className="text-muted-foreground">{ui("routeNothingMissing")}</li>}
                     </ul>
                     {current.progress !== null && (
                       <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-muted">
@@ -135,13 +137,12 @@ export function GuidedRoutePanel({ caseId, scenario, onGo }: Props) {
                 </div>
 
                 <Button className="mt-4" onClick={() => onGo(current.step.target, current.step.subTab)}>
-                  Ir al paso {current.step.order}
+                  {ui("routeGoToStep")} {current.step.order}
                 </Button>
               </div>
             ) : (
               <div className="mt-5 rounded-md border bg-muted/40 p-4 text-sm">
-                <strong>Análisis completo.</strong> Los doce pasos están cubiertos: mandato, evidencias, ambición, posicionamiento, países,
-                evaluación, entrada, socio y decisión con su puerta de revisión. Puede exportar el informe o guardar el escenario.
+<strong>{ui("routeComplete")}</strong> {ui("routeCompleteDetail")}
               </div>
             )}
 
@@ -159,7 +160,7 @@ export function GuidedRoutePanel({ caseId, scenario, onGo }: Props) {
                       <Circle className={`h-4 w-4 shrink-0 ${state.status === "in_progress" ? "text-primary" : "text-muted-foreground/40"}`} />
                     )}
                     <span className="w-6 shrink-0 tabular-nums text-muted-foreground">{state.step.order}</span>
-                    <span className={state.status === "done" ? "text-muted-foreground line-through" : ""}>{state.step.title}</span>
+                    <span className={state.status === "done" ? "text-muted-foreground line-through" : ""}>{t(state.step.title)}</span>
                     {state.status !== "done" && state.progress !== null && (
                       <span className="ml-auto text-xs text-muted-foreground">{Math.round(state.progress * 100)}%</span>
                     )}
@@ -170,7 +171,7 @@ export function GuidedRoutePanel({ caseId, scenario, onGo }: Props) {
 
             {!enabled && (
               <p className="mt-3 text-xs text-muted-foreground">
-                La ruta empieza a medir en cuanto haya un caso abierto. Sin caso solo puede seguir el primer paso.
+{ui("routeNoCase")}
               </p>
             )}
           </>

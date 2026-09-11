@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { evaluateRoute, GUIDED_STEPS, type RouteSnapshot } from "@shared/domain/guidedRoute";
+import { LANGUAGES, pick } from "@shared/i18n";
 
 function empty(): RouteSnapshot {
   return {
@@ -53,10 +54,29 @@ describe("la ruta guiada", () => {
 
   it("cada paso dice qué se decide, por qué importa, un ejemplo del libro y su criterio de calidad", () => {
     for (const step of GUIDED_STEPS) {
-      expect(step.decision.length).toBeGreaterThan(20);
-      expect(step.why.length).toBeGreaterThan(40);
-      expect(step.example.source).toMatch(/p\.|pp\.|Tabla|Fig\.|Ejemplo|Mini-caso|assignment/);
+      expect(step.decision.es.length).toBeGreaterThan(20);
+      expect(step.why.es.length).toBeGreaterThan(40);
+      expect(step.example.source).toMatch(/p\.|pp\.|Table|Fig\.|Example|Mini-case|assignment/);
       expect(step.quality.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("está entero en los dos idiomas, sin huecos", () => {
+    for (const step of GUIDED_STEPS) {
+      for (const lang of LANGUAGES) {
+        expect(pick(step.title, lang).length).toBeGreaterThan(5);
+        expect(pick(step.decision, lang).length).toBeGreaterThan(20);
+        expect(pick(step.why, lang).length).toBeGreaterThan(40);
+        expect(pick(step.example.text, lang).length).toBeGreaterThan(40);
+        for (const item of step.quality) expect(pick(item, lang).length).toBeGreaterThan(10);
+      }
+    }
+  });
+
+  it("el español y el inglés dicen cosas distintas, no la misma cadena repetida", () => {
+    for (const step of GUIDED_STEPS) {
+      expect(step.title.es).not.toBe(step.title.en);
+      expect(step.why.es).not.toBe(step.why.en);
     }
   });
 
@@ -64,7 +84,7 @@ describe("la ruta guiada", () => {
     const route = evaluateRoute(empty());
     expect(route.current?.step.id).toBe("case");
     expect(route.current?.status).toBe("in_progress");
-    expect(route.current?.missing).toContain("Crear o seleccionar un caso");
+    expect(route.current?.missing.map((item) => item.es)).toContain("Crear o seleccionar un caso");
     expect(route.doneCount).toBe(0);
   });
 
@@ -72,7 +92,7 @@ describe("la ruta guiada", () => {
     const snapshot = { ...empty(), caseId: 3 };
     const route = evaluateRoute(snapshot);
     expect(route.current?.step.id).toBe("case");
-    expect(route.current?.missing).toContain("Escribir el mandato: qué hay que decidir");
+    expect(route.current?.missing.map((item) => item.es)).toContain("Escribir el mandato: qué hay que decidir");
   });
 
   it("avanza al material y luego al mandato conforme se completa", () => {
@@ -87,7 +107,7 @@ describe("la ruta guiada", () => {
     const snapshot = { ...complete(), assessedCountries: 1 };
     const route = evaluateRoute(snapshot);
     expect(route.current?.step.id).toBe("assessment");
-    expect(route.current?.missing[0]).toMatch(/Quedan 2 país/);
+    expect(route.current?.missing[0].es).toMatch(/Quedan 2 país/);
     expect(route.current?.progress).toBeCloseTo(1 / 3, 3);
   });
 
@@ -95,7 +115,7 @@ describe("la ruta guiada", () => {
     const snapshot = { ...complete(), candidateCount: 5, screenedCount: 0, assessedCountries: 0 };
     const route = evaluateRoute(snapshot);
     expect(route.current?.step.id).toBe("countries");
-    expect(route.current?.missing[0]).toMatch(/deja fuera a todos/);
+    expect(route.current?.missing[0].es).toMatch(/deja fuera a todos/);
   });
 
   it("lleva el progreso de los módulos a la ruta", () => {
@@ -103,18 +123,18 @@ describe("la ruta guiada", () => {
     const route = evaluateRoute(snapshot);
     expect(route.current?.step.id).toBe("entry");
     expect(route.current?.progress).toBeCloseTo(0.5, 3);
-    expect(route.current?.missing[0]).toBe("4 de 8 apartados contestados");
+    expect(route.current?.missing[0].es).toBe("4 de 8 apartados contestados");
   });
 
   it("distingue los tres estados finales de la economía", () => {
     const noFinance = evaluateRoute({ ...complete(), financialReady: false });
-    expect(noFinance.current?.missing[0]).toMatch(/supuestos económicos/);
+    expect(noFinance.current?.missing[0].es).toMatch(/supuestos económicos/);
 
     const noResult = evaluateRoute({ ...complete(), hasResult: false });
-    expect(noResult.current?.missing[0]).toBe("Generar la evaluación");
+    expect(noResult.current?.missing[0].es).toBe("Generar la evaluación");
 
     const noGate = evaluateRoute({ ...complete(), approvalCount: 0 });
-    expect(noGate.current?.missing[0]).toMatch(/puerta de decisión/);
+    expect(noGate.current?.missing[0].es).toMatch(/puerta de decisión/);
   });
 
   it("con todo hecho no hay paso actual y el contador está lleno", () => {
