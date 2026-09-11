@@ -20,6 +20,8 @@ import {
   type AssessmentValue,
   type LifeCycleCluster,
 } from "@shared/domain/countryAssessment";
+import { useLanguage } from "@/i18n";
+import type { Localized } from "@shared/i18n";
 
 /**
  * Panel de evaluación detallada del capítulo 6.
@@ -69,7 +71,7 @@ export type BlockProposal = {
 export type BlockObjection = { itemPath: string | null; objection: string; severity: string };
 
 type Props = {
-  countryName: string;
+  countryName: Localized | string;
   assessment: CountryAssessmentState;
   onChange: (next: CountryAssessmentState) => void;
   /** Propuesta del copiloto para un bloque. Ausente cuando no hay documento de caso activo. */
@@ -78,6 +80,7 @@ type Props = {
 };
 
 export function CountryAssessmentPanel({ countryName, assessment, onChange, onSuggestBlock, onCritiqueBlock }: Props) {
+  const { t, ui } = useLanguage();
   const progress = assessmentProgress(assessment);
   const [busyBlock, setBusyBlock] = useState<string | null>(null);
   const [proposals, setProposals] = useState<Partial<Record<string, BlockProposal>>>({});
@@ -118,7 +121,7 @@ export function CountryAssessmentPanel({ countryName, assessment, onChange, onSu
     onChange({
       ...assessment,
       ratings: { ...assessment.ratings, [rating.itemPath]: rating.value },
-      notes: { ...assessment.notes, [rating.itemPath]: assessment.notes[rating.itemPath] || `${rating.rationale} · Cita: «${rating.evidenceQuotes[0] ?? ""}»` },
+      notes: { ...assessment.notes, [rating.itemPath]: assessment.notes[rating.itemPath] || `${rating.rationale} · ${ui("caCitation")}: «${rating.evidenceQuotes[0] ?? ""}»` },
     });
     setProposals((current) => {
       const proposal = current[blockKey];
@@ -146,14 +149,13 @@ export function CountryAssessmentPanel({ countryName, assessment, onChange, onSu
     <div className="assessment-panel space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <div className="step-tag">EVALUACIÓN DETALLADA · CAPÍTULO 6</div>
+          <div className="step-tag">{ui("caEyebrow")}</div>
           <p className="text-sm text-muted-foreground">
-            {countryName}. Puntúe de 0 a {assessmentScaleMax} solo lo que haya podido contrastar; lo que quede sin evaluar se
-            declara como no evaluado y no entra en la puntuación.
+            {t(countryName)}. {ui("caIntroPre")} {assessmentScaleMax} {ui("caIntroTail")}
           </p>
         </div>
         <Badge variant={progress.pct >= 60 ? "default" : "outline"}>
-          {progress.assessed}/{progress.total} evaluados · {progress.pct}%
+          {progress.assessed}/{progress.total} {ui("caAssessed")} · {progress.pct}%
         </Badge>
       </div>
 
@@ -164,21 +166,21 @@ export function CountryAssessmentPanel({ countryName, assessment, onChange, onSu
             <AccordionItem key={block.key} value={block.key}>
               <AccordionTrigger className="text-left">
                 <div className="flex w-full items-center justify-between gap-3 pr-2">
-                  <span className="font-medium">{block.label}</span>
+                  <span className="font-medium">{t(block.label)}</span>
                   <span className="text-xs text-muted-foreground">
-                    {blockCount.assessed}/{blockCount.total} · {block.direction === "adverse" ? "4 = desfavorable" : "4 = favorable"}
+                    {blockCount.assessed}/{blockCount.total} · {block.direction === "adverse" ? ui("caAdverse") : ui("caFavourable")}
                   </span>
                 </div>
               </AccordionTrigger>
               <AccordionContent>
-                <p className="mb-3 text-sm text-muted-foreground">{block.intro}</p>
-                <p className="mb-4 text-xs italic text-muted-foreground">Fuente: {block.source}</p>
+                <p className="mb-3 text-sm text-muted-foreground">{t(block.intro)}</p>
+                <p className="mb-4 text-xs italic text-muted-foreground">{ui("caSource")}: {t(block.source)}</p>
                 <div className="space-y-6">
                   {block.groups.map((group) => (
                     <section key={group.key} className="space-y-3">
                       <div>
-                        <h4 className="text-sm font-semibold">{group.label}</h4>
-                        <p className="text-xs text-muted-foreground">{group.intro}</p>
+                        <h4 className="text-sm font-semibold">{t(group.label)}</h4>
+                        <p className="text-xs text-muted-foreground">{t(group.intro)}</p>
                       </div>
                       <div className="space-y-4">
                         {group.items.map((item) => {
@@ -188,10 +190,10 @@ export function CountryAssessmentPanel({ countryName, assessment, onChange, onSu
                             <div key={item.key} className="assessment-item">
                               <div className="flex flex-wrap items-start justify-between gap-2">
                                 <div className="min-w-0 flex-1">
-                                  <strong className="text-sm">{item.label}</strong>
-                                  <p className="text-xs text-muted-foreground">{item.help}</p>
+                                  <strong className="text-sm">{t(item.label)}</strong>
+                                  <p className="text-xs text-muted-foreground">{t(item.help)}</p>
                                 </div>
-                                <div className="flex gap-1" role="group" aria-label={item.label}>
+                                <div className="flex gap-1" role="group" aria-label={t(item.label)}>
                                   {scaleValues.map((scaleValue) => (
                                     <Button
                                       key={scaleValue}
@@ -200,7 +202,7 @@ export function CountryAssessmentPanel({ countryName, assessment, onChange, onSu
                                       variant={value === scaleValue ? "default" : "outline"}
                                       className="h-8 w-8 p-0"
                                       aria-pressed={value === scaleValue}
-                                      title={scaleValue === 0 ? item.anchorLow : scaleValue === assessmentScaleMax ? item.anchorHigh : undefined}
+                                      title={scaleValue === 0 ? t(item.anchorLow) : scaleValue === assessmentScaleMax ? t(item.anchorHigh) : undefined}
                                       onClick={() => setRating(path, scaleValue)}
                                     >
                                       {scaleValue}
@@ -209,15 +211,15 @@ export function CountryAssessmentPanel({ countryName, assessment, onChange, onSu
                                 </div>
                               </div>
                               <div className="mt-1 flex justify-between text-[11px] text-muted-foreground">
-                                <span>0 · {item.anchorLow}</span>
-                                <span className="text-right">{assessmentScaleMax} · {item.anchorHigh}</span>
+                                <span>0 · {t(item.anchorLow)}</span>
+                                <span className="text-right">{assessmentScaleMax} · {t(item.anchorHigh)}</span>
                               </div>
                               <Input
                                 className="calibration-rationale"
                                 value={assessment.notes[path] ?? ""}
                                 onChange={(event) => setNote(path, event.target.value)}
-                                placeholder="Evidencia: fuente, entrevista u observación"
-                                aria-label={`Justificación de ${item.label}`}
+                                placeholder={ui("caEvidencePlaceholder")}
+                                aria-label={`${ui("caRationaleFor")} ${t(item.label)}`}
                               />
                             </div>
                           );
@@ -232,16 +234,16 @@ export function CountryAssessmentPanel({ countryName, assessment, onChange, onSu
                       {onSuggestBlock && (
                         <Button size="sm" variant="outline" onClick={() => requestSuggestion(block.key)} disabled={busyBlock !== null}>
                           {busyBlock === `suggest:${block.key}` ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <Sparkles className="mr-2 h-3.5 w-3.5" />}
-                          Proponer desde el caso
+                          {ui("caPropose")}
                         </Button>
                       )}
                       {onCritiqueBlock && (
                         <Button size="sm" variant="ghost" onClick={() => requestCritique(block.key)} disabled={busyBlock !== null}>
                           {busyBlock === `critique:${block.key}` ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : null}
-                          Revisar mis puntuaciones
+                          {ui("caReview")}
                         </Button>
                       )}
-                      <span className="text-xs text-muted-foreground">Las propuestas se revisan una a una; ninguna se aplica sola.</span>
+                      <span className="text-xs text-muted-foreground">{ui("caCopilotHint")}</span>
                     </div>
 
                     {proposals[block.key]?.ratings.length ? (
@@ -254,7 +256,7 @@ export function CountryAssessmentPanel({ countryName, assessment, onChange, onSu
                                 <p className="text-xs text-muted-foreground">{rating.rationale}</p>
                                 {rating.evidenceQuotes[0] && <p className="mt-1 text-xs italic text-muted-foreground">«{rating.evidenceQuotes[0]}»</p>}
                               </div>
-                              <Button size="sm" onClick={() => applyProposedRating(block.key, rating)}>Aplicar</Button>
+                              <Button size="sm" onClick={() => applyProposedRating(block.key, rating)}>{ui("caApply")}</Button>
                             </div>
                           </div>
                         ))}
@@ -263,7 +265,10 @@ export function CountryAssessmentPanel({ countryName, assessment, onChange, onSu
 
                     {proposals[block.key] && !proposals[block.key]!.ratings.length && (
                       <p className="mt-2 text-xs text-muted-foreground">
-                        Sin propuestas aplicables. {proposals[block.key]!.discarded.length ? `${proposals[block.key]!.discarded.length} descartadas por falta de cita o justificación.` : "El material no sostiene ninguna puntuación de este bloque."}
+                        {ui("caNoProposals")}{" "}
+                        {proposals[block.key]!.discarded.length
+                          ? `${proposals[block.key]!.discarded.length} ${ui("caDiscardedTail")}`
+                          : ui("caNothingSupports")}
                       </p>
                     )}
 
@@ -279,7 +284,7 @@ export function CountryAssessmentPanel({ countryName, assessment, onChange, onSu
                     ) : null}
 
                     {objections[block.key]?.length === 0 && (
-                      <p className="mt-2 text-xs text-muted-foreground">El revisor no encontró objeciones en este bloque.</p>
+                      <p className="mt-2 text-xs text-muted-foreground">{ui("caNoObjections")}</p>
                     )}
                   </div>
                 )}
@@ -291,22 +296,22 @@ export function CountryAssessmentPanel({ countryName, assessment, onChange, onSu
         <AccordionItem value="context">
           <AccordionTrigger className="text-left">
             <div className="flex w-full items-center justify-between gap-3 pr-2">
-              <span className="font-medium">Incentivos, sostenibilidad y ciclo de vida</span>
-              <span className="text-xs text-muted-foreground">{assessment.incentives.length} incentivos marcados</span>
+              <span className="font-medium">{ui("caContextTitle")}</span>
+              <span className="text-xs text-muted-foreground">{assessment.incentives.length} {ui("caIncentivesMarked")}</span>
             </div>
           </AccordionTrigger>
           <AccordionContent>
             <div className="space-y-6">
               <section className="space-y-3">
                 <div>
-                  <h4 className="text-sm font-semibold">Incentivos a la inversión</h4>
-                  <p className="text-xs text-muted-foreground">{incentiveWeightNote}</p>
-                  <p className="text-xs italic text-muted-foreground">Fuente: Tabla 6.5, pp. 241-242</p>
+                  <h4 className="text-sm font-semibold">{ui("caIncentivesTitle")}</h4>
+                  <p className="text-xs text-muted-foreground">{t(incentiveWeightNote)}</p>
+                  <p className="text-xs italic text-muted-foreground">{ui("caSource")}: {ui("caIncentivesSource")}</p>
                 </div>
                 <div className="grid gap-4 md:grid-cols-2">
                   {incentiveFamilies.map((family) => (
                     <div key={family.key} className="space-y-2">
-                      <h5 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{family.label}</h5>
+                      <h5 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t(family.label)}</h5>
                       {family.instruments.map((instrument) => {
                         const key = `${family.key}.${instrument.key}`;
                         const id = `incentive-${key}`;
@@ -317,7 +322,7 @@ export function CountryAssessmentPanel({ countryName, assessment, onChange, onSu
                               checked={assessment.incentives.includes(key)}
                               onCheckedChange={() => onChange({ ...assessment, incentives: toggleFromList(assessment.incentives, key) })}
                             />
-                            <Label htmlFor={id} className="text-xs font-normal leading-snug">{instrument.label}</Label>
+                            <Label htmlFor={id} className="text-xs font-normal leading-snug">{t(instrument.label)}</Label>
                           </div>
                         );
                       })}
@@ -328,9 +333,9 @@ export function CountryAssessmentPanel({ countryName, assessment, onChange, onSu
 
               <section className="space-y-3">
                 <div>
-                  <h4 className="text-sm font-semibold">Cuestiones ambientales y sociales</h4>
-                  <p className="text-xs text-muted-foreground">El libro las plantea como filtro previo a la inversión, no como matiz.</p>
-                  <p className="text-xs italic text-muted-foreground">Fuente: p. 242</p>
+                  <h4 className="text-sm font-semibold">{ui("caEsgTitle")}</h4>
+                  <p className="text-xs text-muted-foreground">{ui("caEsgDesc")}</p>
+                  <p className="text-xs italic text-muted-foreground">{ui("caSource")}: {ui("caEsgSource")}</p>
                 </div>
                 <div className="space-y-2">
                   {sustainabilityChecks.map((check) => {
@@ -342,7 +347,7 @@ export function CountryAssessmentPanel({ countryName, assessment, onChange, onSu
                           checked={assessment.sustainabilityConcerns.includes(check.key)}
                           onCheckedChange={() => onChange({ ...assessment, sustainabilityConcerns: toggleFromList(assessment.sustainabilityConcerns, check.key) })}
                         />
-                        <Label htmlFor={id} className="text-xs font-normal leading-snug">{check.label}</Label>
+                        <Label htmlFor={id} className="text-xs font-normal leading-snug">{t(check.label)}</Label>
                       </div>
                     );
                   })}
@@ -351,16 +356,16 @@ export function CountryAssessmentPanel({ countryName, assessment, onChange, onSu
 
               <section className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="lifecycle-cluster" className="text-sm font-semibold">Cluster de ciclo de vida</Label>
+                  <Label htmlFor="lifecycle-cluster" className="text-sm font-semibold">{ui("caLifeCycle")}</Label>
                   <Select
                     value={assessment.lifeCycleCluster ?? "none"}
                     onValueChange={(value) => onChange({ ...assessment, lifeCycleCluster: value === "none" ? null : (value as LifeCycleCluster) })}
                   >
-                    <SelectTrigger id="lifecycle-cluster"><SelectValue placeholder="Sin clasificar" /></SelectTrigger>
+                    <SelectTrigger id="lifecycle-cluster"><SelectValue placeholder={ui("caUnclassified")} /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="none">Sin clasificar</SelectItem>
+                      <SelectItem value="none">{ui("caUnclassified")}</SelectItem>
                       {lifeCycleClusters.map((cluster) => (
-                        <SelectItem key={cluster.key} value={cluster.key}>{cluster.label}</SelectItem>
+                        <SelectItem key={cluster.key} value={cluster.key}>{t(cluster.label)}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -368,14 +373,14 @@ export function CountryAssessmentPanel({ countryName, assessment, onChange, onSu
                     <p className="text-xs text-muted-foreground">
                       {(() => {
                         const cluster = lifeCycleClusters.find((entry) => entry.key === assessment.lifeCycleCluster)!;
-                        return `Demanda típica: crecimiento ${cluster.growth.toLowerCase()}, tamaño ${cluster.size.toLowerCase()}. ${cluster.segmentation}. Curva de valor: ${cluster.valueCurve}. Competencia: ${cluster.competition.toLowerCase()}.`;
+                        return `${ui("caDemandGrowth")} ${t(cluster.growth).toLowerCase()}, ${ui("caDemandSize")} ${t(cluster.size).toLowerCase()}. ${t(cluster.segmentation)}. ${ui("caDemandValueCurve")}: ${t(cluster.valueCurve)}. ${ui("caDemandCompetition")}: ${t(cluster.competition).toLowerCase()}.`;
                       })()}
                     </p>
                   )}
-                  <p className="text-xs italic text-muted-foreground">Fuente: Tabla 6.2, p. 234</p>
+                  <p className="text-xs italic text-muted-foreground">{ui("caSource")}: {ui("caLifeCycleSource")}</p>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="ease-score" className="text-sm font-semibold">Facilidad para hacer negocios (0-100)</Label>
+                  <Label htmlFor="ease-score" className="text-sm font-semibold">{ui("caEase")}</Label>
                   <Input
                     id="ease-score"
                     type="number"
@@ -386,9 +391,9 @@ export function CountryAssessmentPanel({ countryName, assessment, onChange, onSu
                       const raw = event.target.value;
                       onChange({ ...assessment, easeOfDoingBusinessScore: raw === "" ? null : Number(raw) });
                     }}
-                    placeholder="Ej. 67"
+                    placeholder={ui("caEasePlaceholder")}
                   />
-                  <p className="text-xs text-muted-foreground">Puntuación pública del país. Entra en el factor de apertura junto a la política gubernamental.</p>
+                  <p className="text-xs text-muted-foreground">{ui("caEaseHelp")}</p>
                 </div>
               </section>
             </div>

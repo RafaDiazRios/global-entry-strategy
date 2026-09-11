@@ -344,6 +344,70 @@ export const UI_STRINGS = {
   coBlocks: loc("bloquea", "blocks"),
   coGoTo: loc("Ir a", "Go to"),
 
+  // Panel de evaluación de países — capítulo 6
+  caEyebrow: loc("EVALUACIÓN DETALLADA · CAPÍTULO 6", "DETAILED ASSESSMENT · CHAPTER 6"),
+  caIntroPre: loc("Puntúe de 0 a", "Score from 0 to"),
+  caIntroTail: loc(
+    "solo lo que haya podido contrastar; lo que quede sin evaluar se declara como no evaluado y no entra en la puntuación.",
+    "only what you have been able to verify; whatever is left unrated is declared unrated and stays out of the score."
+  ),
+  caAssessed: loc("evaluados", "assessed"),
+  caAdverse: loc("4 = desfavorable", "4 = unfavourable"),
+  caFavourable: loc("4 = favorable", "4 = favourable"),
+  caSource: loc("Fuente", "Source"),
+  caEvidencePlaceholder: loc(
+    "Evidencia: fuente, entrevista u observación",
+    "Evidence: source, interview or observation"
+  ),
+  caRationaleFor: loc("Justificación de", "Rationale for"),
+  caPropose: loc("Proponer desde el caso", "Propose from the case"),
+  caReview: loc("Revisar mis puntuaciones", "Review my scores"),
+  caCopilotHint: loc(
+    "Las propuestas se revisan una a una; ninguna se aplica sola.",
+    "Proposals are reviewed one by one; none is applied on its own."
+  ),
+  caApply: loc("Aplicar", "Apply"),
+  caCitation: loc("Cita", "Quote"),
+  caNoProposals: loc("Sin propuestas aplicables.", "No applicable proposals."),
+  caDiscardedTail: loc(
+    "descartadas por falta de cita o justificación.",
+    "discarded for lack of a quote or a rationale."
+  ),
+  caNothingSupports: loc(
+    "El material no sostiene ninguna puntuación de este bloque.",
+    "The material does not support any score in this block."
+  ),
+  caNoObjections: loc(
+    "El revisor no encontró objeciones en este bloque.",
+    "The reviewer found no objections in this block."
+  ),
+  caContextTitle: loc(
+    "Incentivos, sostenibilidad y ciclo de vida",
+    "Incentives, sustainability and life cycle"
+  ),
+  caIncentivesMarked: loc("incentivos marcados", "incentives marked"),
+  caIncentivesTitle: loc("Incentivos a la inversión", "Investment incentives"),
+  caIncentivesSource: loc("Tabla 6.5, pp. 241-242", "Table 6.5, pp. 241-242"),
+  caEsgTitle: loc("Cuestiones ambientales y sociales", "Environmental and social issues"),
+  caEsgDesc: loc(
+    "El libro las plantea como filtro previo a la inversión, no como matiz.",
+    "The book treats them as a filter before investing, not as a nuance."
+  ),
+  caEsgSource: loc("p. 242", "p. 242"),
+  caLifeCycle: loc("Cluster de ciclo de vida", "Life-cycle cluster"),
+  caUnclassified: loc("Sin clasificar", "Unclassified"),
+  caLifeCycleSource: loc("Tabla 6.2, p. 234", "Table 6.2, p. 234"),
+  caDemandGrowth: loc("Demanda típica: crecimiento", "Typical demand: growth"),
+  caDemandSize: loc("tamaño", "size"),
+  caDemandValueCurve: loc("Curva de valor", "Value curve"),
+  caDemandCompetition: loc("Competencia", "Competition"),
+  caEase: loc("Facilidad para hacer negocios (0-100)", "Ease of doing business (0-100)"),
+  caEaseHelp: loc(
+    "Puntuación pública del país. Entra en el factor de apertura junto a la política gubernamental.",
+    "The country's public score. It feeds the openness factor alongside government policy."
+  ),
+  caEasePlaceholder: loc("Ej. 67", "e.g. 67"),
+
   // Idioma
   language: loc("Idioma", "Language"),
 } as const;

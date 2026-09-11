@@ -1,5 +1,13 @@
+import { pick, type Localized } from "@shared/i18n";
 import { invokeLLM, type InvokeParams, type InvokeResult, type MessageContent } from "../_core/llm";
 import { assessmentBlockByKey, assessmentScaleMax, itemPath, itemsOf, type AssessmentBlockKey } from "@shared/domain/countryAssessment";
+
+/**
+ * El copiloto todavía trabaja en español: las etiquetas del marco se resuelven a ese idioma
+ * antes de entrar en el prompt. Cuando el copiloto pase a ser bilingüe, esto tomará el
+ * idioma de la petición en lugar de fijarlo.
+ */
+const es = (value: Localized | string) => pick(value, "es");
 
 /**
  * Copiloto de caso.
@@ -168,8 +176,8 @@ function frameworkCatalogue() {
   for (const key of ["market", "resources", "industry", "cage", "risk"] as AssessmentBlockKey[]) {
     const block = assessmentBlockByKey.get(key);
     if (!block) continue;
-    const items = itemsOf(block).map((item) => `${itemPath(key, item.groupKey, item.key)} — ${item.label}`);
-    blocks.push(`${block.label}:\n${items.join("\n")}`);
+    const items = itemsOf(block).map((item) => `${itemPath(key, item.groupKey, item.key)} — ${es(item.label)}`);
+    blocks.push(`${es(block.label)}:\n${items.join("\n")}`);
   }
   return blocks.join("\n\n");
 }
@@ -298,9 +306,9 @@ export async function proposeAssessmentBlock(
   const itemBrief = block.groups
     .map((group) => {
       const items = group.items
-        .map((item) => `- ${itemPath(blockKey, group.key, item.key)} · ${item.label}. ${item.help}\n  0 = ${item.anchorLow} | ${assessmentScaleMax} = ${item.anchorHigh}`)
+        .map((item) => `- ${itemPath(blockKey, group.key, item.key)} · ${es(item.label)}. ${es(item.help)}\n  0 = ${es(item.anchorLow)} | ${assessmentScaleMax} = ${es(item.anchorHigh)}`)
         .join("\n");
-      return `${group.label} (${group.intro})\n${items}`;
+      return `${es(group.label)} (${es(group.intro)})\n${items}`;
     })
     .join("\n\n");
 
@@ -312,7 +320,7 @@ export async function proposeAssessmentBlock(
         content: [
           {
             type: "text",
-            text: `País evaluado: ${options.countryName}.\n${options.context ? `Contexto de la decisión: ${options.context}\n` : ""}\nBloque: ${block.label}. ${block.intro}\nOrientación de la escala: ${block.direction === "adverse" ? `${assessmentScaleMax} es desfavorable` : `${assessmentScaleMax} es favorable`}.\n\nÍtems:\n${itemBrief}`,
+            text: `País evaluado: ${options.countryName}.\n${options.context ? `Contexto de la decisión: ${options.context}\n` : ""}\nBloque: ${es(block.label)}. ${es(block.intro)}\nOrientación de la escala: ${block.direction === "adverse" ? `${assessmentScaleMax} es desfavorable` : `${assessmentScaleMax} es favorable`}.\n\nÍtems:\n${itemBrief}`,
           },
           ...sourceParts(source),
         ],
@@ -416,7 +424,7 @@ export async function critiqueAssessment(
         content: [
           {
             type: "text",
-            text: `País: ${options.countryName ?? "el país evaluado"}.\nBloque: ${block.label}. Orientación: ${block.direction === "adverse" ? `${assessmentScaleMax} es desfavorable` : `${assessmentScaleMax} es favorable`}.\n\nPuntuaciones a revisar:\n${summary || "(ninguna)"}`,
+            text: `País: ${options.countryName ?? "el país evaluado"}.\nBloque: ${es(block.label)}. Orientación: ${block.direction === "adverse" ? `${assessmentScaleMax} es desfavorable` : `${assessmentScaleMax} es favorable`}.\n\nPuntuaciones a revisar:\n${summary || "(ninguna)"}`,
           },
           ...sourceParts(source),
         ],

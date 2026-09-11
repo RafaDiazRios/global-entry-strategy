@@ -1,3 +1,4 @@
+import { loc, type Localized } from "@shared/i18n";
 import {
   assessmentBlockByKey,
   assessmentBlocks,
@@ -300,9 +301,9 @@ function bandFor(value: number | null | undefined, thresholds: [number, number, 
 
 export type CountryProfileMatch = {
   key: CountryProfileKey;
-  label: string;
-  description: string;
-  examples: string;
+  label: Localized;
+  description: Localized;
+  examples: Localized;
   /** Grado de coincidencia con los rasgos observables, 0-1. */
   match: number;
   /** Rasgos que se pudieron comparar. */
@@ -313,7 +314,7 @@ export type CountryProfileClassification = {
   best: CountryProfileMatch | null;
   ranking: CountryProfileMatch[];
   observedTraits: Partial<Record<TraitKey, ProfileTrait>>;
-  source: string;
+  source: Localized;
 };
 
 export function classifyCountryProfile(data: MarketData, assessment?: CountryAssessment): CountryProfileClassification {
@@ -377,7 +378,7 @@ export function classifyCountryProfile(data: MarketData, assessment?: CountryAss
     best: override ?? (ranking[0]?.comparedTraits ? ranking[0] : null),
     ranking,
     observedTraits,
-    source: "Tabla 6.6, p. 249",
+    source: loc("Tabla 6.6, p. 249", "Table 6.6, p. 249"),
   };
 }
 
@@ -389,10 +390,10 @@ export type OpportunityRiskPosition = {
   opportunity: number;
   risk: number;
   quadrant: OpportunityRiskQuadrant;
-  label: string;
-  reading: string;
+  label: Localized;
+  reading: Localized;
   midpoints: { opportunity: number; risk: number };
-  source: string;
+  source: Localized;
 };
 
 export function positionOnOpportunityRiskMatrix(
@@ -418,6 +419,6 @@ export function positionOnOpportunityRiskMatrix(
     label: opportunityRiskQuadrants[quadrant].label,
     reading: opportunityRiskQuadrants[quadrant].reading,
     midpoints: { opportunity: opportunityMid, risk: riskMid },
-    source: "Figura 6.2, p. 227",
+    source: loc("Figura 6.2, p. 227", "Figure 6.2, p. 227"),
   };
 }
