@@ -21,6 +21,8 @@ import { CountryAssessmentPanel, assessmentProgress, emptyAssessment, type Count
 import { CaseWorkspace } from "@/components/CaseWorkspace";
 import { GlobalStrategyPanel } from "@/components/GlobalStrategyPanel";
 import { GuidedRoutePanel } from "@/components/GuidedRoutePanel";
+import { AssumptionBoard } from "@/components/AssumptionBoard";
+import { ThesisPanel } from "@/components/ThesisPanel";
 import { LanguageSwitch } from "@/components/LanguageSwitch";
 import { useLanguage } from "@/i18n";
 import { pick, type Localized } from "@shared/i18n";
@@ -715,6 +717,12 @@ export default function Home() {
         <div className="mt-5"><OnboardingGuide mandateReady={Boolean(companyName.trim() && homeCountry.trim() && industry.trim() && businessModel.trim())} candidateCount={candidates.length} dataReady={candidates.some((candidate) => marketData[candidate.code]?.sourceStatus !== "unavailable")} financialReady={candidates.some((candidate) => financialByCountry[candidate.code]?.tamYearOne !== null && financialByCountry[candidate.code]?.tamYearOne !== undefined)} evaluationReady={Boolean(result)} onNavigate={setActiveTab} /></div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-7">
+          {/*
+            El modo no se elige: se deduce. Un caso con tesis enunciada enseña el tablero de
+            supuestos; uno sin ella, la ruta guiada. El tablero se calla solo cuando no hay
+            tesis, así que los dos pueden vivir aquí sin pisarse.
+          */}
+          {caseId !== null && <AssumptionBoard caseId={caseId} onGoToThesis={() => setActiveTab("case")} />}
           <GuidedRoutePanel
             caseId={caseId}
             scenario={{
@@ -749,7 +757,7 @@ export default function Home() {
             <TabsTrigger value="approval"><ClipboardCheck className="mr-2 h-4 w-4" /> {ui("tabGates")}</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="case" className="mt-6"><CaseWorkspace caseId={caseId} onCaseSelected={changeCase} decisionContext={[companyName, industry, valueProposition].filter(Boolean).join(" · ")} defaults={{ companyName, homeCountry, industry }} activeDocumentId={caseDocumentId} onActiveDocumentChange={setCaseDocumentId} /></TabsContent>
+          <TabsContent value="case" className="mt-6 space-y-6">{caseId !== null && <ThesisPanel caseId={caseId} />}<CaseWorkspace caseId={caseId} onCaseSelected={changeCase} decisionContext={[companyName, industry, valueProposition].filter(Boolean).join(" · ")} defaults={{ companyName, homeCountry, industry }} activeDocumentId={caseDocumentId} onActiveDocumentChange={setCaseDocumentId} /></TabsContent>
           <TabsContent value="ambition" className="mt-6"><GlobalStrategyPanel caseId={caseId} subTab={strategySubTab} onSubTabChange={setStrategySubTab} /></TabsContent>
               <TabsContent value="brief" className="tab-enter">
             <div className="grid gap-6 xl:grid-cols-[1.45fr_.8fr]">

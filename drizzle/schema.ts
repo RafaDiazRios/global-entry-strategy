@@ -16,7 +16,7 @@ export const milestoneStatus = entryStrategy.enum("milestoneStatus", ["pending",
 export const evidenceKind = entryStrategy.enum("evidenceKind", ["document", "public_data", "interview", "assumption", "ai_extraction"]);
 export const evidenceAuthor = entryStrategy.enum("evidenceAuthor", ["user", "ai"]);
 export const evidenceStatus = entryStrategy.enum("evidenceStatus", ["accepted", "suggested", "rejected"]);
-export const caseModuleKey = entryStrategy.enum("caseModuleKey", ["ambition", "positioning", "entry", "partnering", "route"]);
+export const caseModuleKey = entryStrategy.enum("caseModuleKey", ["ambition", "positioning", "entry", "partnering", "route", "thesis"]);
 
 /** Usuario de la aplicación. `openId` es el identificador estable del proveedor de acceso. */
 export const users = entryStrategy.table("users", {

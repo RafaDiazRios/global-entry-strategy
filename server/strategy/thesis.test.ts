@@ -4,7 +4,8 @@ import { emptyThesisInput, type ThesisInput } from "@shared/domain/thesis";
 import { ASSUMPTION_RULES, emptyAnswer, type AssumptionAnswer } from "@shared/domain/assumptionMap";
 import { INDUSTRIES, resolveChain, sectorMode } from "@shared/domain/industries";
 import { BASE_CHAIN } from "@shared/domain/approvalChain";
-import { deriveAssumptions, evaluateChain, evaluateThesis, outOfScope, splitByAuthority, unownedAssumptions } from "./thesis";
+import { blindSpots, deriveAssumptions, evaluateChain, evaluateThesis, outOfScope, splitByAuthority, unownedAssumptions } from "./thesis";
+import { parseThesisPayload } from "./globalStrategySchemas";
 
 /**
  * Los dos casos de prueba son reales y opuestos a propósito: uno de manufactura con entrada de
@@ -280,5 +281,75 @@ describe("evaluateChain", () => {
     const statuses = new Set(verdicts.map((verdict) => verdict.status));
     expect(statuses.has("at_risk")).toBe(true);
     expect(verdicts.every((verdict) => verdict.assumptions.every((entry) => entry.slot.test === verdict.approver.test))).toBe(true);
+  });
+});
+
+describe("el motor de coherencia, al revés", () => {
+  it("no dice nada mientras no haya tesis", () => {
+    expect(blindSpots(emptyThesisInput(), [])).toEqual([]);
+  });
+
+  it("un supuesto mortal sin averiguar bloquea, y lo dice en los dos idiomas", () => {
+    const spots = blindSpots(lubricador(), []);
+    const critical = spots.find((spot) => spot.id === "critical_unestablished");
+    expect(critical?.severity).toBe("block");
+    expect(pick(critical?.detail, "es")).toMatch(/no se puede defender/);
+    expect(pick(critical?.detail, "en")).toMatch(/cannot be defended/);
+  });
+
+  it("dar algo por cierto sin una sola fuente es la pregunta que llega primero", () => {
+    const answers = deriveAssumptions(lubricador()).map((slot) =>
+      answer(slot.id, { belief: "holds", confidence: 4, falsifier: "Que la cuota del líder supere el 40%" }),
+    );
+    const spots = blindSpots(lubricador(), answers);
+    expect(spots.map((spot) => spot.id)).toContain("held_without_evidence");
+  });
+
+  it("cazar la contradicción: fuera de alcance y sosteniendo la tesis a la vez", () => {
+    // Decir «entrada de país» y a la vez «ya operamos allí» es incoherente, y la
+    // incoherencia se ve porque un supuesto mortal mira un bloque que se dio por excluido.
+    const contradictory: ThesisInput = { ...lubricador(), presence: "operating" };
+    const spots = blindSpots(contradictory, []);
+    expect(spots.some((spot) => spot.id.startsWith("excluded_but_load_bearing"))).toBe(true);
+  });
+
+  it("el caso de Citi no dispara esa contradicción: entrada de producto donde ya se opera es coherente", () => {
+    const spots = blindSpots(citiNetherlands(), []);
+    expect(spots.some((spot) => spot.id.startsWith("excluded_but_load_bearing"))).toBe(false);
+  });
+
+  it("trae lo que el marco señala en un módulo que la tesis no toca", () => {
+    const finding = {
+      id: "alliance_mode_without_partner_analysis",
+      severity: "block" as const,
+      modules: ["partnering" as const],
+      title: { es: "Entrada por alianza sin análisis de socio", en: "Alliance entry with no partner analysis" },
+      detail: { es: "Detalle en español.", en: "Detail in English." },
+      provenance: { es: "p. 265", en: "p. 265" },
+    };
+    // La tesis de Citi es por sucursal: no toca el módulo de socio, así que el aviso entra.
+    const spots = blindSpots(citiNetherlands(), [], [finding]);
+    expect(spots.some((spot) => spot.id === "framework_unmentioned_alliance_mode_without_partner_analysis")).toBe(true);
+
+    // La de Lubricador es por empresa conjunta: sí lo toca, así que no lo repite.
+    const covered = blindSpots(lubricador(), [], [finding]);
+    expect(covered.some((spot) => spot.id.startsWith("framework_unmentioned"))).toBe(false);
+  });
+});
+
+describe("ida y vuelta por el esquema de guardado", () => {
+  it("una tesis completa sobrevive a guardarse y volver", () => {
+    const payload = { thesis: citiNetherlands(), answers: [answer("group_strategy", { belief: "does_not_hold", falsifier: "Salida de consumo declarada" })] };
+    const round = parseThesisPayload(JSON.parse(JSON.stringify(payload)));
+    expect(round.thesis.industryId).toBe("financial_services");
+    expect(round.thesis.regulatoryGate.requiresLicence).toBe(true);
+    expect(round.answers[0].belief).toBe("does_not_hold");
+    expect(evaluateThesis(round.thesis, round.answers).status).toBe("blocked");
+  });
+
+  it("un payload corrupto devuelve una tesis vacía en lugar de reventar", () => {
+    const round = parseThesisPayload({ thesis: { company: 42 }, answers: "no" });
+    expect(round.thesis.company).toBeNull();
+    expect(round.answers).toEqual([]);
   });
 });

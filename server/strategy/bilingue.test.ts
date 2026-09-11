@@ -81,7 +81,7 @@ const SAME_IN_BOTH = new Set([
   "Capital", "Control", "Digital", "Global", "Hubs", "Local", "Marketing", "Pre-emption", "Regional",
   // Términos del libro que en español se usan en inglés, y una palabra que coincide.
   "Liability of foreignness", "Transfer, Adapt, Create", "8. Gates", "gradual",
-  "Cultural", "Hub", "Veto", "Supervisor",
+  "Cultural", "Hub", "Veto", "Supervisor", "Sector", "No",
 ]);
 
 /** Las citas del libro se escriben igual en los dos idiomas salvo la palabra «Tabla». */

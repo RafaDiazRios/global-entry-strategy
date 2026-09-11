@@ -43,6 +43,13 @@
       "when": 1789063786238,
       "tag": "0005_ruta_guiada",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1789063787238,
+      "tag": "0006_tesis",
+      "breakpoints": true
     }
   ]
 }

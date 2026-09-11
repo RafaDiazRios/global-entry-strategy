@@ -13,7 +13,12 @@ import { storageGetSignedUrl, storagePut } from "./storage";
 import { getWgiGovernanceData } from "./strategy/wgi";
 import { ambitionCompleteness, ambitionGap, computeIndices, CONVENTIONS, DEFAULT_THRESHOLDS, positionOnAmbitionMap } from "./strategy/globalAmbition";
 import { diagnoseValueChain, diagnoseValueCurve, positioningCompleteness, positioningWarnings, resolvePositioning, resourceGap } from "./strategy/globalPositioning";
-import { ambitionInputSchema, entryStrategyInputSchema, parseAmbition, parseEntryStrategy, parsePartnering, parsePositioning, parseRouteProgress, partneringInputSchema, positioningInputSchema, routeProgressSchema } from "./strategy/globalStrategySchemas";
+import { ambitionInputSchema, entryStrategyInputSchema, parseAmbition, parseEntryStrategy, parsePartnering, parsePositioning, parseRouteProgress, parseThesisPayload, partneringInputSchema, positioningInputSchema, routeProgressSchema, thesisPayloadSchema } from "./strategy/globalStrategySchemas";
+import { blindSpots, evaluateThesis } from "./strategy/thesis";
+import * as thesisDomain from "@shared/domain/thesis";
+import * as assumptionDomain from "@shared/domain/assumptionMap";
+import { AUTHORITIES } from "@shared/domain/approvalChain";
+import { INDUSTRIES, resolveChain } from "@shared/domain/industries";
 import { entryStrategyCompleteness, entryStrategyWarnings, mappingShortlist, paceProfile, phaseDefinition } from "./strategy/entryStrategy";
 import * as entryDomain from "@shared/domain/entryStrategy";
 import * as partneringDomain from "@shared/domain/partnering";
@@ -337,6 +342,39 @@ function analyseEntryStrategy(input: entryDomain.EntryStrategyInput) {
     shortlist: mappingShortlist(input.marketAttractiveness, input.politicalClimate),
     warnings: entryStrategyWarnings(input),
     completeness: entryStrategyCompleteness(input),
+  };
+}
+
+/**
+ * La tesis se evalúa contra la cadena de aprobación y, para la comprobación al revés, contra
+ * lo que ya haya en los demás módulos. Un caso que empezó en modo aprendizaje y que después
+ * enuncia una tesis se beneficia de todo lo que ya estaba contestado.
+ */
+async function analyseThesis(
+  userId: number,
+  caseId: number,
+  thesis: thesisDomain.ThesisInput,
+  answers: assumptionDomain.AssumptionAnswer[],
+) {
+  const [ambition, positioning, entry, partnering] = await Promise.all([
+    db.getCaseModule(userId, caseId, "ambition"),
+    db.getCaseModule(userId, caseId, "positioning"),
+    db.getCaseModule(userId, caseId, "entry"),
+    db.getCaseModule(userId, caseId, "partnering"),
+  ]);
+  const dossier = {
+    ambition: ambition ? parseAmbition(ambition.payload) : null,
+    positioning: positioning ? parsePositioning(positioning.payload) : null,
+    entry: entry ? parseEntryStrategy(entry.payload) : null,
+    partnering: partnering ? parsePartnering(partnering.payload) : null,
+  };
+  const findings = evaluateCoherence(dossier);
+  return {
+    thesis,
+    answers,
+    verdict: evaluateThesis(thesis, answers),
+    blindSpots: blindSpots(thesis, answers, findings),
+    chain: resolveChain(thesis.industryId),
   };
 }
 
@@ -781,6 +819,15 @@ export const appRouter = router({
       countryRoles: ambitionDomain.COUNTRY_ROLES,
       stages: ambitionDomain.GLOBALIZATION_STAGES,
       organizationalDesigns: ambitionDomain.ORGANIZATIONAL_DESIGNS,
+      // Modo trabajo: la tesis, los sectores y la cadena de aprobación.
+      industries: INDUSTRIES,
+      authorities: AUTHORITIES,
+      consequences: assumptionDomain.CONSEQUENCES,
+      beliefs: assumptionDomain.BELIEFS,
+      countryPresence: thesisDomain.COUNTRY_PRESENCE,
+      thesisStances: thesisDomain.THESIS_STANCES,
+      entryKinds: thesisDomain.ENTRY_KINDS,
+      provenanceOrigins: thesisDomain.PROVENANCE_ORIGINS,
       valuePropositionDimensions: positioningDomain.VALUE_PROPOSITION_DIMENSIONS,
       positionings: positioningDomain.POSITIONINGS,
       positioningsProvenance: positioningDomain.POSITIONINGS_PROVENANCE,
@@ -867,6 +914,22 @@ export const appRouter = router({
       }),
 
     /** Progreso de la ruta guiada: qué pasos ha confirmado el analista y cuáles se saltó. */
+    getThesis: protectedProcedure
+      .input(z.object({ caseId: z.number().int().positive() }))
+      .query(async ({ ctx, input }) => {
+        const stored = await db.getCaseModule(ctx.user.id, input.caseId, "thesis");
+        const { thesis, answers } = parseThesisPayload(stored?.payload);
+        return analyseThesis(ctx.user.id, input.caseId, thesis, answers);
+      }),
+
+    saveThesis: protectedProcedure
+      .input(z.object({ caseId: z.number().int().positive(), payload: thesisPayloadSchema }))
+      .mutation(async ({ ctx, input }) => {
+        await db.saveCaseModule(ctx.user.id, input.caseId, "thesis", input.payload);
+        const { thesis, answers } = input.payload;
+        return analyseThesis(ctx.user.id, input.caseId, thesis as never, answers as never);
+      }),
+
     getRouteProgress: protectedProcedure
       .input(z.object({ caseId: z.number().int().positive() }))
       .query(async ({ ctx, input }) => {

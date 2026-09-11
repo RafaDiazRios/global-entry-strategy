@@ -321,7 +321,9 @@ export const ASSUMPTION_RULES: AssumptionRule[] = [
         "The product fits the group's risk appetite and credit policy."
       ),
       test: "risk_appetite",
-      area: "assessment",
+      // El apetito es una política del grupo, no una lectura del país: por eso vive en la
+      // tesis y no en la evaluación del capítulo 6.
+      area: "thesis",
       consequence: "dies",
       origin: "sector",
       provenance: loc(

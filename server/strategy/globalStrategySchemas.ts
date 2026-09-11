@@ -1,3 +1,5 @@
+import { emptyThesisInput, type ThesisInput } from "@shared/domain/thesis";
+import type { AssumptionAnswer } from "@shared/domain/assumptionMap";
 import { z } from "zod";
 import { emptyAmbitionInput, type AmbitionInput } from "@shared/domain/globalAmbition";
 import { emptyPositioningInput, type PositioningInput } from "@shared/domain/globalPositioning";
@@ -195,4 +197,58 @@ export const routeProgressSchema = z.object({
 export function parseRouteProgress(payload: unknown) {
   const parsed = routeProgressSchema.safeParse(payload);
   return parsed.success ? parsed.data : { confirmed: [], skipped: [] };
+}
+
+/* ------------------------------------------------------------------------------------ */
+/* Tesis y supuestos                                                                     */
+/* ------------------------------------------------------------------------------------ */
+
+const countryPresence = z.enum(["none", "representative", "other_business", "region_only", "operating"]);
+const thesisStance = z.enum(["enter", "do_not_enter"]);
+const entryKind = z.enum(["country", "product"]);
+const industryId = z.enum(["generic", "financial_services", "retail_consumer"]);
+const belief = z.enum(["holds", "does_not_hold", "unknown"]);
+
+export const thesisInputSchema = z.object({
+  company: z.string().max(180).nullable(),
+  industryId: industryId.nullable(),
+  countryCode: z.string().max(3).nullable(),
+  product: z.string().max(200).nullable(),
+  presence: countryPresence.nullable(),
+  entryKind: entryKind.nullable(),
+  stance: thesisStance.nullable(),
+  groupConstraint: z.object({
+    declaredStrategy: z.string().max(600).nullable(),
+    returnThresholdPct: z.number().nullable(),
+    availableEntities: z.string().max(600).nullable(),
+  }),
+  regulatoryGate: z.object({
+    requiresLicence: z.boolean().nullable(),
+    licenceRoute: z.string().max(400).nullable(),
+    note: z.string().max(600).nullable(),
+  }),
+  modeKey: z.string().max(60).nullable(),
+  horizonMonths: z.number().int().nullable(),
+  commitment: z.object({ amount: z.number().nullable(), currency: z.string().max(8).nullable() }),
+  reasons: z.array(z.string().max(400)).max(3),
+  rivalOf: z.string().max(60).nullable(),
+});
+
+export const assumptionAnswerSchema = z.object({
+  slotId: z.string().max(60),
+  belief,
+  confidence: z.number().int().min(0).max(4).nullable(),
+  evidence: z.string().max(1000).nullable(),
+  falsifier: z.string().max(1000).nullable(),
+});
+
+export const thesisPayloadSchema = z.object({
+  thesis: thesisInputSchema,
+  answers: z.array(assumptionAnswerSchema).max(40),
+});
+
+export function parseThesisPayload(payload: unknown): { thesis: ThesisInput; answers: AssumptionAnswer[] } {
+  const parsed = thesisPayloadSchema.safeParse(payload);
+  if (!parsed.success) return { thesis: emptyThesisInput(), answers: [] };
+  return { thesis: parsed.data.thesis as ThesisInput, answers: parsed.data.answers as AssumptionAnswer[] };
 }

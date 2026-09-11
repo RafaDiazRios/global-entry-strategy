@@ -9,6 +9,7 @@ import {
 import { type Approver, type ApproverTest, type ModelArea } from "@shared/domain/approvalChain";
 import { resolveChain, sectorMode } from "@shared/domain/industries";
 import { PRESENCE_SUPPRESSES_COUNTRY_BLOCKS, thesisIsStated, type ThesisInput } from "@shared/domain/thesis";
+import type { CoherenceFinding, ModuleKey } from "@shared/domain/coherence";
 
 /**
  * Motor del modo trabajo.
@@ -254,4 +255,102 @@ export function evaluateThesis(thesis: ThesisInput, answers: AssumptionAnswer[])
     openCriticalCount,
     headline,
   };
+}
+
+/* ------------------------------------------------------------------------------------ */
+/* El motor de coherencia, al revés                                                      */
+/* ------------------------------------------------------------------------------------ */
+
+/**
+ * El riesgo de trabajar desde una tesis es que solo miras donde apunta la hipótesis, y así
+ * cualquier tesis mala se confirma sola. El antídoto es correr la comprobación al revés: en
+ * lugar de decir «llevas el 62%», decir qué señala el marco que la tesis no menciona.
+ */
+export type BlindSpot = {
+  id: string;
+  severity: "block" | "warn";
+  title: Localized;
+  detail: Localized;
+};
+
+const MODULE_TO_AREA: Record<ModuleKey, ModelArea> = {
+  ambition: "ambition",
+  positioning: "positioning",
+  entry: "entry",
+  partnering: "partnering",
+};
+
+export function blindSpots(
+  thesis: ThesisInput,
+  answers: AssumptionAnswer[],
+  findings: CoherenceFinding[] = [],
+): BlindSpot[] {
+  if (!thesisIsStated(thesis)) return [];
+
+  const spots: BlindSpot[] = [];
+  const resolved = resolveAssumptions(thesis, answers);
+  const exclusions = outOfScope(thesis);
+  const excluded = new Set(exclusions.map((exclusion) => exclusion.area));
+  const covered = new Set(resolved.map((entry) => entry.slot.area));
+
+  // 1. Un supuesto que mata la tesis y sigue sin averiguar.
+  const unestablished = resolved.filter((entry) => entry.slot.consequence === "dies" && !entry.answered);
+  if (unestablished.length) {
+    spots.push({
+      id: "critical_unestablished",
+      severity: "block",
+      title: loc("Supuestos mortales sin averiguar", "Fatal assumptions not yet established"),
+      detail: loc(
+        `${unestablished.length} supuesto(s) pueden matar la tesis y todavía no tienen creencia declarada con su falsador. Mientras sigan así, la tesis no se puede defender: solo se puede repetir.`,
+        `${unestablished.length} assumption(s) can kill the thesis and still have no stated belief with a falsifier. While that holds, the thesis cannot be defended: it can only be repeated.`
+      ),
+    });
+  }
+
+  // 2. Declarado como cierto sin nada detrás. Es lo que separa una creencia de una apuesta.
+  const unevidenced = resolved.filter(
+    (entry) => entry.answer.belief === "holds" && !(entry.answer.evidence ?? "").trim(),
+  );
+  if (unevidenced.length) {
+    spots.push({
+      id: "held_without_evidence",
+      severity: "warn",
+      title: loc("Supuestos que se dan por ciertos sin evidencia", "Assumptions taken as true with no evidence"),
+      detail: loc(
+        `${unevidenced.length} supuesto(s) se declaran sostenidos sin una sola fuente. En la sala, esa es la pregunta que llega primero.`,
+        `${unevidenced.length} assumption(s) are declared to hold without a single source. In the room, that is the first question you get.`
+      ),
+    });
+  }
+
+  // 3. Algo que se declaró fuera de alcance y que un supuesto mortal sigue mirando.
+  for (const entry of resolved) {
+    if (entry.slot.consequence !== "dies" || !excluded.has(entry.slot.area)) continue;
+    spots.push({
+      id: `excluded_but_load_bearing_${entry.slot.id}`,
+      severity: "block",
+      title: loc("Fuera de alcance y sosteniendo la tesis a la vez", "Out of scope and load-bearing at the same time"),
+      detail: loc(
+        `«${pick(entry.slot.claim, "es")}» puede matar la tesis, y su bloque se ha declarado fuera de alcance. Una de las dos cosas está mal.`,
+        `“${pick(entry.slot.claim, "en")}” can kill the thesis, and its block has been declared out of scope. One of the two is wrong.`
+      ),
+    });
+  }
+
+  // 4. Lo que el marco señala en un módulo que la tesis nunca toca.
+  for (const finding of findings) {
+    const areas = finding.modules.map((module) => MODULE_TO_AREA[module]);
+    if (areas.some((area) => covered.has(area))) continue;
+    spots.push({
+      id: `framework_unmentioned_${finding.id}`,
+      severity: finding.severity === "block" ? "block" : "warn",
+      title: loc(
+        `El marco lo señala y la tesis no lo menciona: ${pick(finding.title, "es").toLowerCase()}`,
+        `The framework flags it and the thesis does not mention it: ${pick(finding.title, "en").toLowerCase()}`
+      ),
+      detail: finding.detail,
+    });
+  }
+
+  return spots;
 }

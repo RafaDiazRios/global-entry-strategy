@@ -408,6 +408,103 @@ export const UI_STRINGS = {
   ),
   caEasePlaceholder: loc("Ej. 67", "e.g. 67"),
 
+  // Modo trabajo — la tesis
+  thTitle: loc("La tesis", "The thesis"),
+  thDesc: loc(
+    "Un mandato es una pregunta; una tesis es una afirmación que se puede matar. Escriba la segunda.",
+    "A mandate is a question; a thesis is a claim that can be killed. Write the second."
+  ),
+  thCompany: loc("Empresa", "Company"),
+  thIndustry: loc("Sector", "Sector"),
+  thCountry: loc("País", "Country"),
+  thProduct: loc("Producto o negocio", "Product or business"),
+  thPresence: loc("Presencia actual en el país", "Current presence in the country"),
+  thEntryKind: loc("Tipo de entrada", "Kind of entry"),
+  thStance: loc("Posición", "Stance"),
+  thGroupConstraint: loc("Restricción del grupo", "Group constraint"),
+  thGroupConstraintHelp: loc(
+    "Lo que la casa ya ha decidido y esta tesis tiene que respetar o contradecir a la cara.",
+    "What the house has already decided, which this thesis must respect or contradict openly."
+  ),
+  thDeclaredStrategy: loc("Estrategia declarada", "Declared strategy"),
+  thDeclaredStrategyPh: loc(
+    "Lo que el grupo le ha contado al mercado que va a hacer",
+    "What the group has told the market it will do"
+  ),
+  thReturnThreshold: loc("Umbral de retorno (%)", "Return threshold (%)"),
+  thEntities: loc("Entidades y licencias disponibles", "Entities and licences available"),
+  thRegGate: loc("Puerta regulatoria", "Regulatory gate"),
+  thRegGateHelp: loc(
+    "En un sector regulado, el regulador poda los modos antes de que empiece el análisis.",
+    "In a regulated sector the regulator prunes the modes before the analysis starts."
+  ),
+  thRequiresLicence: loc("¿Exige licencia o autorización?", "Does it require a licence or authorization?"),
+  thLicenceRoute: loc("Vía de licencia", "Licence route"),
+  thMode: loc("Modo", "Mode"),
+  thModeUndecided: loc("Por decidir", "To be decided"),
+  thHorizon: loc("Horizonte (meses)", "Horizon (months)"),
+  thCommitment: loc("Compromiso", "Commitment"),
+  thCurrency: loc("Moneda", "Currency"),
+  thReasons: loc("Porque… (de una a tres razones)", "Because… (one to three reasons)"),
+  thReasonPh: loc("Una razón, en una frase", "One reason, in one sentence"),
+  thAddReason: loc("Añadir razón", "Add reason"),
+  thToastSaved: loc("Tesis guardada", "Thesis saved"),
+  thYes: loc("Sí", "Yes"),
+  thNo: loc("No", "No"),
+  thRequiresPartner: loc("exige socio", "requires a partner"),
+  thRequiresLicenceTag: loc("exige licencia", "requires a licence"),
+
+  // Modo trabajo — el tablero de supuestos
+  abEyebrow: loc("Qué sostiene la tesis", "What holds the thesis up"),
+  abStatusBlocked: loc("Bloqueada", "Blocked"),
+  abStatusAtRisk: loc("En riesgo", "At risk"),
+  abStatusClear: loc("Sin veto en contra", "No veto against it"),
+  abStatusNotStated: loc("Sin enunciar", "Not stated"),
+  abNoThesis: loc(
+    "Escriba la tesis en la pestaña del caso y aquí aparecerá de qué depende.",
+    "Write the thesis in the case tab and what it depends on will appear here."
+  ),
+  abCritical: loc("Supuestos que pueden pararla", "Assumptions that can stop it"),
+  abShaping: loc("Supuestos que la moldean", "Assumptions that shape it"),
+  abBelief: loc("Creencia", "Belief"),
+  abConfidence: loc("Confianza", "Confidence"),
+  abEvidence: loc("Evidencia", "Evidence"),
+  abEvidencePh: loc("Fuente, dato o entrevista", "Source, figure or interview"),
+  abFalsifier: loc("Qué lo falsaría", "What would falsify it"),
+  abFalsifierPh: loc(
+    "El hecho concreto que lo desmentiría",
+    "The concrete fact that would disprove it"
+  ),
+  abFalsifierMissing: loc(
+    "Sin esto, el supuesto no está contestado: es una apuesta.",
+    "Without this, the assumption is not answered: it is a bet."
+  ),
+  abOwner: loc("Lo mira", "Checked by"),
+  abNoOwner: loc("Nadie en esta cadena lo mira", "Nobody in this chain checks it"),
+  abGovernanceGap: loc("Hueco de gobierno", "Governance gap"),
+  abGovernanceGapHelp: loc(
+    "Un supuesto que puede matar la tesis y que ningún aprobador de esta cadena mira. No es un fallo del modelo: es un hueco de la casa.",
+    "An assumption that can kill the thesis and that no approver in this chain looks at. It is not a flaw in the model: it is a gap in the house."
+  ),
+  abChain: loc("La cadena de aprobación", "The approval chain"),
+  abChainHelp: loc(
+    "Los vetos corren primero, al revés que en el organigrama.",
+    "The vetoes run first, the opposite of the org chart."
+  ),
+  abOutOfScope: loc("Declarado fuera de alcance", "Declared out of scope"),
+  abBlindSpots: loc(
+    "Lo que el marco señala y la tesis no menciona",
+    "What the framework flags and the thesis does not mention"
+  ),
+  abKillPairs: loc("Qué la tumba, y quién", "What stops it, and who"),
+  abCollapse: loc("Plegar el tablero", "Collapse the board"),
+  abExpand: loc("Desplegar el tablero", "Expand the board"),
+  abGoToCase: loc("Ir a la tesis", "Go to the thesis"),
+  abClear: loc("Despejado", "Clear"),
+  abAtRisk: loc("En riesgo", "At risk"),
+  abFails: loc("Falla", "Fails"),
+  abNotTested: loc("Sin probar", "Not tested"),
+
   // Idioma
   language: loc("Idioma", "Language"),
 } as const;
