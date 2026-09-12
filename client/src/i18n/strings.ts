@@ -1323,6 +1323,20 @@ export const UI_STRINGS = {
   ),
   clFindings: loc("Lo que hay que explicar", "What needs explaining"),
 
+  // Memo de decisión
+  dmTitle: loc("Memo de decisión", "Decision memo"),
+  dmDesc: loc(
+    "La página que se lee diez minutos antes del comité: la tesis, lo que la mata, y lo que todavía no se sabe. No lleva puntuaciones ni recomendación de la herramienta; la firma la pone una persona.",
+    "The page read ten minutes before the committee: the thesis, what kills it, and what is not yet known. No scores and no recommendation from the tool; a person signs it."
+  ),
+  dmDownload: loc("Descargar en PDF", "Download as PDF"),
+  dmDownloaded: loc("Memo generado.", "Memo generated."),
+  dmFailed: loc("No se pudo crear el memo.", "The memo could not be created."),
+  dmNoThesis: loc(
+    "Enuncie la tesis en la pestaña del caso para poder generar el memo.",
+    "State the thesis in the case tab so the memo can be generated."
+  ),
+
   language: loc("Idioma", "Language"),
 } as const;
 

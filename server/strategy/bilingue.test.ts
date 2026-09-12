@@ -23,6 +23,7 @@ import * as approvalChain from "@shared/domain/approvalChain";
 import * as industries from "@shared/domain/industries";
 import * as revenueStack from "@shared/domain/revenueStack";
 import * as competitiveLandscape from "@shared/domain/competitiveLandscape";
+import * as decisionMemo from "@shared/domain/decisionMemo";
 import * as assumptionMap from "@shared/domain/assumptionMap";
 import { UI_STRINGS } from "../../client/src/i18n/strings";
 import { STACK_TEMPLATES } from "@shared/domain/industries";
@@ -50,6 +51,7 @@ const MODULES: Record<string, Record<string, unknown>> = {
   industries: industries,
   revenueStack: revenueStack,
   competitiveLandscape: competitiveLandscape,
+  decisionMemo: decisionMemo,
   assumptionMap: assumptionMap,
 };
 
