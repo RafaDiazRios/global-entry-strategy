@@ -26,12 +26,14 @@ type Props = {
   /** Contexto del mandato, que se pasa al copiloto para acotar la extracción. */
   decisionContext: string;
   defaults: { companyName: string; homeCountry: string; industry: string };
+  /** Nombre que ya tiene el escenario, para no hacer inventar un título distinto al mismo trabajo. */
+  suggestedTitle?: string;
   /** Documento sobre el que trabaja el copiloto, compartido con la pestaña de calibración. */
   activeDocumentId: number | null;
   onActiveDocumentChange: (documentId: number | null) => void;
 };
 
-export function CaseWorkspace({ caseId, onCaseSelected, decisionContext, defaults, activeDocumentId, onActiveDocumentChange }: Props) {
+export function CaseWorkspace({ caseId, onCaseSelected, decisionContext, defaults, suggestedTitle, activeDocumentId, onActiveDocumentChange }: Props) {
   const { lang, t, ui } = useLanguage();
   const [title, setTitle] = useState("");
   const [pastedText, setPastedText] = useState("");
@@ -175,7 +177,10 @@ export function CaseWorkspace({ caseId, onCaseSelected, decisionContext, default
           <div className="flex flex-wrap items-end gap-3">
             <div className="min-w-[240px] flex-1 space-y-2">
               <Label htmlFor="case-title">{ui("cwNewCase")}</Label>
-              <Input id="case-title" value={title} onChange={(event) => setTitle(event.target.value)} placeholder={ui("cwTitlePlaceholder")} />
+              <Input id="case-title" value={title} onChange={(event) => setTitle(event.target.value)} placeholder={(suggestedTitle ?? "").trim() || ui("cwTitlePlaceholder")} />
+              {!title.trim() && (suggestedTitle ?? "").trim() && (
+                <button type="button" className="identity-source" onClick={() => setTitle(suggestedTitle!.trim())}>{ui("cwUseScenarioName")}: «{suggestedTitle!.trim()}»</button>
+              )}
             </div>
             <Button onClick={handleCreateCase} disabled={createCase.isPending}>
               {createCase.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null} {ui("cwCreateCase")}

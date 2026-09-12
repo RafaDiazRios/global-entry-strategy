@@ -1377,6 +1377,21 @@ export const UI_STRINGS = {
   ),
   prepGoToRoute: loc("Empezar el análisis", "Start the analysis"),
 
+  // Una sola fuente por dato
+  idFrom: loc("Viene de", "Comes from"),
+  idFromThesis: loc("la tesis", "the thesis"),
+  idChangeThere: loc("Cambiarlo allí", "Change it there"),
+  idDivergence: loc("No coincide con la tesis", "It does not match the thesis"),
+  idUseThesis: loc("Usar el de la tesis", "Use the thesis value"),
+  idPrefilled: loc(
+    "Rellenado desde la tesis. Puede cambiarlo, y si lo cambia la herramienta se lo dirá en lugar de elegir por usted.",
+    "Filled in from the thesis. You can change it, and if you do the tool will say so rather than choosing for you."
+  ),
+  idCountryMissing: loc("Añadir país", "Add country"),
+  idConsistency: loc("Consistencia con la tesis", "Consistency with the thesis"),
+  thUseFromBrief: loc("Usar lo que dice el mandato", "Use what the mandate says"),
+  cwUseScenarioName: loc("Usar el nombre del escenario", "Use the scenario name"),
+
   language: loc("Idioma", "Language"),
 } as const;
 

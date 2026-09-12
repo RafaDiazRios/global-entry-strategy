@@ -23,7 +23,17 @@ import { industry, type IndustryId } from "@shared/domain/industries";
 const select =
   "h-9 w-full rounded-md border border-input bg-background px-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring";
 
-export function ThesisPanel({ caseId }: { caseId: number }) {
+/**
+ * Lo que el mandato ya dice, por si se empezó por ahí.
+ *
+ * La tesis es la dueña de estos datos, así que no se rellenan solos desde el mandato: eso
+ * invertiría la propiedad y dejaría de estar claro quién manda. Lo que sí se hace es
+ * ofrecerlos, para que quien trabajó primero la fase 1 no tenga que teclear lo mismo otra
+ * vez. Un clic, y la tesis sigue siendo quien lo dice.
+ */
+export type ThesisSuggestions = { company?: string; countryCode?: string };
+
+export function ThesisPanel({ caseId, suggestions }: { caseId: number; suggestions?: ThesisSuggestions }) {
   const { t, ui } = useLanguage();
   const utils = trpc.useUtils();
   const reference = trpc.globalStrategy.reference.useQuery();
@@ -73,6 +83,11 @@ export function ThesisPanel({ caseId }: { caseId: number }) {
           <div>
             <Label>{ui("thCompany")}</Label>
             <Input value={draft.company ?? ""} onChange={(event) => update({ company: event.target.value || null })} />
+            {!(draft.company ?? "").trim() && (suggestions?.company ?? "").trim() && (
+              <button type="button" className="identity-source" onClick={() => update({ company: suggestions!.company! })}>
+                {ui("thUseFromBrief")}: «{suggestions!.company}»
+              </button>
+            )}
           </div>
           <div>
             <Label>{ui("thIndustry")}</Label>

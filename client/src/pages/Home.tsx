@@ -6,6 +6,9 @@ import { CompetitorMapPanel, type ComputedLandscape } from "@/components/Competi
 import { DecisionMemoSection } from "@/components/DecisionMemoPanel";
 import { PreparationPanel } from "@/components/PreparationPanel";
 import { sanitisePreparation } from "@shared/domain/preparation";
+import { IdentityNotice } from "@/components/IdentityNotice";
+import { identityDivergences, identityPrefill } from "@shared/domain/caseIdentity";
+import { industry as industryById } from "@shared/domain/industries";
 import type { CompetitiveLandscape } from "@shared/domain/competitiveLandscape";
 import type { RevenueStack } from "@shared/domain/revenueStack";
 import { Badge } from "@/components/ui/badge";
@@ -275,6 +278,19 @@ export default function Home() {
   });
   const preparation = sanitisePreparation(routeProgress.data);
 
+  /**
+   * Una sola fuente por dato. La tesis es la dueña de la empresa, la industria y el país
+   * porque vive en el caso, y de un caso pueden colgar varios escenarios.
+   */
+  const thesisQuery = trpc.globalStrategy.getThesis.useQuery({ caseId: caseId ?? 0 }, { enabled: caseId !== null });
+  const caseQuery = trpc.case.get.useQuery({ caseId: caseId ?? 0 }, { enabled: caseId !== null });
+  const identitySource = {
+    company: thesisQuery.data?.thesis.company ?? null,
+    industryLabel: thesisQuery.data?.thesis.industryId ? pick(industryById(thesisQuery.data.thesis.industryId).label, lang) : null,
+    countryCode: thesisQuery.data?.thesis.countryCode ?? null,
+    caseTitle: caseQuery.data?.title ?? null,
+  };
+
   function togglePreparation(itemId: string, next: boolean) {
     if (caseId === null) return;
     const current = routeProgress.data ?? { confirmed: [], skipped: [], gathered: [] };
@@ -283,6 +299,27 @@ export default function Home() {
       : preparation.gathered.filter((entry) => entry !== itemId);
     saveRouteProgress.mutate({ caseId, payload: { confirmed: current.confirmed, skipped: current.skipped, gathered } });
   }
+
+  const identityLocal = {
+    company: companyName,
+    industry,
+    scenarioName,
+    candidateCodes: candidates.map((candidate) => candidate.code),
+  };
+  const divergences = identityDivergences(identitySource, identityLocal);
+
+  /**
+   * Rellenar un hueco es seguro y se hace solo; cambiar un valor escrito no lo es y no se
+   * hace nunca. Si los dos existen y no coinciden, el aviso lo dice y alinearlos es un clic,
+   * pero el clic lo da una persona.
+   */
+  useEffect(() => {
+    const fill = identityPrefill(identitySource, identityLocal);
+    if (fill.company !== undefined) setCompanyName(fill.company);
+    if (fill.industry !== undefined) setIndustry(fill.industry);
+    if (fill.scenarioName !== undefined) setScenarioName(fill.scenarioName);
+    // Solo se mira cuando cambia el dueño: así escribir en el campo no vuelve a dispararlo.
+  }, [identitySource.company, identitySource.industryLabel, identitySource.caseTitle]);
 
   const selectedObjective = objectiveOptions.find((option) => option.value === objective)!;
   const formValid = companyName.trim() && homeCountry.trim() && industry.trim() && businessModel.trim() && screenedCandidates.length > 0;
@@ -863,12 +900,12 @@ export default function Home() {
             />
           </TabsContent>
 
-          <TabsContent value="case" className="mt-6 space-y-6">{caseId !== null && <ThesisPanel caseId={caseId} />}<CaseWorkspace caseId={caseId} onCaseSelected={changeCase} decisionContext={[companyName, industry, valueProposition].filter(Boolean).join(" · ")} defaults={{ companyName, homeCountry, industry }} activeDocumentId={caseDocumentId} onActiveDocumentChange={setCaseDocumentId} /></TabsContent>
+          <TabsContent value="case" className="mt-6 space-y-6">{caseId !== null && <ThesisPanel caseId={caseId} suggestions={{ company: companyName, countryCode: candidates[0]?.code }} />}<CaseWorkspace suggestedTitle={scenarioName} caseId={caseId} onCaseSelected={changeCase} decisionContext={[companyName, industry, valueProposition].filter(Boolean).join(" · ")} defaults={{ companyName, homeCountry, industry }} activeDocumentId={caseDocumentId} onActiveDocumentChange={setCaseDocumentId} /></TabsContent>
           <TabsContent value="ambition" className="mt-6"><GlobalStrategyPanel caseId={caseId} subTab={strategySubTab} onSubTabChange={setStrategySubTab} /></TabsContent>
               <TabsContent value="brief" className="tab-enter">
             <div className="grid gap-6 xl:grid-cols-[1.45fr_.8fr]">
               <Card className="strategic-card"><CardHeader><div className="step-tag">{ui("hmPart2Ch5")}</div><CardTitle>{ui("hmBriefTitle")}</CardTitle><CardDescription>{ui("hmBriefDesc")}</CardDescription></CardHeader><CardContent className="space-y-6">
-                <div className="grid gap-5 md:grid-cols-2"><Field label={ui("hmCompany")} required><Input value={companyName} onChange={(event) => setCompanyName(event.target.value)} placeholder={ui("hmCompanyPh")} /></Field><Field label={ui("hmHomeCountry")} required><Input value={homeCountry} onChange={(event) => setHomeCountry(event.target.value)} placeholder={ui("hmHomeCountryPh")} /></Field><Field label={ui("hmIndustry")} required><Input value={industry} onChange={(event) => setIndustry(event.target.value)} placeholder={ui("hmIndustryPh")} /></Field><Field label={ui("hmBusinessModel")} required><Input value={businessModel} onChange={(event) => setBusinessModel(event.target.value)} placeholder={ui("hmBusinessModelPh")} /></Field></div>
+                <div className="grid gap-5 md:grid-cols-2"><Field label={ui("hmCompany")} required><Input value={companyName} onChange={(event) => setCompanyName(event.target.value)} placeholder={ui("hmCompanyPh")} />{caseId !== null && <IdentityNotice field="company" divergences={divergences} onGoToOwner={() => setActiveTab("case")} onAdopt={setCompanyName} />}</Field><Field label={ui("hmHomeCountry")} required><Input value={homeCountry} onChange={(event) => setHomeCountry(event.target.value)} placeholder={ui("hmHomeCountryPh")} /></Field><Field label={ui("hmIndustry")} required><Input value={industry} onChange={(event) => setIndustry(event.target.value)} placeholder={ui("hmIndustryPh")} />{caseId !== null && <IdentityNotice field="industry" divergences={divergences} onGoToOwner={() => setActiveTab("case")} onAdopt={setIndustry} />}</Field><Field label={ui("hmBusinessModel")} required><Input value={businessModel} onChange={(event) => setBusinessModel(event.target.value)} placeholder={ui("hmBusinessModelPh")} /></Field></div>
                 <Field label={ui("hmValueProp")}><Textarea value={valueProposition} onChange={(event) => setValueProposition(event.target.value)} placeholder={ui("hmValuePropPh")} className="min-h-28" /></Field>
                 <div className="grid gap-5 md:grid-cols-[1fr_160px]"><Field label={ui("hmObjective")} required><Select value={objective} onValueChange={(value) => setObjective(value as Objective)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{objectiveOptions.map((option) => <SelectItem value={option.value} key={option.value}>{t(option.label)}</SelectItem>)}</SelectContent></Select></Field><Field label={ui("hmHorizon")} required><Input type="number" min="1" max="25" value={horizonYears} onChange={(event) => setHorizonYears(event.target.value)} /></Field></div>
               </CardContent></Card>
@@ -879,6 +916,7 @@ export default function Home() {
           <TabsContent value="screen" className="tab-enter">
             <div className="grid gap-6 xl:grid-cols-[1.1fr_.9fr]">
               <Card className="strategic-card"><CardHeader><div className="step-tag">{ui("hmPart2Ch6")}</div><CardTitle>{ui("hmUniverseTitle")}</CardTitle><CardDescription>{ui("hmUniverseDesc")}</CardDescription></CardHeader><CardContent className="space-y-6">
+                {caseId !== null && <IdentityNotice field="country" divergences={divergences} onGoToOwner={() => setActiveTab("case")} />}
                 <div className="flex gap-3"><Select value={selectedCode} onValueChange={setSelectedCode}><SelectTrigger className="flex-1"><SelectValue placeholder={ui("hmPickCountry")} /></SelectTrigger><SelectContent>{COUNTRY_REGIONS.map(({ id: region, label }) => <div key={region}><div className="select-label">{t(label)}</div>{catalog.filter((item) => item[2] === region).map(([code, name]) => <SelectItem key={code} value={code}>{t(name)}</SelectItem>)}</div>)}</SelectContent></Select><Button onClick={addCandidate} disabled={!selectedCode}><Plus className="mr-2 h-4 w-4" /> {ui("hmAdd")}</Button></div>
                 <div className="candidate-grid">{candidates.length ? candidates.map((candidate) => <button key={candidate.code} className={`candidate-chip ${activeCountry === candidate.code ? "active" : ""} ${!screenedCandidates.some((item) => item.code === candidate.code) ? "excluded" : ""}`} onClick={() => { setActiveCountry(candidate.code); setActiveTab("calibrate"); }}><span className="country-code">{candidate.code}</span><span><strong>{t(candidate.name)}</strong><small>{t(regionLabel(candidate.region))}</small></span><span role="button" aria-label={`Eliminar ${candidate.name}`} onClick={(event) => { event.stopPropagation(); removeCandidate(candidate.code); }}><X className="h-4 w-4" /></span></button>) : <EmptyState icon={MapPinned} title={ui("hmNoCandidates")} text={ui("hmNoCandidatesDesc")} />}</div>
                 <div className="divider" />

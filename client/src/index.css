@@ -594,3 +594,11 @@ button:active:not(:disabled) { transform: scale(.98); }
 .prep-percountry { border-color: #cfe0d5; background: #eef6f1; color: #2f6b4c; }
 .prep-body small { display: block; margin-top: 3px; font-size: 11px; line-height: 1.45; color: #6d8478; }
 .prep-body .prep-needed { color: #8a9d92; }
+
+/* Una sola fuente por dato --------------------------------------------------------- */
+.identity-source { display: inline-flex; align-items: center; gap: 4px; margin-top: 4px; padding: 0; border: 0; background: none; font-size: 11px; color: #7b9086; cursor: pointer; }
+.identity-source:hover { color: #2f6b4c; text-decoration: underline; text-underline-offset: 2px; }
+.identity-divergence { margin-top: 6px; padding: 9px 11px; border-radius: 8px; background: #fdf4ef; color: #8a5322; }
+.identity-divergence-head { display: flex; align-items: center; gap: 6px; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; }
+.identity-divergence p { margin: 5px 0 0; font-size: 12px; line-height: 1.5; }
+.identity-divergence-actions { margin-top: 7px; display: flex; flex-wrap: wrap; gap: 6px; }
