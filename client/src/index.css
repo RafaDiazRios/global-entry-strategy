@@ -571,3 +571,26 @@ button:active:not(:disabled) { transform: scale(.98); }
 .route-bring-what { font-size: 13px; color: #28382f; }
 .route-origin { margin-left: 7px; font-size: 10px; font-weight: 600; vertical-align: middle; }
 .route-bring small { display: block; margin-top: 2px; font-size: 11px; line-height: 1.45; color: #6d8478; }
+
+/* Preparación ---------------------------------------------------------------------- */
+.prep-summary { margin-top: 16px; display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
+.prep-summary > div { padding: 10px 12px; border: 1px solid #e2ebe6; border-radius: 8px; background: #fafcfb; }
+.prep-summary span { display: block; font-size: 11px; color: #64796e; }
+.prep-summary strong { display: block; margin-top: 3px; font-size: 17px; font-weight: 600; color: #1d4735; }
+.prep-summary em { font-style: normal; font-size: 12px; font-weight: 500; color: #64796e; }
+.prep-group-title { font-family: ui-serif, Georgia, serif; font-size: 17px; font-weight: 500; color: #1d4735; margin: 0; }
+.prep-list { margin: 14px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px; }
+.prep-list li { display: flex; gap: 10px; padding: 10px 11px; border: 1px solid #e6eeea; border-radius: 8px; }
+.prep-list li.is-done { background: #f5faf7; border-color: #d3e5da; }
+.prep-list li.is-done .prep-what > span { color: #5d7a6b; text-decoration: line-through; }
+.prep-check { flex-shrink: 0; margin-top: 1px; background: none; border: 0; padding: 0; cursor: pointer; color: #9db3a7; }
+.prep-check:hover:not(:disabled) { color: #2f6b4c; }
+.prep-check:disabled { cursor: not-allowed; opacity: .5; }
+.prep-list li.is-done .prep-check { color: #2f8a5c; }
+.prep-body { min-width: 0; }
+.prep-what { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; }
+.prep-what > span { font-size: 13px; line-height: 1.45; color: #26382f; }
+.prep-origin, .prep-percountry { font-size: 10px; font-weight: 600; }
+.prep-percountry { border-color: #cfe0d5; background: #eef6f1; color: #2f6b4c; }
+.prep-body small { display: block; margin-top: 3px; font-size: 11px; line-height: 1.45; color: #6d8478; }
+.prep-body .prep-needed { color: #8a9d92; }

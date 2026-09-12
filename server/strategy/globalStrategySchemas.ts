@@ -189,14 +189,21 @@ const stepId = z.enum([
   "value_chain", "countries", "assessment", "entry", "partnering", "economics",
 ]);
 
+/**
+ * La preparación viaja con el progreso de la ruta y no en un módulo propio: es la misma
+ * pregunta —por dónde va este caso— leída antes de empezar en lugar de durante. El campo es
+ * opcional para que los casos guardados antes de que existiera sigan abriéndose.
+ */
 export const routeProgressSchema = z.object({
   confirmed: z.array(stepId).max(12),
   skipped: z.array(stepId).max(12),
+  gathered: z.array(z.string().max(60)).max(60).optional(),
 });
 
 export function parseRouteProgress(payload: unknown) {
   const parsed = routeProgressSchema.safeParse(payload);
-  return parsed.success ? parsed.data : { confirmed: [], skipped: [] };
+  const value = parsed.success ? parsed.data : { confirmed: [], skipped: [], gathered: [] };
+  return { ...value, gathered: value.gathered ?? [] };
 }
 
 /* ------------------------------------------------------------------------------------ */

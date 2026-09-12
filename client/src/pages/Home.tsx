@@ -4,6 +4,8 @@ import OnboardingGuide from "@/components/OnboardingGuide";
 import { RevenueStackPanel, type ComputedPlausibility, type ComputedStack } from "@/components/RevenueStackPanel";
 import { CompetitorMapPanel, type ComputedLandscape } from "@/components/CompetitorMapPanel";
 import { DecisionMemoSection } from "@/components/DecisionMemoPanel";
+import { PreparationPanel } from "@/components/PreparationPanel";
+import { sanitisePreparation } from "@shared/domain/preparation";
 import type { CompetitiveLandscape } from "@shared/domain/competitiveLandscape";
 import type { RevenueStack } from "@shared/domain/revenueStack";
 import { Badge } from "@/components/ui/badge";
@@ -18,7 +20,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
-import { AlertTriangle, ArrowDownToLine, ArrowUpRight, BarChart3, Building2, ChartNoAxesCombined, CheckCircle2, ChevronRight, CircleAlert, CircleDollarSign, ClipboardCheck, Columns3, Compass, Database, FileCheck2, FileDown, FileText, Globe2, Loader2, MapPinned, Pencil, Plus, RefreshCw, RotateCcw, Save, ShieldCheck, SlidersHorizontal, Sparkles, Target, Trash2, X } from "lucide-react";
+import { AlertTriangle, ArrowDownToLine, ArrowUpRight, BarChart3, Building2, ChartNoAxesCombined, CheckCircle2, ChevronRight, CircleAlert, CircleDollarSign, ClipboardCheck, Columns3, Compass, Database, FileCheck2, FileDown, FileText, Globe2, ListChecks, Loader2, MapPinned, Pencil, Plus, RefreshCw, RotateCcw, Save, ShieldCheck, SlidersHorizontal, Sparkles, Target, Trash2, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { countryCatalog } from "@shared/domain/countries";
@@ -187,7 +189,7 @@ function decisionStyle(action: CountryResult["investmentRecommendation"]["action
 export default function Home() {
   const { isAuthenticated } = useAuth();
   const { t, lang, ui } = useLanguage();
-  const [activeTab, setActiveTab] = useState("brief");
+  const [activeTab, setActiveTab] = useState("prep");
   const [caseId, setCaseId] = useState<number | null>(null);
   const [caseDocumentId, setCaseDocumentId] = useState<number | null>(null);
   const [strategySubTab, setStrategySubTab] = useState<"ambition" | "positioning" | "entry" | "partnering" | "coherence">("ambition");
@@ -262,6 +264,25 @@ export default function Home() {
     if (Number(growthMin) > -100 && (data.gdpGrowth ?? -100) < Number(growthMin)) return false;
     return true;
   }), [candidates, marketData, excluded, popMin, gdpMin, growthMin]);
+
+  /**
+   * La preparación se guarda con el progreso de la ruta: es la misma pregunta —por dónde va
+   * este caso— leída antes de empezar en lugar de durante.
+   */
+  const routeProgress = trpc.globalStrategy.getRouteProgress.useQuery({ caseId: caseId ?? 0 }, { enabled: caseId !== null });
+  const saveRouteProgress = trpc.globalStrategy.saveRouteProgress.useMutation({
+    onSuccess: () => trpcUtils.globalStrategy.getRouteProgress.invalidate({ caseId: caseId ?? 0 }),
+  });
+  const preparation = sanitisePreparation(routeProgress.data);
+
+  function togglePreparation(itemId: string, next: boolean) {
+    if (caseId === null) return;
+    const current = routeProgress.data ?? { confirmed: [], skipped: [], gathered: [] };
+    const gathered = next
+      ? Array.from(new Set([...preparation.gathered, itemId]))
+      : preparation.gathered.filter((entry) => entry !== itemId);
+    saveRouteProgress.mutate({ caseId, payload: { confirmed: current.confirmed, skipped: current.skipped, gathered } });
+  }
 
   const selectedObjective = objectiveOptions.find((option) => option.value === objective)!;
   const formValid = companyName.trim() && homeCountry.trim() && industry.trim() && businessModel.trim() && screenedCandidates.length > 0;
@@ -820,6 +841,7 @@ export default function Home() {
           />
 
           <TabsList className="studio-tabs">
+            <TabsTrigger value="prep"><ListChecks className="mr-2 h-4 w-4" /> {ui("tabPrep")}</TabsTrigger>
             <TabsTrigger value="case"><FileText className="mr-2 h-4 w-4" /> {ui("tabCase")}</TabsTrigger>
             <TabsTrigger value="brief"><Building2 className="mr-2 h-4 w-4" /> {ui("tabBrief")}</TabsTrigger>
             <TabsTrigger value="ambition"><Compass className="mr-2 h-4 w-4" /> {ui("tabStrategy")}</TabsTrigger>
@@ -830,6 +852,16 @@ export default function Home() {
             <TabsTrigger value="decision"><Target className="mr-2 h-4 w-4" /> {ui("tabDecision")}</TabsTrigger>
             <TabsTrigger value="approval"><ClipboardCheck className="mr-2 h-4 w-4" /> {ui("tabGates")}</TabsTrigger>
           </TabsList>
+
+          <TabsContent value="prep" className="mt-6">
+            <PreparationPanel
+              gathered={preparation.gathered}
+              canEdit={caseId !== null}
+              candidateCount={candidates.length}
+              onToggle={togglePreparation}
+              onStart={() => setActiveTab(caseId === null ? "case" : "brief")}
+            />
+          </TabsContent>
 
           <TabsContent value="case" className="mt-6 space-y-6">{caseId !== null && <ThesisPanel caseId={caseId} />}<CaseWorkspace caseId={caseId} onCaseSelected={changeCase} decisionContext={[companyName, industry, valueProposition].filter(Boolean).join(" · ")} defaults={{ companyName, homeCountry, industry }} activeDocumentId={caseDocumentId} onActiveDocumentChange={setCaseDocumentId} /></TabsContent>
           <TabsContent value="ambition" className="mt-6"><GlobalStrategyPanel caseId={caseId} subTab={strategySubTab} onSubTabChange={setStrategySubTab} /></TabsContent>

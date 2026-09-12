@@ -1349,6 +1349,34 @@ export const UI_STRINGS = {
     "Nothing is blocked: you can work out of order. What you should not do is work out of order without knowing it."
   ),
 
+  // Preparación
+  tabPrep: loc("Preparación", "Preparation"),
+  prepEyebrow: loc("antes de empezar", "before you start"),
+  prepTitle: loc("Reúna esto primero y no se atascará a mitad", "Gather this first and you will not stall halfway"),
+  prepIntro: loc(
+    "Un análisis de entrada se atasca casi siempre por el mismo sitio, y no es el análisis: es descubrir en la fase 5 que hacen falta las ventas por región, pedirlas, y perder una semana. Esta lista es lo que la ruta pide en sus doce pasos, agrupado por de quién habla el dato en lugar de por cuándo hace falta.",
+    "An entry analysis almost always stalls at the same place, and it is not the analysis: it is discovering in phase 5 that sales by region are needed, asking for them, and losing a week. This list is what the route asks for across its twelve steps, grouped by who the data is about rather than by when it is needed."
+  ),
+  prepGathered: loc("reunido", "gathered"),
+  prepOf: loc("de", "of"),
+  prepPendingPublic: loc("se descargan solos", "download on their own"),
+  prepPendingFieldwork: loc("hay que ir a pedirlos", "have to be asked for"),
+  prepPerCountry: loc("por cada país", "per country"),
+  prepPerCountryTag: loc("Por país", "Per country"),
+  prepNeededBy: loc("Lo piden", "Needed by"),
+  prepStepsCount: loc("pasos", "steps"),
+  prepStepCount: loc("paso", "step"),
+  prepMarkGathered: loc("Marcar como reunido", "Mark as gathered"),
+  prepSignIn: loc(
+    "Cree o seleccione un caso para poder ir marcando lo que ya tiene.",
+    "Create or select a case to start ticking off what you already have."
+  ),
+  prepCalendarNote: loc(
+    "Lo que se descarga solo no marca el calendario. Lo marca lo que hay que ir a pedir, y sobre todo lo que hay que preguntar una vez por cada país.",
+    "What downloads on its own does not set the calendar. What sets it is what has to be asked for, and above all what has to be asked once per country."
+  ),
+  prepGoToRoute: loc("Empezar el análisis", "Start the analysis"),
+
   language: loc("Idioma", "Language"),
 } as const;
 
