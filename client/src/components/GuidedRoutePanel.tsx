@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { trpc } from "@/lib/trpc";
-import { evaluateRoute, emptyConfirmations, type RouteSnapshot, type StepId, type StepState } from "@shared/domain/guidedRoute";
+import { DATA_ORIGINS, evaluateRoute, emptyConfirmations, type RouteSnapshot, type StepId, type StepState } from "@shared/domain/guidedRoute";
 import { useLanguage } from "@/i18n";
 
 /**
@@ -170,6 +170,65 @@ export function GuidedRoutePanel({ caseId, scenario, onGo }: Props) {
                     )}
                   </div>
                 </div>
+
+                {/* Las dependencias van después de «qué falta» porque la mitad de las veces
+                    lo que falta no está en este paso sino en uno anterior. */}
+                {(current.blockedBy.length > 0 || current.restsOn.length > 0) && (
+                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                    {current.blockedBy.length > 0 && (
+                      <div className="route-blocked">
+                        <div className="text-xs font-semibold uppercase">{ui("routeBlockedBy")}</div>
+                        <ul className="mt-1 space-y-1 text-sm">
+                          {current.blockedBy.map((entry) => (
+                            <li key={entry.step.id} className="flex flex-wrap items-baseline gap-1">
+                              <span>{t(entry.what)}</span>
+                              <button type="button" className="route-jump" onClick={() => onGo(entry.step.target, entry.step.subTab)}>
+                                {ui("routeGoToStepShort")} {entry.step.order} · {t(entry.step.title)}
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                        <p className="mt-2 text-xs opacity-80">{ui("routeDependencyNote")}</p>
+                      </div>
+                    )}
+                    {current.restsOn.length > 0 && (
+                      <div>
+                        <div className="text-xs font-semibold uppercase text-muted-foreground">{ui("routeRestsOn")}</div>
+                        <ul className="mt-1 space-y-1 text-sm text-muted-foreground">
+                          {current.restsOn.map((entry) => (
+                            <li key={entry.step.id} className="flex gap-2">
+                              <Check className="mt-1 h-3 w-3 shrink-0" />
+                              {t(entry.what)}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div className="mt-3">
+                  <div className="text-xs font-semibold uppercase text-muted-foreground">{ui("routeBring")}</div>
+                  <ul className="route-bring">
+                    {current.step.bring.map((data, index) => {
+                      const origin = DATA_ORIGINS.find((entry) => entry.id === data.origin);
+                      return (
+                        <li key={index}>
+                          <span className="route-bring-what">{t(data.what)}</span>
+                          {origin && <Badge variant="outline" className="route-origin" title={t(origin.help)}>{t(origin.label)}</Badge>}
+                          <small>{t(data.where)}</small>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+
+                {current.unlocks.length > 0 && (
+                  <p className="mt-3 text-xs text-muted-foreground">
+                    <strong className="text-foreground">{ui("routeUnlocks")}:</strong>{" "}
+                    {current.unlocks.map((entry) => t(entry.step.title)).join(" · ")}
+                  </p>
+                )}
 
                 <div className="mt-4 flex flex-wrap items-center gap-2">
                   <Button variant="outline" onClick={() => onGo(current.step.target, current.step.subTab)}>

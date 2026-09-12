@@ -10,6 +10,23 @@
  * (cap. 5) al atractivo de países (cap. 6), de ahí a la estrategia de entrada (cap. 7) y a
  * la vía de acceso (cap. 8), y termina en la economía de la decisión. Saltarse el orden se
  * puede —las pestañas siguen ahí— pero la ruta dice lo que se está saltando.
+ *
+ * Lo que faltaba, y se añade aquí, son las otras dos preguntas que hace cualquiera que abre
+ * la herramienta por primera vez: qué necesito tener antes de empezar este paso, y de dónde
+ * saco lo que me pide.
+ *
+ * La primera se resuelve con dependencias declaradas —este paso necesita esto de aquel— que
+ * la ruta comprueba contra el estado real del caso, no contra una lista fija. Decir «primero
+ * el mandato» es un manual; decir «le falta el TAM de Países Bajos, y está en la fase 5» es
+ * una herramienta.
+ *
+ * La segunda se resuelve diciendo de dónde sale cada dato, y eso importa más de lo que
+ * parece: un número que se descarga del Banco Mundial y otro que hay que ir a pedirle al
+ * director financiero no cuestan lo mismo ni valen lo mismo, y saber cuál es cuál antes de
+ * empezar es la diferencia entre planificar el trabajo y descubrirlo.
+ *
+ * Lo que un paso desbloquea no se declara: se deriva invirtiendo las dependencias. Dos
+ * listas que dicen lo mismo acaban divergiendo el día que alguien toca una.
  */
 
 import { loc, type Localized } from "../i18n";
@@ -31,6 +48,75 @@ export type StepId =
 /** Pestaña de la aplicación donde se trabaja el paso. */
 export type StepTarget = "case" | "brief" | "ambition" | "screen" | "calibrate" | "finance" | "compare" | "decision" | "approval";
 
+/**
+ * De dónde sale un dato. Determina cuánto cuesta conseguirlo y cuánto pesa como evidencia,
+ * que son las dos cosas que hay que saber antes de prometer una fecha.
+ */
+export type DataOrigin =
+  | "public_source"
+  | "case_material"
+  | "company"
+  | "group_decision"
+  | "field_research"
+  | "judgement";
+
+export const DATA_ORIGINS: { id: DataOrigin; label: Localized; help: Localized }[] = [
+  {
+    id: "public_source",
+    label: loc("Fuente pública", "Public source"),
+    help: loc(
+      "Se descarga solo. No hay que pedírselo a nadie y es verificable por cualquiera.",
+      "It downloads on its own. Nobody has to be asked, and anyone can verify it."
+    ),
+  },
+  {
+    id: "case_material",
+    label: loc("Material del caso", "Case material"),
+    help: loc(
+      "Está en los documentos que ha cargado. Sale con cita y localizador.",
+      "It is in the documents you loaded. It comes with a quote and a locator."
+    ),
+  },
+  {
+    id: "company",
+    label: loc("Datos de la empresa", "Company data"),
+    help: loc(
+      "Hay que pedirlo dentro de casa: cuentas, ventas por región, plantilla, activos.",
+      "It has to be asked for internally: accounts, sales by region, headcount, assets."
+    ),
+  },
+  {
+    id: "group_decision",
+    label: loc("Decisión ya tomada por el grupo", "A decision the group has already taken"),
+    help: loc(
+      "No es un juicio del analista: es una política que existe y que esta tesis respeta o contradice de forma explícita.",
+      "It is not the analyst's judgement: it is an existing policy that this thesis either respects or explicitly contradicts."
+    ),
+  },
+  {
+    id: "field_research",
+    label: loc("Investigación de campo", "Field research"),
+    help: loc(
+      "Entrevistas, visitas, asesor local, prueba comercial. Es lo que más tarda y lo que más pesa.",
+      "Interviews, visits, a local adviser, a commercial test. It takes the longest and it carries the most weight."
+    ),
+  },
+  {
+    id: "judgement",
+    label: loc("Juicio propio, con su razón escrita", "Your own judgement, with its reason written"),
+    help: loc(
+      "Legítimo y necesario, siempre que quede registrado de qué depende. Sin la razón escrita no es evidencia, es una corazonada.",
+      "Legitimate and necessary, as long as what it rests on is recorded. Without the written reason it is not evidence, it is a hunch."
+    ),
+  },
+];
+
+/** Lo que este paso necesita de otro anterior. */
+export type StepNeed = { from: StepId; what: Localized };
+
+/** Un dato que hay que traer, con su procedencia y dónde encontrarlo. */
+export type StepData = { what: Localized; origin: DataOrigin; where: Localized };
+
 export type GuidedStep = {
   id: StepId;
   order: number;
@@ -46,6 +132,10 @@ export type GuidedStep = {
   target: StepTarget;
   /** Sub-pestaña dentro del panel de estrategia global, cuando aplica. */
   subTab?: "ambition" | "positioning" | "entry" | "partnering";
+  /** De qué pasos depende, y de qué exactamente. Lo que desbloquea se deriva invirtiéndolo. */
+  needs: StepNeed[];
+  /** Qué hay que traer de fuera para poder contestarlo. */
+  bring: StepData[];
 };
 
 export const GUIDED_STEPS: GuidedStep[] = [
@@ -71,6 +161,10 @@ export const GUIDED_STEPS: GuidedStep[] = [
       loc("Se puede responder con «sí, así» o «no, por esto»", "It can be answered with \u201cyes, this way\u201d or \u201cno, because of this\u201d"),
     ],
     target: "case",
+    needs: [],
+    bring: [
+      { what: loc("La pregunta que alguien ha hecho y hay que contestar", "The question someone asked and that has to be answered"), origin: "group_decision", where: loc("El encargo: quién lo pide, qué espera y para cuándo.", "The brief: who is asking, what they expect and by when.") },
+    ],
   },
   {
     id: "material",
@@ -94,6 +188,10 @@ export const GUIDED_STEPS: GuidedStep[] = [
       loc("Un supuesto sin fuente se marca como supuesto, no se disfraza de dato", "An assumption without a source is marked as an assumption, not disguised as data"),
     ],
     target: "case",
+    needs: [{ from: "case", what: loc("un caso abierto donde colgar los documentos", "an open case to hang the documents on") }],
+    bring: [
+      { what: loc("El texto del caso, un informe sectorial o las notas de la investigación", "The case text, a sector report or the research notes"), origin: "case_material", where: loc("Pegar el texto es mejor que subir el PDF: permite comprobar que cada cita aparece de verdad en el original.", "Pasting the text beats uploading the PDF: it lets each quote be checked against the original.") },
+    ],
   },
   {
     id: "brief",
@@ -116,6 +214,12 @@ export const GUIDED_STEPS: GuidedStep[] = [
       loc("El horizonte es coherente con el objetivo: aprender lleva menos años que construir cuota", "The horizon matches the objective: learning takes fewer years than building share"),
     ],
     target: "brief",
+    needs: [{ from: "case", what: loc("la pregunta que hay que contestar", "the question that has to be answered") }],
+    bring: [
+      { what: loc("Empresa, país de origen, industria y modelo de negocio", "Company, home country, industry and business model"), origin: "company", where: loc("Lo sabe cualquiera de la casa; el modelo de negocio conviene acordarlo, no suponerlo.", "Anyone in the company knows it; the business model is worth agreeing rather than assuming.") },
+      { what: loc("La propuesta de valor y qué activo la hace defendible", "The value proposition and the asset that makes it defensible"), origin: "judgement", where: loc("Es un juicio, y el que más condiciona todo lo demás. Escríbalo aunque le parezca obvio.", "It is a judgement, and the one that shapes everything else. Write it down even if it seems obvious.") },
+      { what: loc("El horizonte y el objetivo de entrada", "The horizon and the entry objective"), origin: "group_decision", where: loc("Suele venir del plan estratégico: si no existe, decidirlo aquí y decir que se decidió aquí.", "It usually comes from the strategic plan: if there is none, decide it here and say that it was decided here.") },
+    ],
   },
   {
     id: "ambition_motives",
@@ -140,6 +244,10 @@ export const GUIDED_STEPS: GuidedStep[] = [
     ],
     target: "ambition",
     subTab: "ambition",
+    needs: [{ from: "brief", what: loc("la industria y el objetivo, que determinan qué motivos son plausibles", "the industry and the objective, which determine which motives are plausible") }],
+    bring: [
+      { what: loc("Por qué la compañía quiere salir fuera, en sus propias palabras", "Why the company wants to go abroad, in its own words"), origin: "group_decision", where: loc("Actas del comité, plan estratégico o la conversación con quien encarga el trabajo.", "Committee minutes, the strategic plan, or the conversation with whoever commissioned the work.") },
+    ],
   },
   {
     id: "ambition_indices",
@@ -164,6 +272,12 @@ export const GUIDED_STEPS: GuidedStep[] = [
     ],
     target: "ambition",
     subTab: "ambition",
+    needs: [{ from: "brief", what: loc("la industria, para poder comparar contra la demanda mundial del sector", "the industry, to compare against world demand in that sector") }],
+    bring: [
+      { what: loc("Ventas de la compañía por región", "Company sales by region"), origin: "company", where: loc("Control de gestión. Es el dato que más tarda en llegar: pídalo el primer día.", "Management accounting. It is the slowest figure to arrive: ask for it on day one.") },
+      { what: loc("Activos y personal por región", "Assets and people by region"), origin: "company", where: loc("Cuentas consolidadas y recursos humanos.", "Consolidated accounts and human resources.") },
+      { what: loc("Reparto de la demanda mundial de la industria por región", "How world demand for the industry splits by region"), origin: "public_source", where: loc("La tabla del libro sirve de referencia; una asociación sectorial da la cifra actual.", "The table in the book works as a reference; a trade association gives the current figure.") },
+    ],
   },
   {
     id: "positioning",
@@ -188,6 +302,10 @@ export const GUIDED_STEPS: GuidedStep[] = [
     ],
     target: "ambition",
     subTab: "positioning",
+    needs: [{ from: "brief", what: loc("la propuesta de valor, que es lo que la curva compara", "the value proposition, which is what the curve compares") }],
+    bring: [
+      { what: loc("Quiénes son los competidores relevantes y en qué se les compara", "Who the relevant competitors are and on what they are compared"), origin: "field_research", where: loc("Los atributos los eligen los clientes, no el catálogo. Si no ha hablado con ninguno, la curva es una hipótesis y conviene decirlo.", "Customers choose the attributes, not the catalogue. If you have spoken to none, the curve is a hypothesis and should be labelled as one.") },
+    ],
   },
   {
     id: "value_chain",
@@ -212,6 +330,10 @@ export const GUIDED_STEPS: GuidedStep[] = [
     ],
     target: "ambition",
     subTab: "positioning",
+    needs: [{ from: "positioning", what: loc("la ventaja declarada, que decide qué funciones deben integrarse", "the declared advantage, which decides which functions must be integrated") }],
+    bring: [
+      { what: loc("Dónde se gestiona hoy cada función y dónde debería gestionarse", "Where each function is managed today and where it should be"), origin: "company", where: loc("Operaciones y los responsables de cada función. Es una conversación, no un dato.", "Operations and the function owners. It is a conversation, not a figure.") },
+    ],
   },
   {
     id: "countries",
@@ -234,6 +356,14 @@ export const GUIDED_STEPS: GuidedStep[] = [
       loc("Los indicadores públicos se han descargado y los huecos están declarados", "Public indicators have been fetched and the gaps are declared"),
     ],
     target: "screen",
+    needs: [
+      { from: "ambition_motives", what: loc("el rol que debe jugar la geografía, que acota el universo", "the role geography should play, which bounds the universe") },
+      { from: "ambition_indices", what: loc("la brecha entre el rol declarado y el que miden los índices, que dice en qué regiones hay que moverse", "the gap between the declared role and the one the indices measure, which says which regions to move in") },
+    ],
+    bring: [
+      { what: loc("La lista de países que merece la pena mirar", "The list of countries worth looking at"), origin: "judgement", where: loc("El catálogo descarga solo el PIB, la IED, el impuesto y el tipo de cambio; lo que no descarga es la razón por la que ese país está en la lista.", "The catalogue downloads GDP, FDI, tax and exchange rate on its own; what it does not download is the reason that country is on the list.") },
+      { what: loc("Los umbrales de preselección y las exclusiones", "The screening thresholds and the exclusions"), origin: "group_decision", where: loc("Un país excluido por política del grupo se excluye aquí y queda escrito, en lugar de desaparecer sin motivo.", "A country excluded by group policy is excluded here and written down, instead of vanishing without a reason.") },
+    ],
   },
   {
     id: "assessment",
@@ -257,6 +387,14 @@ export const GUIDED_STEPS: GuidedStep[] = [
       loc("La confianza que muestra la herramienta refleja la evidencia real, no el número de deslizadores movidos", "The confidence shown reflects real evidence, not how many sliders were moved"),
     ],
     target: "calibrate",
+    needs: [
+      { from: "countries", what: loc("al menos un país que pase el filtro", "at least one country past the screen") },
+      { from: "material", what: loc("evidencia aceptada con la que sostener las puntuaciones", "accepted evidence to support the scores") },
+    ],
+    bring: [
+      { what: loc("Lo que el material del caso dice de cada bloque", "What the case material says about each block"), origin: "case_material", where: loc("El copiloto extrae afirmaciones con su cita; lo que no traiga cita no llega hasta aquí.", "The copilot extracts claims with their quote; anything without a quote does not reach this point.") },
+      { what: loc("Lo que no está en ningún documento: competencia local, canal, trato del regulador", "What is in no document: local competition, channel, how the regulator behaves"), origin: "field_research", where: loc("Asesor local, distribuidor, alguien que ya opere allí. Es donde se gana o se pierde el análisis.", "A local adviser, a distributor, somebody already operating there. This is where the analysis is won or lost.") },
+    ],
   },
   {
     id: "entry",
@@ -281,6 +419,14 @@ export const GUIDED_STEPS: GuidedStep[] = [
     ],
     target: "ambition",
     subTab: "entry",
+    needs: [
+      { from: "assessment", what: loc("el atractivo y el riesgo del país, que condicionan el modo", "the attractiveness and risk of the country, which condition the mode") },
+      { from: "value_chain", what: loc("qué capacidades se transfieren, se adaptan o se crean", "which capabilities are transferred, adapted or created") },
+    ],
+    bring: [
+      { what: loc("En qué fase del ciclo está el mercado y quién ha entrado ya", "What stage of the cycle the market is in and who has already entered"), origin: "field_research", where: loc("Prensa sectorial, registros mercantiles y quien esté sobre el terreno.", "Trade press, company registries and whoever is on the ground.") },
+      { what: loc("Qué exige el regulador para operar", "What the regulator requires in order to operate"), origin: "public_source", where: loc("El supervisor del país publica los requisitos; en sector regulado esto poda los modos antes de empezar.", "The country's supervisor publishes the requirements; in a regulated sector this prunes the modes before anything starts.") },
+    ],
   },
   {
     id: "partnering",
@@ -305,6 +451,14 @@ export const GUIDED_STEPS: GuidedStep[] = [
     ],
     target: "ambition",
     subTab: "partnering",
+    needs: [
+      { from: "entry", what: loc("el modo elegido: si no exige socio, este paso no aplica", "the chosen mode: if it needs no partner, this step does not apply") },
+      { from: "value_chain", what: loc("qué capacidad falta, que es lo que se va a construir, alquilar o comprar", "which capability is missing, which is what gets built, borrowed or bought") },
+    ],
+    bring: [
+      { what: loc("Quién podría ser el socio y qué se sabe de cómo se comporta", "Who the partner might be and what is known about how they behave"), origin: "field_research", where: loc("Referencias de terceros que hayan trabajado con ellos. Una alianza cae por el encaje más débil, no por la media.", "References from third parties who have worked with them. An alliance fails on the weakest fit, not on the average.") },
+      { what: loc("Qué prima se está dispuesto a pagar por mantener abierta la opción", "What premium you are willing to pay to keep the option open"), origin: "group_decision", where: loc("Es una decisión de la casa sobre cuánto vale esperar, no un cálculo.", "It is a decision by the company about what waiting is worth, not a calculation.") },
+    ],
   },
   {
     id: "economics",
@@ -328,6 +482,17 @@ export const GUIDED_STEPS: GuidedStep[] = [
       loc("La alternativa preferida tiene una puerta de decisión con responsable y fecha", "The preferred alternative has a decision gate with an owner and a date"),
     ],
     target: "finance",
+    needs: [
+      { from: "assessment", what: loc("los países evaluados, que son los que entran en la comparación", "the assessed countries, which are the ones that enter the comparison") },
+      { from: "entry", what: loc("el modo preferido, que decide qué alternativa se modela primero", "the preferred mode, which decides which alternative is modelled first") },
+      { from: "partnering", what: loc("la vía de acceso elegida —construir, alquilar o comprar—, que cambia la inversión que carga la alternativa", "the chosen access route \u2014build, borrow or buy\u2014 which changes the investment the alternative carries") },
+    ],
+    bring: [
+      { what: loc("Tamaño del mercado y cuota alcanzable, o los drivers del negocio si usa la cuenta por líneas", "Market size and reachable share, or the business drivers if you use the P&L by line"), origin: "field_research", where: loc("Asociación sectorial, informe de mercado o el propio caso. Es el número que más se discute y el que peor se documenta.", "A trade association, a market report or the case itself. It is the most argued-over figure and the worst documented.") },
+      { what: loc("Inversión inicial y coste operativo por alternativa", "Initial investment and operating cost by alternative"), origin: "company", where: loc("Ingeniería, operaciones y quien haya montado algo parecido en otro país.", "Engineering, operations and whoever has built something similar in another country.") },
+      { what: loc("Tasa de descuento y umbral de retorno", "Discount rate and return threshold"), origin: "group_decision", where: loc("Finanzas corporativas los tiene fijados. Usar otros obliga a explicar por qué.", "Corporate finance has them set. Using different ones means explaining why.") },
+      { what: loc("Impuesto corporativo y tipo de cambio", "Corporate tax and exchange rate"), origin: "public_source", where: loc("Se descargan al actualizar el mercado, y siguen siendo editables.", "They download when the market is refreshed, and they stay editable.") },
+    ],
   },
 ];
 
@@ -386,6 +551,16 @@ export type StepState = {
   missing: Localized[];
   /** Progreso 0-1 cuando el paso lo tiene medido. */
   progress: number | null;
+  /**
+   * Dependencias que todavía no están satisfechas, comprobadas contra el estado real del
+   * caso. No bloquean: se puede trabajar fuera de orden, y a veces hay que hacerlo. Lo que
+   * no se puede es hacerlo sin enterarse.
+   */
+  blockedBy: { step: GuidedStep; what: Localized }[];
+  /** Dependencias satisfechas, para poder decir sobre qué se apoya este paso. */
+  restsOn: { step: GuidedStep; what: Localized }[];
+  /** Qué pasos posteriores esperan algo de este. Se deriva invirtiendo las dependencias. */
+  unlocks: { step: GuidedStep; what: Localized }[];
 };
 
 export type RouteState = {
@@ -487,8 +662,33 @@ export function evaluateRoute(snapshot: RouteSnapshot): RouteState {
     const confirmed = snapshot.confirmations.confirmed.includes(step.id);
     const skipped = snapshot.confirmations.skipped.includes(step.id);
     const status: StepStatus = confirmed ? "done" : skipped ? "skipped" : "pending";
-    return { step, status, gateMet: done, missing, progress };
+    return { step, status, gateMet: done, missing, progress, blockedBy: [], restsOn: [], unlocks: [] };
   });
+
+  /**
+   * Las dependencias se resuelven en una segunda pasada porque un paso necesita saber si el
+   * anterior está hecho, y eso no se sabe hasta haberlos recorrido todos.
+   *
+   * Un paso saltado cuenta como no satisfecho. Saltarlo fue una decisión legítima, pero lo
+   * que dependía de él sigue dependiendo, y fingir lo contrario sería exactamente la clase
+   * de silencio que esta herramienta existe para evitar.
+   */
+  const byId = new Map(states.map((state) => [state.step.id, state]));
+  const satisfied = (stepId: StepId) => {
+    const state = byId.get(stepId);
+    return Boolean(state && (state.status === "done" || state.gateMet));
+  };
+
+  for (const state of states) {
+    for (const need of state.step.needs) {
+      const source = byId.get(need.from);
+      if (!source) continue;
+      const entry = { step: source.step, what: need.what };
+      if (satisfied(need.from)) state.restsOn.push(entry);
+      else state.blockedBy.push(entry);
+      source.unlocks.push({ step: state.step, what: need.what });
+    }
+  }
 
   // El paso actual es el primero que nadie ha resuelto: ni confirmado ni saltado. No se
   // bloquea nada, se puede trabajar fuera de orden, y la ruta refleja lo que queda.

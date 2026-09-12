@@ -1337,6 +1337,18 @@ export const UI_STRINGS = {
     "State the thesis in the case tab so the memo can be generated."
   ),
 
+  // Dependencias y datos de cada paso
+  routeBlockedBy: loc("Le falta esto de antes", "Missing from earlier steps"),
+  routeRestsOn: loc("Se apoya en", "It rests on"),
+  routeUnlocks: loc("Desbloquea", "It unlocks"),
+  routeUnlocksNone: loc("Es el último paso: no desbloquea nada más.", "It is the last step: it unlocks nothing further."),
+  routeBring: loc("Qué hay que traer, y de dónde", "What to bring, and from where"),
+  routeGoToStepShort: loc("Ir", "Go"),
+  routeDependencyNote: loc(
+    "Nada está bloqueado: se puede trabajar fuera de orden. Lo que no conviene es hacerlo sin saberlo.",
+    "Nothing is blocked: you can work out of order. What you should not do is work out of order without knowing it."
+  ),
+
   language: loc("Idioma", "Language"),
 } as const;
 
